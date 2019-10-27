@@ -2,33 +2,23 @@ package utils
 
 import (
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestEvery_shouldCallMethodAtIntervalUntilStop(t *testing.T) {
+	wg := sync.WaitGroup{}
 	duration := 1 * time.Millisecond
 	counter := 0
 	f := func() {
 		counter++
+		wg.Done()
 	}
 
+	wg.Add(3)
 	quit := Every(duration, f)
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait()
 	close(quit)
-	assert.Greater(t, counter, 30) // check greater than 30 because running 100 times in 100 milliseconds is a bit too much
-}
-
-func TestEvery_shouldNotCallAfterQuitChannelWasClosed(t *testing.T) {
-	duration := 1 * time.Millisecond
-	counter := 0
-	f := func() {
-		counter++
-	}
-
-	quit := Every(duration, f)
-	close(quit)
-	counterAfterStop := counter
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, counter, counterAfterStop) // check greater than 30 because running 100 times in 100 milliseconds is a bit too much
+	assert.GreaterOrEqual(t, counter, 3) // check greater than 30 because running 100 times in 100 milliseconds is a bit too much
 }
