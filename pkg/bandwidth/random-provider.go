@@ -1,9 +1,6 @@
 package bandwidth
 
-import (
-	"crypto/rand"
-	"math/big"
-)
+import "github.com/anthonyraymond/joal-cli/pkg/randutils"
 
 type IRandomSpeedProvider interface {
 	GetBytesPerSeconds() int64
@@ -19,11 +16,5 @@ func (r *RandomSpeedProvider) GetBytesPerSeconds() int64 {
 	return r.value
 }
 func (r *RandomSpeedProvider) Refresh() {
-	upperBound := big.NewInt(0).Sub(big.NewInt(r.maximumBytesPerSeconds), big.NewInt(r.minimumBytesPerSeconds))
-	n, err := rand.Int(rand.Reader, upperBound)
-	if err != nil {
-		r.value = 0
-		return
-	}
-	r.value = n.Int64() + r.minimumBytesPerSeconds
+	r.value = randutils.Range(r.minimumBytesPerSeconds, r.maximumBytesPerSeconds)
 }
