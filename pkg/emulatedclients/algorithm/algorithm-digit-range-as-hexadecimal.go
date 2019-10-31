@@ -35,8 +35,14 @@ func (a *NumRangeAsHexadecimalAlgorithm) AfterPropertiesSet() error {
 	if a.Max == nil {
 		return errors.New("property 'max' is required in NumRangeAsHexadecimalAlgorithm")
 	}
-	if a.Min == a.Max {
+	if *a.Min > *a.Max {
 		return errors.New("'max' must be greater or equal to 'min' in NumRangeAsHexadecimalAlgorithm")
+	}
+	if a.MaxLength == nil {
+		return errors.New("property 'MaxLength' cannot be nil in NumRangeAsHexadecimalAlgorithm ")
+	}
+	if *a.MaxLength < 1 {
+		return errors.New("property 'MaxLength' must be greater than 1 in NumRangeAsHexadecimalAlgorithm ")
 	}
 
 	return nil
