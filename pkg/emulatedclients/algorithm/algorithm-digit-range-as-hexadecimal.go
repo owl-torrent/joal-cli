@@ -25,6 +25,9 @@ func (a *NumRangeAsHexadecimalAlgorithm) Generate() string {
 	if a.TrimLeadingZeroes {
 		hex = strings.TrimLeft(hex, "0")
 	}
+	if len(hex) == 0 { // if there was only zeroes and they all got trimmed: returns zero
+		hex = "0"
+	}
 	return a.Case.ApplyCase(hex)
 }
 
