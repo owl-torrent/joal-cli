@@ -25,10 +25,3 @@ func Range(minInclusive int64, maxInclusive int64) int64 {
 	// at this point the min inclusive is assured to be less than 0
 	return globalRand.Int63n(-minInclusive+maxInclusive) + minInclusive
 }
-
-func abs(v int64) int64 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
