@@ -11,9 +11,9 @@ import (
 type Case int
 
 const (
-	Lower Case = iota
+	None Case = iota
 	Upper
-	None
+	Lower
 )
 
 func (c Case) String() string {
@@ -31,15 +31,15 @@ func (c Case) ApplyCase(str string) string {
 }
 
 var toString = map[Case]string{
+	None:  "none",
 	Lower: "lower",
 	Upper: "upper",
-	None:  "none",
 }
 
 var toID = map[string]Case{
+	"none":  None,
 	"lower": Lower,
 	"upper": Upper,
-	"none":  None,
 }
 
 // MarshalJSON marshals the enum as a quoted json string
