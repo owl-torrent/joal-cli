@@ -18,13 +18,13 @@ pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
 	}
 	_ = algorithm.AfterPropertiesSet()
 	assert.IsType(t, &RegexPatternAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, *algorithm.Impl.(*RegexPatternAlgorithm).Pattern, `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`)
+	assert.Equal(t, algorithm.Impl.(*RegexPatternAlgorithm).Pattern, `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`)
 }
 
 func TestGenerateRegexAlgorithm(t *testing.T) {
 	pattern := `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`
 	alg := &RegexPatternAlgorithm{
-		Pattern: &pattern,
+		Pattern: pattern,
 	}
 	_ = alg.AfterPropertiesSet()
 
@@ -36,7 +36,7 @@ func TestGenerateRegexAlgorithm(t *testing.T) {
 func TestGenerateRegexAlgorithmShouldBeRandom(t *testing.T) {
 	pattern := `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`
 	alg := &RegexPatternAlgorithm{
-		Pattern: &pattern,
+		Pattern: pattern,
 	}
 	_ = alg.AfterPropertiesSet()
 

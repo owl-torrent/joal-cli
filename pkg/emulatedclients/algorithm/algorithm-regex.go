@@ -6,7 +6,7 @@ import (
 )
 
 type RegexPatternAlgorithm struct {
-	Pattern   *string           `yaml:"pattern"`
+	Pattern   string            `yaml:"pattern"`
 	generator *reggen.Generator `yaml:"-"`
 }
 
@@ -15,10 +15,10 @@ func (r *RegexPatternAlgorithm) Generate() string {
 }
 
 func (r *RegexPatternAlgorithm) AfterPropertiesSet() error {
-	if r.Pattern == nil {
-		return errors.New("RegexPatternAlgorithm can not have a nil pattern")
+	if len(r.Pattern) == 0 {
+		return errors.New("RegexPatternAlgorithm can not have a empty pattern")
 	}
-	generator, err := reggen.NewGenerator(*r.Pattern)
+	generator, err := reggen.NewGenerator(r.Pattern)
 	if err != nil {
 		return errors.Wrap(err, "Bad regex pattern for algorithm generator RegexPatternAlgorithm")
 	}
