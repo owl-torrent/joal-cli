@@ -9,7 +9,8 @@ import (
 )
 
 var generatorImplementations = map[string]func() IGenerator{
-	"NEVER_REFRESH": func() IGenerator { return &NeverRefreshGenerator{} },
+	"NEVER_REFRESH":  func() IGenerator { return &NeverRefreshGenerator{} },
+	"ALWAYS_REFRESH": func() IGenerator { return &AlwaysRefreshGenerator{} },
 }
 
 type IGenerator interface {
