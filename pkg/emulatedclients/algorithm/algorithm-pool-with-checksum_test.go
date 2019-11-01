@@ -20,9 +20,9 @@ length: 20
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	assert.IsType(t, &PoolWithChecksumAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, *algorithm.Impl.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
-	assert.Equal(t, *algorithm.Impl.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
-	assert.Equal(t, *algorithm.Impl.(*PoolWithChecksumAlgorithm).Length, 20)
+	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
+	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
+	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).Length, 20)
 }
 
 func TestGeneratePoolWithChecksumAlgorithm(t *testing.T) {
@@ -30,9 +30,9 @@ func TestGeneratePoolWithChecksumAlgorithm(t *testing.T) {
 	characterPool := `0123456789abcdefghijklmnopqrstuvwxyz`
 	length := 20
 	alg := &PoolWithChecksumAlgorithm{
-		Prefix:         &prefix,
-		CharactersPool: &characterPool,
-		Length:         &length,
+		Prefix:         prefix,
+		CharactersPool: characterPool,
+		Length:         length,
 	}
 	_ = alg.AfterPropertiesSet()
 
@@ -59,9 +59,9 @@ func TestGeneratePoolWithChecksumAlgorithmShouldBeRandom(t *testing.T) {
 	characterPool := `0123456789abcdefghijklmnopqrstuvwxyz`
 	length := 20
 	alg := &PoolWithChecksumAlgorithm{
-		Prefix:         &prefix,
-		CharactersPool: &characterPool,
-		Length:         &length,
+		Prefix:         prefix,
+		CharactersPool: characterPool,
+		Length:         length,
 	}
 	_ = alg.AfterPropertiesSet()
 
