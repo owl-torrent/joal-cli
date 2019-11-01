@@ -52,9 +52,10 @@ func TestGenerate_TimedRefresh_ShouldRegenerateWhenTimerExpires(t *testing.T) {
 	_ = generator.AfterPropertiesSet()
 
 	dumbAlg := &DumbAlgorithm{}
-	generator.Get(dumbAlg, metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), tracker.None)
-	time.Sleep(20 * time.Millisecond)
-	generator.Get(dumbAlg, metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"), tracker.None)
+	infoHash := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+	generator.Get(dumbAlg, infoHash, tracker.None)
+	generator.nextGeneration = time.Now().Add(-1 * time.Second)
+	generator.Get(dumbAlg, infoHash, tracker.None)
 
 	assert.Greater(t, dumbAlg.counter, 1, "Should have been called more than once")
 }
