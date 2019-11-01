@@ -11,6 +11,7 @@ import (
 var generatorImplementations = map[string]func() IGenerator{
 	"NEVER_REFRESH":  func() IGenerator { return &NeverRefreshGenerator{} },
 	"ALWAYS_REFRESH": func() IGenerator { return &AlwaysRefreshGenerator{} },
+	"TIMED_REFRESH":  func() IGenerator { return &TimedRefreshGenerator{} },
 }
 
 type IGenerator interface {
