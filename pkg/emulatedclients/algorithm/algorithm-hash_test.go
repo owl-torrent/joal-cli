@@ -2,8 +2,28 @@ package algorithm
 
 import (
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 	"testing"
 )
+
+func TestUnmarshalHashAlgorithm(t *testing.T) {
+	yamlString := `---
+type: HASH
+trimLeadingZeroes: true
+maxLength: 8
+case: lower
+`
+	algorithm := &algorithm{}
+	err := yaml.Unmarshal([]byte(yamlString), algorithm)
+	if err != nil {
+		t.Fatalf("Failed to unmarshall: %+v", err)
+	}
+	_ = algorithm.AfterPropertiesSet()
+	assert.IsType(t, &HashAlgorithm{}, algorithm.Impl)
+	assert.True(t, algorithm.Impl.(*HashAlgorithm).TrimLeadingZeroes)
+	assert.Equal(t, 8, algorithm.Impl.(*HashAlgorithm).MaxLength)
+	assert.Equal(t, Lower, algorithm.Impl.(*HashAlgorithm).Case)
+}
 
 func TestHashAlgorithm_GenerateShouldGenerateHashes(t *testing.T) {
 	algorithm := &HashAlgorithm{

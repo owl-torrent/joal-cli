@@ -6,6 +6,7 @@ import (
 )
 
 var algorithmImplementations = map[string]func() IAlgorithm{
+	"HASH":                             func() IAlgorithm { return &HashAlgorithm{} },
 	"REGEX":                            func() IAlgorithm { return &RegexPatternAlgorithm{} },
 	"CHAR_POOL_WITH_CHECKSUM":          func() IAlgorithm { return &PoolWithChecksumAlgorithm{} },
 	"NUM_RANGE_ENCODED_AS_HEXADECIMAL": func() IAlgorithm { return &NumRangeAsHexadecimalAlgorithm{} },
