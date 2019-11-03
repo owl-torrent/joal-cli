@@ -8,35 +8,36 @@ import (
 	"github.com/pkg/errors"
 )
 
-var generatorImplementations = map[string]func() IGenerator{
-	"NEVER_REFRESH":  func() IGenerator { return &NeverRefreshGenerator{} },
-	"ALWAYS_REFRESH": func() IGenerator { return &AlwaysRefreshGenerator{} },
-	"TIMED_REFRESH":  func() IGenerator { return &TimedRefreshGenerator{} },
-	"TIMED_OR_AFTER_STARTED_ANNOUNCE_REFRESH": func() IGenerator { return &TimedOrAfterStartedAnnounceRefreshGenerator{} },
-	"TORRENT_PERSISTENT_REFRESH":              func() IGenerator { return &TorrentPersistentGenerator{} },
-	"TORRENT_VOLATILE_REFRESH":                func() IGenerator { return &TorrentVolatileGenerator{} },
+var generatorImplementations = map[string]func() iGenerator{
+	"NEVER_REFRESH":  func() iGenerator { return &NeverRefreshGenerator{} },
+	"ALWAYS_REFRESH": func() iGenerator { return &AlwaysRefreshGenerator{} },
+	"TIMED_REFRESH":  func() iGenerator { return &TimedRefreshGenerator{} },
+	"TIMED_OR_AFTER_STARTED_ANNOUNCE_REFRESH": func() iGenerator { return &TimedOrAfterStartedAnnounceRefreshGenerator{} },
+	"TORRENT_PERSISTENT_REFRESH":              func() iGenerator { return &TorrentPersistentGenerator{} },
+	"TORRENT_VOLATILE_REFRESH":                func() iGenerator { return &TorrentVolatileGenerator{} },
 }
 
-type IGenerator interface {
+type iGenerator interface {
 	Get(algorithm algorithm.IAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) string
 	AfterPropertiesSet() error
 }
-type generator struct {
-	Impl      IGenerator           `yaml:",inline"`
+type Generator struct {
+	impl      iGenerator           `yaml:",inline"`
 	Algorithm algorithm.IAlgorithm `yaml:"algorithm"`
 }
 
-func (a *generator) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	generatorType := &struct {
-		Name string `yaml:"type"`
+func (a *Generator) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	unmarshalStruct := &struct {
+		Name      string               `yaml:"type"`
+		Algorithm *algorithm.Algorithm `yaml:"algorithm"`
 	}{}
-	err := unmarshal(&generatorType)
+	err := unmarshal(&unmarshalStruct)
 	if err != nil {
 		return err
 	}
 
 	// if the generator is known create new empty instance of it
-	implFactory, exist := generatorImplementations[generatorType.Name]
+	implFactory, exist := generatorImplementations[unmarshalStruct.Name]
 	if !exist {
 		allTypes := make([]string, len(generatorImplementations))
 		i := 0
@@ -44,7 +45,7 @@ func (a *generator) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			allTypes[i] = key
 			i++
 		}
-		return errors.New(fmt.Sprintf("generator type '%s' does not exists. Possible values are: %v", generatorType.Name, allTypes))
+		return errors.New(fmt.Sprintf("generator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes))
 	}
 
 	generator := implFactory()
@@ -52,15 +53,16 @@ func (a *generator) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	a.Impl = generator
+	a.impl = generator
+	a.Algorithm = unmarshalStruct.Algorithm
 	return nil
 }
 
-func (a *generator) Get(infoHash torrent.InfoHash, event tracker.AnnounceEvent) string {
-	return a.Impl.Get(a.Algorithm, infoHash, event)
+func (a *Generator) Get(infoHash torrent.InfoHash, event tracker.AnnounceEvent) string {
+	return a.impl.Get(a.Algorithm, infoHash, event)
 }
 
-func (a *generator) AfterPropertiesSet() error {
+func (a *Generator) AfterPropertiesSet() error {
 	if a.Algorithm == nil {
 		return errors.New("NeverRefreshGenerator can not have a nil algorithm")
 	}
@@ -68,5 +70,5 @@ func (a *generator) AfterPropertiesSet() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to validate generator algorithm")
 	}
-	return a.Impl.AfterPropertiesSet()
+	return a.impl.AfterPropertiesSet()
 }

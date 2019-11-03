@@ -17,11 +17,11 @@ type IAlgorithm interface {
 	AfterPropertiesSet() error
 }
 
-type algorithm struct {
-	Impl IAlgorithm `yaml:",inline"`
+type Algorithm struct {
+	impl IAlgorithm `yaml:",inline"`
 }
 
-func (a *algorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *Algorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	algorithmType := &struct {
 		Name string `yaml:"type"`
 	}{}
@@ -47,14 +47,14 @@ func (a *algorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	a.Impl = algorithm
+	a.impl = algorithm
 	return nil
 }
 
-func (a *algorithm) Generate() string {
-	return a.Impl.Generate()
+func (a *Algorithm) Generate() string {
+	return a.impl.Generate()
 }
 
-func (a *algorithm) AfterPropertiesSet() error {
-	return a.Impl.AfterPropertiesSet()
+func (a *Algorithm) AfterPropertiesSet() error {
+	return a.impl.AfterPropertiesSet()
 }

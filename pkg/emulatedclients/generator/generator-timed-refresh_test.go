@@ -18,14 +18,14 @@ algorithm:
   type: REGEX
   pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
 `
-	generator := &generator{}
+	generator := &Generator{}
 	err := yaml.Unmarshal([]byte(yamlString), generator)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = generator.AfterPropertiesSet()
-	assert.IsType(t, &TimedRefreshGenerator{}, generator.Impl)
-	assert.Equal(t, 1*time.Millisecond, generator.Impl.(*TimedRefreshGenerator).RefreshEvery)
+	assert.IsType(t, &TimedRefreshGenerator{}, generator.impl)
+	assert.Equal(t, 1*time.Millisecond, generator.impl.(*TimedRefreshGenerator).RefreshEvery)
 }
 
 func TestGenerate_TimedRefresh_ShouldNotGenerateUntilTimerExpires(t *testing.T) {

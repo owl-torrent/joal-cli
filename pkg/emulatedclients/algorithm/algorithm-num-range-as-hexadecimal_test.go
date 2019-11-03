@@ -15,18 +15,18 @@ trimLeadingZeroes: true
 maxLength: 8
 case: lower
 `
-	algorithm := &algorithm{}
+	algorithm := &Algorithm{}
 	err := yaml.Unmarshal([]byte(yamlString), algorithm)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = algorithm.AfterPropertiesSet()
-	assert.IsType(t, &NumRangeAsHexadecimalAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, int64(1), algorithm.Impl.(*NumRangeAsHexadecimalAlgorithm).Min)
-	assert.Equal(t, int64(350), algorithm.Impl.(*NumRangeAsHexadecimalAlgorithm).Max)
-	assert.True(t, algorithm.Impl.(*NumRangeAsHexadecimalAlgorithm).TrimLeadingZeroes)
-	assert.Equal(t, 8, algorithm.Impl.(*NumRangeAsHexadecimalAlgorithm).MaxLength)
-	assert.Equal(t, Lower, algorithm.Impl.(*NumRangeAsHexadecimalAlgorithm).Case)
+	assert.IsType(t, &NumRangeAsHexadecimalAlgorithm{}, algorithm.impl)
+	assert.Equal(t, int64(1), algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Min)
+	assert.Equal(t, int64(350), algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Max)
+	assert.True(t, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).TrimLeadingZeroes)
+	assert.Equal(t, 8, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).MaxLength)
+	assert.Equal(t, Lower, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Case)
 }
 
 func TestDigitRangeAsHexadecimalAlgorithm_Generate(t *testing.T) {

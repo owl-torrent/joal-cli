@@ -13,16 +13,16 @@ trimLeadingZeroes: true
 maxLength: 8
 case: lower
 `
-	algorithm := &algorithm{}
+	algorithm := &Algorithm{}
 	err := yaml.Unmarshal([]byte(yamlString), algorithm)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = algorithm.AfterPropertiesSet()
-	assert.IsType(t, &HashAlgorithm{}, algorithm.Impl)
-	assert.True(t, algorithm.Impl.(*HashAlgorithm).TrimLeadingZeroes)
-	assert.Equal(t, 8, algorithm.Impl.(*HashAlgorithm).MaxLength)
-	assert.Equal(t, Lower, algorithm.Impl.(*HashAlgorithm).Case)
+	assert.IsType(t, &HashAlgorithm{}, algorithm.impl)
+	assert.True(t, algorithm.impl.(*HashAlgorithm).TrimLeadingZeroes)
+	assert.Equal(t, 8, algorithm.impl.(*HashAlgorithm).MaxLength)
+	assert.Equal(t, Lower, algorithm.impl.(*HashAlgorithm).Case)
 }
 
 func TestHashAlgorithm_GenerateShouldGenerateHashes(t *testing.T) {

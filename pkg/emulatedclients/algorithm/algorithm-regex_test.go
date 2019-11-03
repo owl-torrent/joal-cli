@@ -11,14 +11,14 @@ func TestUnmarshalRegexAlgorithm(t *testing.T) {
 type: REGEX
 pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
 `
-	algorithm := &algorithm{}
+	algorithm := &Algorithm{}
 	err := yaml.Unmarshal([]byte(yamlString), algorithm)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = algorithm.AfterPropertiesSet()
-	assert.IsType(t, &RegexPatternAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, algorithm.Impl.(*RegexPatternAlgorithm).Pattern, `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`)
+	assert.IsType(t, &RegexPatternAlgorithm{}, algorithm.impl)
+	assert.Equal(t, algorithm.impl.(*RegexPatternAlgorithm).Pattern, `^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$`)
 }
 
 func TestGenerateRegexAlgorithm(t *testing.T) {

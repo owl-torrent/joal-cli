@@ -16,13 +16,13 @@ algorithm:
   type: REGEX
   pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
 `
-	generator := &generator{}
+	generator := &Generator{}
 	err := yaml.Unmarshal([]byte(yamlString), generator)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = generator.AfterPropertiesSet()
-	assert.IsType(t, &AlwaysRefreshGenerator{}, generator.Impl)
+	assert.IsType(t, &AlwaysRefreshGenerator{}, generator.impl)
 }
 
 func TestGenerateAlwaysRefresh(t *testing.T) {

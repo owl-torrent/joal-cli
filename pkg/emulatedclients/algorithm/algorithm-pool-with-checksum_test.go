@@ -14,15 +14,15 @@ prefix: -TR284Z-
 charactersPool: 0123456789abcdefghijklmnopqrstuvwxyz
 length: 20
 `
-	algorithm := &algorithm{}
+	algorithm := &Algorithm{}
 	err := yaml.Unmarshal([]byte(yamlString), algorithm)
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
-	assert.IsType(t, &PoolWithChecksumAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
-	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
-	assert.Equal(t, algorithm.Impl.(*PoolWithChecksumAlgorithm).Length, 20)
+	assert.IsType(t, &PoolWithChecksumAlgorithm{}, algorithm.impl)
+	assert.Equal(t, algorithm.impl.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
+	assert.Equal(t, algorithm.impl.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
+	assert.Equal(t, algorithm.impl.(*PoolWithChecksumAlgorithm).Length, 20)
 }
 
 func TestGeneratePoolWithChecksumAlgorithm(t *testing.T) {
