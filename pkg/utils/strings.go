@@ -13,6 +13,12 @@ func AccessAwareStringNew(str string) *AccessAwareString {
 		val:          str,
 	}
 }
+func AccessAwareStringNewSince(str string, lastAccessed time.Time) *AccessAwareString {
+	return &AccessAwareString{
+		lastAccessed: lastAccessed,
+		val:          str,
+	}
+}
 
 func (s *AccessAwareString) Get() string {
 	s.lastAccessed = time.Now()

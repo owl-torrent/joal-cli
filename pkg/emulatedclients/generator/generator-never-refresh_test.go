@@ -31,15 +31,13 @@ func TestGenerateNeverRefresh(t *testing.T) {
 	}
 	_ = generator.AfterPropertiesSet()
 
-	valueSet := make(map[string]bool, 1)
 	dumbAlg := &DumbAlgorithm{}
 	for i := 0; i < 500; i++ {
 		infoHash := metainfo.NewHashFromHex(fmt.Sprintf("%dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", i)[0:40])
-		valueSet[generator.Get(dumbAlg, infoHash, tracker.None)] = true
+		generator.Get(dumbAlg, infoHash, tracker.None)
 	}
 
 	assert.Equal(t, 1, dumbAlg.counter, "Should have been called once")
-	assert.Len(t, valueSet, 1) // has provider unique value
 }
 
 type DumbAlgorithm struct {
