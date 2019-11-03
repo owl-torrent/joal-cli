@@ -14,6 +14,7 @@ var generatorImplementations = map[string]func() IGenerator{
 	"TIMED_REFRESH":  func() IGenerator { return &TimedRefreshGenerator{} },
 	"TIMED_OR_AFTER_STARTED_ANNOUNCE_REFRESH": func() IGenerator { return &TimedOrAfterStartedAnnounceRefreshGenerator{} },
 	"TORRENT_PERSISTENT_REFRESH":              func() IGenerator { return &TorrentPersistentGenerator{} },
+	"TORRENT_VOLATILE_REFRESH":                func() IGenerator { return &TorrentVolatileGenerator{} },
 }
 
 type IGenerator interface {
