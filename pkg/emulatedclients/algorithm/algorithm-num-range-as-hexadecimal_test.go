@@ -1,6 +1,7 @@
 package algorithm
 
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"testing"
@@ -26,7 +27,7 @@ case: lower
 	assert.Equal(t, int64(350), algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Max)
 	assert.True(t, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).TrimLeadingZeroes)
 	assert.Equal(t, 8, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).MaxLength)
-	assert.Equal(t, Lower, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Case)
+	assert.Equal(t, casing.Lower, algorithm.impl.(*NumRangeAsHexadecimalAlgorithm).Case)
 }
 
 func TestDigitRangeAsHexadecimalAlgorithm_Generate(t *testing.T) {
@@ -35,7 +36,7 @@ func TestDigitRangeAsHexadecimalAlgorithm_Generate(t *testing.T) {
 		Max               int64
 		TrimLeadingZeroes bool
 		maxLength         int
-		Case              Case
+		Case              casing.Case
 	}
 	tests := []struct {
 		name   string
@@ -46,8 +47,8 @@ func TestDigitRangeAsHexadecimalAlgorithm_Generate(t *testing.T) {
 		{name: "shouldFormatWithoutLeadingZeroes", fields: fields{Min: 1, Max: 1, TrimLeadingZeroes: true, maxLength: 8}, want: "1"},
 		{name: "shouldFormatLargeNumbersAndTrimAccordingToLength", fields: fields{Min: 9223372036854775807, Max: 9223372036854775807, TrimLeadingZeroes: true, maxLength: 9}, want: "fffffffff"},
 		{name: "shouldFormatLargeNumbersAndTrimAccordingToLength2", fields: fields{Min: 9223372036854775807, Max: 9223372036854775807, TrimLeadingZeroes: false, maxLength: 9}, want: "fffffffff"},
-		{name: "shouldApplyCase", fields: fields{Min: 12, Max: 12, TrimLeadingZeroes: false, maxLength: 8, Case: Lower}, want: "0000000c"},
-		{name: "shouldApplyCase", fields: fields{Min: 12, Max: 12, TrimLeadingZeroes: false, maxLength: 8, Case: Upper}, want: "0000000C"},
+		{name: "shouldApplyCase", fields: fields{Min: 12, Max: 12, TrimLeadingZeroes: false, maxLength: 8, Case: casing.Lower}, want: "0000000c"},
+		{name: "shouldApplyCase", fields: fields{Min: 12, Max: 12, TrimLeadingZeroes: false, maxLength: 8, Case: casing.Upper}, want: "0000000C"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

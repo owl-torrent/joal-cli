@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"fmt"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/randutils"
 	"github.com/pkg/errors"
 	"strconv"
@@ -9,11 +10,11 @@ import (
 )
 
 type NumRangeAsHexadecimalAlgorithm struct {
-	Min               int64 `yaml:"min"`
-	Max               int64 `yaml:"max"`
-	TrimLeadingZeroes bool  `yaml:"trimLeadingZeroes"`
-	MaxLength         int   `yaml:"maxLength"`
-	Case              Case  `yaml:"case"`
+	Min               int64       `yaml:"min"`
+	Max               int64       `yaml:"max"`
+	TrimLeadingZeroes bool        `yaml:"trimLeadingZeroes"`
+	MaxLength         int         `yaml:"maxLength"`
+	Case              casing.Case `yaml:"case"`
 }
 
 func (a *NumRangeAsHexadecimalAlgorithm) Generate() string {

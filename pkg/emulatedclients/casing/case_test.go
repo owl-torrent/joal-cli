@@ -1,4 +1,4 @@
-package algorithm
+package casing
 
 import (
 	"github.com/stretchr/testify/assert"

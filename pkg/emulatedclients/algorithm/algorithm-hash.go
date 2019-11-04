@@ -1,15 +1,16 @@
 package algorithm
 
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/randutils"
 	"github.com/pkg/errors"
 	"strings"
 )
 
 type HashAlgorithm struct {
-	TrimLeadingZeroes bool `yaml:"trimLeadingZeroes"`
-	MaxLength         int  `yaml:"maxLength"`
-	Case              Case `yaml:"case"`
+	TrimLeadingZeroes bool        `yaml:"trimLeadingZeroes"`
+	MaxLength         int         `yaml:"maxLength"`
+	Case              casing.Case `yaml:"case"`
 }
 
 func (a *HashAlgorithm) Generate() string {

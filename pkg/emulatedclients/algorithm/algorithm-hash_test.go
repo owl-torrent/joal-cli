@@ -1,6 +1,7 @@
 package algorithm
 
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"testing"
@@ -22,14 +23,14 @@ case: lower
 	assert.IsType(t, &HashAlgorithm{}, algorithm.impl)
 	assert.True(t, algorithm.impl.(*HashAlgorithm).TrimLeadingZeroes)
 	assert.Equal(t, 8, algorithm.impl.(*HashAlgorithm).MaxLength)
-	assert.Equal(t, Lower, algorithm.impl.(*HashAlgorithm).Case)
+	assert.Equal(t, casing.Lower, algorithm.impl.(*HashAlgorithm).Case)
 }
 
 func TestHashAlgorithm_GenerateShouldGenerateHashes(t *testing.T) {
 	algorithm := &HashAlgorithm{
 		TrimLeadingZeroes: false,
 		MaxLength:         8,
-		Case:              None,
+		Case:              casing.None,
 	}
 
 	for i := 0; i < 30; i++ {
@@ -42,7 +43,7 @@ func TestHashAlgorithm_GenerateShouldRespectMaxLength(t *testing.T) {
 	algorithm := &HashAlgorithm{
 		TrimLeadingZeroes: false,
 		MaxLength:         9,
-		Case:              None,
+		Case:              casing.None,
 	}
 
 	assert.Len(t, algorithm.Generate(), 9)
@@ -52,11 +53,11 @@ func TestHashAlgorithm_GenerateShouldApplyCase(t *testing.T) {
 	assert.Regexp(t, "^[A-F0-9]{8}$", (&HashAlgorithm{
 		TrimLeadingZeroes: false,
 		MaxLength:         8,
-		Case:              Upper,
+		Case:              casing.Upper,
 	}).Generate())
 	assert.Regexp(t, "^[a-f0-9]{8}$", (&HashAlgorithm{
 		TrimLeadingZeroes: false,
 		MaxLength:         8,
-		Case:              Lower,
+		Case:              casing.Lower,
 	}).Generate())
 }
