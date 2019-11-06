@@ -59,21 +59,36 @@ func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T
 	assert.Equal(t, 3, announcer.udp.(*DumbUdpAnnouncer).counter)
 }
 
-func TestAnnouncer_ShouldTryNextUrlWhenFailsAndPromote(t *testing.T) {
+func TestAnnouncer_Announce_ShouldNotDemoteIfSucceed(t *testing.T) {
 	announcer := Announcer{
 		http: &DumbHttpAnnouncer{},
 		udp:  &DumbUdpAnnouncer{},
 	}
 
-	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "udp"}}
+	urls := []url.URL{{Scheme: "http"}, {Scheme: "udp"}}
 	_, _ = announcer.Announce(&urls, tracker.AnnounceRequest{})
 	assert.Equal(t, 1, announcer.http.(*DumbHttpAnnouncer).counter)
+	assert.Equal(t, "http", urls[0].Scheme)
+	assert.Equal(t, "udp", urls[1].Scheme)
+	assert.Equal(t, 0, announcer.udp.(*DumbUdpAnnouncer).counter)
+}
+
+func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFail(t *testing.T) {
+	announcer := Announcer{
+		http: &DumbHttpAnnouncer{},
+		udp:  &DumbUdpAnnouncer{},
+	}
+
+	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "http2", Path: "fail"}, {Scheme: "udp"}}
+	_, _ = announcer.Announce(&urls, tracker.AnnounceRequest{})
+	assert.Equal(t, 2, announcer.http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, "udp", urls[0].Scheme)
 	assert.Equal(t, "http", urls[1].Scheme)
+	assert.Equal(t, "http2", urls[2].Scheme)
 	assert.Equal(t, 1, announcer.udp.(*DumbUdpAnnouncer).counter)
 }
 
-func TestAnnouncer_ShouldTryNextUrlWhenFailsAndReturnErrorIfNoneWorks(t *testing.T) {
+func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFailAndReturnErrorIfNoneWorks(t *testing.T) {
 	announcer := Announcer{
 		http: &DumbHttpAnnouncer{},
 		udp:  &DumbUdpAnnouncer{},

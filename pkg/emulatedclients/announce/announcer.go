@@ -56,6 +56,8 @@ func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest tracker.An
 		announceErrors = append(announceErrors, err)
 	}
 
+	tries = len(*announceURLs)
+
 	err = errors.New(fmt.Sprintf("failed to announce on every announce url: %+v", announceErrors))
 	return
 }
