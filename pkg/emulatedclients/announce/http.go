@@ -6,5 +6,5 @@ import (
 )
 
 type IHttpAnnouncer interface {
-	Announce(url url.URL, iAnnounceAble IAnnounceAble) (*tracker.AnnounceResponse, error)
+	Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
 }

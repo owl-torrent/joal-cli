@@ -9,61 +9,55 @@ import (
 )
 
 type Announcer struct {
-	Numwant       int            `yaml:"numwant"`
-	NumwantOnStop int            `yaml:"numwantOnStop"`
-	http          IHttpAnnouncer `yaml:"http"`
-	udp           IUdpAnnouncer  `yaml:"udp"`
-}
-
-type IAnnounceAble interface {
-	Downloaded() int64
-	Uploaded() int64
-	Left() int64
+	http IHttpAnnouncer `yaml:"http"`
+	udp  IUdpAnnouncer  `yaml:"udp"`
 }
 
 type AnnounceUrlList = []url.URL
 
-func rotateLeft(l *AnnounceUrlList) {
-	listLen := len(*l)
-	if listLen < 2 {
+func rotateLeft(l *AnnounceUrlList, offset int) {
+	if offset < 0 || len(*l) == 0 {
 		return
 	}
-	*l = append((*l)[1:], (*l)[0])
+
+	r := offset % len(*l)
+	*l = append((*l)[r:], (*l)[:r]...)
 }
 
-func (a *Announcer) Announce(announceUrls *[]url.URL, iAnnounceAble IAnnounceAble) (*tracker.AnnounceResponse, error) {
-	// iterate on a copy
-	var iterableUrls = make(AnnounceUrlList, len(*announceUrls))
-	copy(iterableUrls, *announceUrls)
+// Announce to the announceURLs in order until one answer properly.
+// The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
+// If none of the trackers respond the methods returns an error.
+func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest tracker.AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
+	var tries = 0
+	defer func(offset *int) { rotateLeft(announceURLs, *offset) }(&tries)
+
 	var announceErrors = make([]error, 0)
-	for _, announceUrl := range iterableUrls {
+	for i, announceUrl := range *announceURLs {
+		tries = i
 		var currentAnnouncer interface {
-			Announce(url url.URL, iAnnounceAble IAnnounceAble) (*tracker.AnnounceResponse, error)
+			Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
 		}
 		if strings.HasPrefix(announceUrl.Scheme, "http") {
 			currentAnnouncer = a.http
 		} else if strings.HasPrefix(announceUrl.Scheme, "udp") {
 			currentAnnouncer = a.udp
-		} else {
-			return nil, errors.New(fmt.Sprintf("Scheme '%s' is not supported", announceUrl.Scheme))
 		}
 
-		if currentAnnouncer == nil { // some client file may not contains definitions for http or udp
-			announceErrors = append(announceErrors, errors.New(fmt.Sprintf("Client does not support '%s' protocol", announceUrl.Scheme)))
-			rotateLeft(announceUrls)
+		if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
+			announceErrors = append(announceErrors, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported", announceUrl.String(), announceUrl.Scheme)))
 			continue
 		}
 
-		res, err := currentAnnouncer.Announce(announceUrl, iAnnounceAble)
+		ret, err = currentAnnouncer.Announce(announceUrl, announceRequest)
 		if err == nil {
-			return res, nil
+			return
 		}
 
-		rotateLeft(announceUrls)
 		announceErrors = append(announceErrors, err)
 	}
 
-	return nil, errors.New(fmt.Sprintf("failed to announce on every announce url: %+v", announceErrors))
+	err = errors.New(fmt.Sprintf("failed to announce on every announce url: %+v", announceErrors))
+	return
 }
 
 type MyType = *[]byte
