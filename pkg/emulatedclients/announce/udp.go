@@ -7,4 +7,5 @@ import (
 
 type IUdpAnnouncer interface {
 	Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
+	AfterPropertiesSet() error
 }

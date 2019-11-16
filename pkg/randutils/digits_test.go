@@ -47,3 +47,26 @@ func TestRangeNegativeMinNegativeMax(t *testing.T) {
 		assert.GreaterOrEqual(t, actual, min)
 	}
 }
+
+func TestRangeUint32(t *testing.T) {
+	type args struct {
+		minInclusive uint32
+		maxInclusive uint32
+	}
+	tests := []struct {
+		name string
+		args args
+		want uint32
+	}{
+		{name: "shouldWorkOnRange1", args: args{minInclusive: 1, maxInclusive: 1}, want: 1},
+		{name: "shouldWorkOnRange1WithValue0", args: args{minInclusive: 0, maxInclusive: 0}, want: 0},
+		{name: "shouldWorkOnRangeMaxValue", args: args{minInclusive: uint32(0xFFFFFFFF), maxInclusive: uint32(0xFFFFFFFF)}, want: 4294967295},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RangeUint32(tt.args.minInclusive, tt.args.maxInclusive); got != tt.want {
+				t.Errorf("RangeUint32() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -24,6 +24,20 @@ func rotateLeft(l *AnnounceUrlList, offset int) {
 	*l = append((*l)[r:], (*l)[:r]...)
 }
 
+func (a *Announcer) AfterPropertiesSet() error {
+	if a.http != nil {
+		if err := a.http.AfterPropertiesSet(); err != nil {
+			return err
+		}
+	}
+	if a.udp != nil {
+		if err := a.udp.AfterPropertiesSet(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Announce to the announceURLs in order until one answer properly.
 // The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
 // If none of the trackers respond the methods returns an error.

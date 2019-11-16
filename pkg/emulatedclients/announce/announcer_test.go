@@ -106,7 +106,7 @@ func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFailAndReturnErrorIfNoneWor
 type DumbHttpAnnouncer struct {
 	counter int
 }
-
+func (a *DumbHttpAnnouncer) AfterPropertiesSet() error { return nil }
 func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {
@@ -119,6 +119,7 @@ type DumbUdpAnnouncer struct {
 	counter int
 }
 
+func (a *DumbUdpAnnouncer) AfterPropertiesSet() error { return nil }
 func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {

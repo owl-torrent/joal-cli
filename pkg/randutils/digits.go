@@ -25,3 +25,12 @@ func Range(minInclusive int64, maxInclusive int64) int64 {
 	// at this point the min inclusive is assured to be less than 0
 	return globalRand.Int63n(-minInclusive+maxInclusive) + minInclusive
 }
+
+// Return a random number between min and max
+func RangeUint32(minInclusive uint32, maxInclusive uint32) uint32 {
+	if minInclusive == maxInclusive {
+		return minInclusive
+	}
+
+	return uint32(Range(int64(minInclusive), int64(maxInclusive)))
+}
