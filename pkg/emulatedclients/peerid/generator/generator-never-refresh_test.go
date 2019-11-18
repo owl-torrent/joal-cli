@@ -49,9 +49,6 @@ func (d *DumbAlgorithm) Generate() peerid.PeerId {
 	d.counter++
 	return [20]byte{}
 }
-func (d *DumbAlgorithm) GetStringFormatter() peerid.Formatter {
-	return func(p peerid.PeerId) string { return "" }
-}
 func (d *DumbAlgorithm) AfterPropertiesSet() error {
 	return nil
 }

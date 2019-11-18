@@ -50,7 +50,6 @@ func (d *DumbAlgorithm) Generate() key.Key {
 	d.counter++
 	return 12
 }
-func (d *DumbAlgorithm) GetStringFormatter() key.Formatter { return func(k key.Key) string { return ""} }
 func (d *DumbAlgorithm) AfterPropertiesSet() error {
 	return nil
 }

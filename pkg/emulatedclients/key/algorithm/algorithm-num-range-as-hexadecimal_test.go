@@ -1,7 +1,6 @@
 package algorithm
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"testing"
