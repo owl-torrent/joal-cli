@@ -9,8 +9,8 @@ import (
 )
 
 type Announcer struct {
-	http IHttpAnnouncer `yaml:"http"`
-	udp  IUdpAnnouncer  `yaml:"udp"`
+	Http IHttpAnnouncer `yaml:"http"`
+	Udp  IUdpAnnouncer  `yaml:"udp"`
 }
 
 type AnnounceUrlList = []url.URL
@@ -25,13 +25,13 @@ func rotateLeft(l *AnnounceUrlList, offset int) {
 }
 
 func (a *Announcer) AfterPropertiesSet() error {
-	if a.http != nil {
-		if err := a.http.AfterPropertiesSet(); err != nil {
+	if a.Http != nil {
+		if err := a.Http.AfterPropertiesSet(); err != nil {
 			return err
 		}
 	}
-	if a.udp != nil {
-		if err := a.udp.AfterPropertiesSet(); err != nil {
+	if a.Udp != nil {
+		if err := a.Udp.AfterPropertiesSet(); err != nil {
 			return err
 		}
 	}
@@ -52,9 +52,9 @@ func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest tracker.An
 			Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
 		}
 		if strings.HasPrefix(announceUrl.Scheme, "http") {
-			currentAnnouncer = a.http
+			currentAnnouncer = a.Http
 		} else if strings.HasPrefix(announceUrl.Scheme, "udp") {
-			currentAnnouncer = a.udp
+			currentAnnouncer = a.Udp
 		}
 
 		if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
