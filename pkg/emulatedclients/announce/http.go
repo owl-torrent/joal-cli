@@ -110,7 +110,7 @@ type HttpRequestHeader struct {
 
 type Peers []tracker.Peer
 
-func (me *Peers) UnmarshalBencode(b []byte) (err error) {
+func (p *Peers) UnmarshalBencode(b []byte) (err error) {
 	var _v interface{}
 	err = bencode.Unmarshal(b, &_v)
 	if err != nil {
@@ -129,7 +129,7 @@ func (me *Peers) UnmarshalBencode(b []byte) (err error) {
 				IP:   cp.IP[:],
 				Port: cp.Port,
 			}
-			*me = append(*me, tracker.Peer{
+			*p = append(*p, tracker.Peer{
 				IP:   localP.IP,
 				Port: localP.Port,
 			})
