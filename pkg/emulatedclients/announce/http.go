@@ -139,8 +139,8 @@ func (me *Peers) UnmarshalBencode(b []byte) (err error) {
 		//FIXME: vars.Add("http responses with list peers", 1)
 		for _, i := range v {
 			var localP Peer
-			localP.fromDictInterface(i.(map[string]interface{}))
-			*me = append(*me, tracker.Peer{
+			localP.FromDictInterface(i.(map[string]interface{}))
+			*p = append(*p, tracker.Peer{
 				IP:   localP.IP,
 				Port: localP.Port,
 			})
