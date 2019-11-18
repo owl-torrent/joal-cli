@@ -14,6 +14,7 @@ const (
 	None Case = iota
 	Upper
 	Lower
+	Capitalize
 )
 
 func (c Case) String() string {
@@ -21,25 +22,31 @@ func (c Case) String() string {
 }
 
 func (c Case) ApplyCase(str string) string {
-	if c == None {
+	switch c {
+	case None:
 		return str
-	}
-	if c == Lower {
+	case Lower:
 		return strings.ToLower(str)
+	case Upper:
+		return strings.ToUpper(str)
+	case Capitalize:
+		return strings.Title(str)
 	}
-	return strings.ToUpper(str)
+	return str
 }
 
 var toString = map[Case]string{
-	None:  "none",
-	Lower: "lower",
-	Upper: "upper",
+	None:       "none",
+	Lower:      "lower",
+	Upper:      "upper",
+	Capitalize: "capitalize",
 }
 
 var toID = map[string]Case{
-	"none":  None,
-	"lower": Lower,
-	"upper": Upper,
+	"none":       None,
+	"lower":      Lower,
+	"upper":      Upper,
+	"capitalize": Capitalize,
 }
 
 // MarshalJSON marshals the enum as a quoted json string
