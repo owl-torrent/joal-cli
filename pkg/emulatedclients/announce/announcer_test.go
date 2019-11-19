@@ -43,19 +43,19 @@ func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T
 		Udp:  &DumbUdpAnnouncer{},
 	}
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "http"}}, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&[]url.URL{{Scheme: "http"}}, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "https"}}, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&[]url.URL{{Scheme: "https"}}, AnnounceRequest{})
 	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp"}}, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp"}}, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp4"}}, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp4"}}, AnnounceRequest{})
 	assert.Equal(t, 2, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp6"}}, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp6"}}, AnnounceRequest{})
 	assert.Equal(t, 3, announcer.Udp.(*DumbUdpAnnouncer).counter)
 }
 
@@ -66,7 +66,7 @@ func TestAnnouncer_Announce_ShouldNotDemoteIfSucceed(t *testing.T) {
 	}
 
 	urls := []url.URL{{Scheme: "http"}, {Scheme: "udp"}}
-	_, _ = announcer.Announce(&urls, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&urls, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, "http", urls[0].Scheme)
 	assert.Equal(t, "udp", urls[1].Scheme)
@@ -80,7 +80,7 @@ func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFail(t *testing.T) {
 	}
 
 	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "http2", Path: "fail"}, {Scheme: "udp"}}
-	_, _ = announcer.Announce(&urls, tracker.AnnounceRequest{})
+	_, _ = announcer.Announce(&urls, AnnounceRequest{})
 	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, "udp", urls[0].Scheme)
 	assert.Equal(t, "http", urls[1].Scheme)
@@ -95,7 +95,7 @@ func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFailAndReturnErrorIfNoneWor
 	}
 
 	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "udp", Path: "fail"}}
-	_, err := announcer.Announce(&urls, tracker.AnnounceRequest{})
+	_, err := announcer.Announce(&urls, AnnounceRequest{})
 	assert.NotNil(t, err)
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, "http", urls[0].Scheme)
@@ -108,7 +108,7 @@ type DumbHttpAnnouncer struct {
 }
 
 func (a *DumbHttpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {
 		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")
@@ -121,7 +121,7 @@ type DumbUdpAnnouncer struct {
 }
 
 func (a *DumbUdpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {
 		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")

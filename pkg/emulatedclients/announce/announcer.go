@@ -8,6 +8,21 @@ import (
 	"strings"
 )
 
+type AnnounceRequest struct {
+	InfoHash   [20]byte
+	PeerId     [20]byte
+	Downloaded int64
+	Left       int64 // If less than 0, math.MaxInt64 will be used for HTTP trackers instead.
+	Uploaded   int64
+	// Apparently this is optional. None can be used for announces done at
+	// regular intervals.
+	Event     tracker.AnnounceEvent
+	IPAddress uint32
+	Key       uint32
+	NumWant   int32 // How many peer addresses are desired. -1 for default.
+	Port      uint16
+} // 82 bytes
+
 type Announcer struct {
 	Http IHttpAnnouncer `yaml:"http"`
 	Udp  IUdpAnnouncer  `yaml:"udp"`
@@ -41,7 +56,7 @@ func (a *Announcer) AfterPropertiesSet() error {
 // Announce to the announceURLs in order until one answer properly.
 // The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
 // If none of the trackers respond the methods returns an error.
-func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest tracker.AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
+func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
 	var tries = 0
 	defer func(offset *int) { rotateLeft(announceURLs, *offset) }(&tries)
 
@@ -49,7 +64,7 @@ func (a *Announcer) Announce(announceURLs *[]url.URL, announceRequest tracker.An
 	for i, announceUrl := range *announceURLs {
 		tries = i
 		var currentAnnouncer interface {
-			Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
+			Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error)
 		}
 		if strings.HasPrefix(announceUrl.Scheme, "http") {
 			currentAnnouncer = a.Http

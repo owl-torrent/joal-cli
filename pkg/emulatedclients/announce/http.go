@@ -7,10 +7,13 @@ import (
 	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/urlencoder"
+	"github.com/pkg/errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -27,45 +30,47 @@ type httpResponse struct {
 }
 
 type IHttpAnnouncer interface {
-	Announce(url url.URL, announceRequest tracker.AnnounceRequest) (tracker.AnnounceResponse, error)
+	Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error)
 	AfterPropertiesSet() error
 }
 
 type HttpAnnouncer struct {
-	ShouldUrlEncode bool                `yaml:"shouldUrlEncode"`
-	Query           string              `yaml:"string"`
-	RequestHeaders  []HttpRequestHeader `yaml:"requestHeaders"`
-	queryTemplate   *template.Template  `yaml:"-"`
+	UrlEncoder      urlencoder.UrlEncoder `yaml:"urlEncoder"`
+	ShouldUrlEncode bool                  `yaml:"shouldUrlEncode"`
+	Query           string                `yaml:"string"`
+	RequestHeaders  []HttpRequestHeader   `yaml:"requestHeaders"`
+	queryTemplate   *template.Template    `yaml:"-"`
 }
 
 func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	var err error
-	a.queryTemplate, err = template.New("httpQueryTemplate").Funcs(templateFunctions).Parse(a.Query)
+	a.queryTemplate, err = template.New("httpQueryTemplate").Funcs(TemplateFunctions(&a.UrlEncoder)).Parse(a.Query)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *HttpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
+func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
 	_url := httptoo.CopyURL(&url)
-	setupQuery(_url, announceRequest)
+	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
+	if err != nil {
+		return ret, errors.Wrap(err, "fail to format query string")
+	}
+	if len(_url.Query()) >= 0 {
+		queryString = fmt.Sprintf("&%s", queryString)
+	}
+	_url.RawQuery = queryString
+
 	req, err := http.NewRequest("GET", _url.String(), nil)
-	/*if opt.Context != nil {
-		req = req.WithContext(opt.Context)
-	}*/
+
 	resp, err := (&http.Client{
 		Timeout: time.Second * 15,
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout: 15 * time.Second,
 			}).DialContext,
-			//Proxy:               opt.HTTPProxy,
 			TLSHandshakeTimeout: 15 * time.Second,
-			/*TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				ServerName:         opt.ServerName,
-			},*/
 		},
 	}).Do(req)
 	if err != nil {
@@ -101,6 +106,12 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest tracker.AnnounceRe
 		})
 	}
 	return
+}
+
+func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (string, error) {
+	sb := strings.Builder{}
+	err := queryTemplate.Execute(&sb, ar)
+	return sb.String(), err
 }
 
 type HttpRequestHeader struct {
@@ -150,35 +161,4 @@ func (p *Peers) UnmarshalBencode(b []byte) (err error) {
 		err = fmt.Errorf("unsupported type: %T", _v)
 		return
 	}
-}
-
-func setupQuery(url *url.URL, ar tracker.AnnounceRequest) {
-	rawQuery := url.RawQuery
-	/*rawQuery = strings.Replace(rawQuery, "{infohash}", string(ar.InfoHash[:]), 1)
-	rawQuery = strings.Replace(rawQuery, "{peerid}", peerid.PeerId(ar.PeerId).Format(), 1)
-	rawQuery = strings.Replace(rawQuery, "{key}", ar.Key, 1)
-	rawQuery = strings.Replace(rawQuery, "{port}", fmt.Sprintf("%d", ar.Port), 1)
-	rawQuery = strings.Replace(rawQuery, "{uploaded}", strconv.FormatInt(ar.Uploaded, 10), 1)
-	rawQuery = strings.Replace(rawQuery, "{downloaded}", strconv.FormatInt(ar.Downloaded, 10), 1)
-	rawQuery = strings.Replace(rawQuery, "{left}", strconv.FormatInt(ar.Left, 10), 1)*/
-
-	/*
-		q.Set("info_hash", string(ar.InfoHash[:]))
-		q.Set("peer_id", string(ar.PeerId[:]))
-		q.Set("port", fmt.Sprintf("%d", ar.Port))
-		q.Set("uploaded", strconv.FormatInt(ar.Uploaded, 10))
-		q.Set("downloaded", strconv.FormatInt(ar.Downloaded, 10))
-		q.Set("left", strconv.FormatInt(ar.Left, 10))
-		if ar.Event != tracker.None {
-			q.Set("event", ar.Event.String())
-		}
-		q.Set("compact", "1")
-		q.Set("supportcrypto", "1")*/
-	/*if opts.ClientIp4.IP != nil {
-		q.Set("ipv4", opts.ClientIp4.String())
-	}
-	if opts.ClientIp6.IP != nil {
-		q.Set("ipv6", opts.ClientIp6.String())
-	}*/
-	url.RawQuery = rawQuery
 }
