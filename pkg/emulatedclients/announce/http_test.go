@@ -4,6 +4,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/urlencoder"
+	"net"
 	"testing"
 	"text/template"
 )
@@ -41,7 +42,7 @@ func Test_setupQuery(t *testing.T) {
 				Left:       58,
 				Uploaded:   1234568,
 				Event:      tracker.Started,
-				IPAddress:  uint32(1234567985),
+				IPAddress:  net.IPv4zero,
 				Key:        uint32(13),
 				NumWant:    30,
 				Port:       14598,

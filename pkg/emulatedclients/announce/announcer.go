@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/pkg/errors"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -17,7 +18,7 @@ type AnnounceRequest struct {
 	// Apparently this is optional. None can be used for announces done at
 	// regular intervals.
 	Event     tracker.AnnounceEvent
-	IPAddress uint32
+	IPAddress net.IP
 	Key       uint32
 	NumWant   int32 // How many peer addresses are desired. -1 for default.
 	Port      uint16
