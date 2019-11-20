@@ -129,7 +129,6 @@ func (p *Peers) UnmarshalBencode(b []byte) (err error) {
 	}
 	switch v := _v.(type) {
 	case string:
-		//FIXME: vars.Add("http responses with string peers", 1)
 		var cnas krpc.CompactIPv4NodeAddrs
 		err = cnas.UnmarshalBinary([]byte(v))
 		if err != nil {
@@ -147,7 +146,6 @@ func (p *Peers) UnmarshalBencode(b []byte) (err error) {
 		}
 		return
 	case []interface{}:
-		//FIXME: vars.Add("http responses with list peers", 1)
 		for _, i := range v {
 			var localP Peer
 			localP.FromDictInterface(i.(map[string]interface{}))
