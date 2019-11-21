@@ -2,40 +2,13 @@ package announce
 
 import (
 	"errors"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/stretchr/testify/assert"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 )
-
-func Test_rotateLeftX(t *testing.T) {
-	type args struct {
-		l      *AnnounceUrlList
-		offset int
-	}
-	tests := []struct {
-		name string
-		args args
-		want AnnounceUrlList
-	}{
-		{name: "shouldNotFailOnEmptyList", args: args{l: &AnnounceUrlList{}, offset: 3}, want: AnnounceUrlList{}},
-		{name: "shouldNotFailOnSingleEntryList", args: args{l: &AnnounceUrlList{url.URL{Host: "a"}}, offset: 2}, want: AnnounceUrlList{url.URL{Host: "a"}}},
-		{name: "shouldRotateZero", args: args{l: &AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}, offset: 0}, want: AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}},
-		{name: "shouldRotateOne", args: args{l: &AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}, offset: 1}, want: AnnounceUrlList{url.URL{Host: "b"}, url.URL{Host: "c"}, url.URL{Host: "a"}}},
-		{name: "shouldRotateExactArraySize", args: args{l: &AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}, offset: 3}, want: AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}},
-		{name: "shouldRotateBiggerThanArraySize", args: args{l: &AnnounceUrlList{url.URL{Host: "a"}, url.URL{Host: "b"}, url.URL{Host: "c"}}, offset: 5}, want: AnnounceUrlList{url.URL{Host: "c"}, url.URL{Host: "a"}, url.URL{Host: "b"}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rotateLeft(tt.args.l, tt.args.offset)
-			if !reflect.DeepEqual(*tt.args.l, tt.want) {
-				t.Errorf("rotateLeftX() = %v, want %v", *tt.args.l, tt.want)
-			}
-		})
-	}
-}
 
 func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T) {
 	announcer := Announcer{
@@ -43,19 +16,19 @@ func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T
 		Udp:  &DumbUdpAnnouncer{},
 	}
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "http"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"http://localhost.fr"}}, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "https"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"https://localhost.fr"}}, AnnounceRequest{})
 	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp://localhost.fr"}}, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp4"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp4://localhost.fr"}}, AnnounceRequest{})
 	assert.Equal(t, 2, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&[]url.URL{{Scheme: "udp6"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp6://localhost.fr"}}, AnnounceRequest{})
 	assert.Equal(t, 3, announcer.Udp.(*DumbUdpAnnouncer).counter)
 }
 
@@ -65,42 +38,32 @@ func TestAnnouncer_Announce_ShouldNotDemoteIfSucceed(t *testing.T) {
 		Udp:  &DumbUdpAnnouncer{},
 	}
 
-	urls := []url.URL{{Scheme: "http"}, {Scheme: "udp"}}
+	urls := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
+	expected := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
 	_, _ = announcer.Announce(&urls, AnnounceRequest{})
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
-	assert.Equal(t, "http", urls[0].Scheme)
-	assert.Equal(t, "udp", urls[1].Scheme)
+	assert.Equal(t, expected, urls)
 	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
 }
 
-func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFail(t *testing.T) {
+func TestAnnouncer_Announce_ShouldPromoteTierAndUrlInTierIfSucceed(t *testing.T) {
 	announcer := Announcer{
 		Http: &DumbHttpAnnouncer{},
 		Udp:  &DumbUdpAnnouncer{},
 	}
 
-	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "http2", Path: "fail"}, {Scheme: "udp"}}
+	urls := metainfo.AnnounceList{
+		{"http://localhost.fr/fail", "http://localhost.fr/x/fail", "http://localhost.fr/y/fail"},
+		{"http://localhost.fr/t2/fail", "http://localhost.fr/t2/x/fail", "http://localhost.fr/t2/y"},
+	}
+	expected := metainfo.AnnounceList{
+		{"http://localhost.fr/t2/y", "http://localhost.fr/t2/fail", "http://localhost.fr/t2/x/fail"},
+		{"http://localhost.fr/fail", "http://localhost.fr/x/fail", "http://localhost.fr/y/fail"},
+	}
 	_, _ = announcer.Announce(&urls, AnnounceRequest{})
-	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
-	assert.Equal(t, "udp", urls[0].Scheme)
-	assert.Equal(t, "http", urls[1].Scheme)
-	assert.Equal(t, "http2", urls[2].Scheme)
-	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
-}
-
-func TestAnnouncer_Announce_ShouldDemoteFailingUrlsOnFailAndReturnErrorIfNoneWorks(t *testing.T) {
-	announcer := Announcer{
-		Http: &DumbHttpAnnouncer{},
-		Udp:  &DumbUdpAnnouncer{},
-	}
-
-	urls := []url.URL{{Scheme: "http", Path: "fail"}, {Scheme: "udp", Path: "fail"}}
-	_, err := announcer.Announce(&urls, AnnounceRequest{})
-	assert.NotNil(t, err)
-	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
-	assert.Equal(t, "http", urls[0].Scheme)
-	assert.Equal(t, "udp", urls[1].Scheme)
-	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
+	assert.Equal(t, 6, announcer.Http.(*DumbHttpAnnouncer).counter)
+	assert.Equal(t, expected, urls)
+	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
 }
 
 type DumbHttpAnnouncer struct {
