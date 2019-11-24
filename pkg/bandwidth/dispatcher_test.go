@@ -10,14 +10,14 @@ import (
 )
 
 type testSwarm struct {
-	seeders  uint64
-	leechers uint64
+	seeders  uint16
+	leechers uint16
 }
 
-func (s *testSwarm) getSeeders() uint64 {
+func (s *testSwarm) GetSeeders() uint16 {
 	return s.seeders
 }
-func (s *testSwarm) getLeechers() uint64 {
+func (s *testSwarm) GetLeechers() uint16 {
 	return s.leechers
 }
 
@@ -73,16 +73,16 @@ func Test_calculateWeightShouldProvidePreciseValues(t *testing.T) {
 }
 
 type DumbSwarm struct {
-	seeders  uint64
-	leechers uint64
+	seeders  uint16
+	leechers uint16
 }
 
-func (s *DumbSwarm) getSeeders() uint64  { return s.seeders }
-func (s *DumbSwarm) getLeechers() uint64 { return s.leechers }
+func (s *DumbSwarm) GetSeeders() uint16  { return s.seeders }
+func (s *DumbSwarm) GetLeechers() uint16 { return s.leechers }
 
 type DumbBandwidthClaimable struct {
 	infoHash           *torrent.InfoHash
-	uploaded           uint64
+	uploaded           int64
 	swarm              ISwarm
 	onFirstAddUploaded func()
 	uploadedWasCalled  bool
@@ -90,7 +90,7 @@ type DumbBandwidthClaimable struct {
 }
 
 func (bc *DumbBandwidthClaimable) InfoHash() *torrent.InfoHash { return bc.infoHash }
-func (bc *DumbBandwidthClaimable) AddUploaded(bytes uint64) {
+func (bc *DumbBandwidthClaimable) AddUploaded(bytes int64) {
 	if bc.addOnlyOnce && bc.uploadedWasCalled {
 		return
 	}
@@ -100,7 +100,7 @@ func (bc *DumbBandwidthClaimable) AddUploaded(bytes uint64) {
 	}
 	bc.uploadedWasCalled = true
 }
-func (bc *DumbBandwidthClaimable) getSwarm() ISwarm { return bc.swarm }
+func (bc *DumbBandwidthClaimable) GetSwarm() ISwarm { return bc.swarm }
 
 type DumbStaticSpeedProvider struct {
 	speed int64

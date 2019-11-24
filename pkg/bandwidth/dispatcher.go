@@ -8,14 +8,14 @@ import (
 )
 
 type ISwarm interface {
-	getSeeders() uint64
-	getLeechers() uint64
+	GetSeeders() uint16
+	GetLeechers() uint16
 }
 type IBandwidthClaimable interface {
 	InfoHash() *torrent.InfoHash
-	AddUploaded(bytes uint64)
+	AddUploaded(bytes int64)
 	// May return nil
-	getSwarm() ISwarm
+	GetSwarm() ISwarm
 }
 
 type IDispatcher interface {
@@ -64,7 +64,7 @@ func (d *Dispatcher) Start() {
 				for claimer, weight := range d.claimers {
 					bytesToDispatch := float64(d.randomSpeedProvider.GetBytesPerSeconds()) * d.dispatcherUpdateInterval.Seconds()
 					percentOfSpeedToAssign := weight / d.totalWeight
-					claimer.AddUploaded(uint64(bytesToDispatch * percentOfSpeedToAssign))
+					claimer.AddUploaded(int64(bytesToDispatch * percentOfSpeedToAssign))
 				}
 				d.lock.RUnlock()
 			case <-d.quit:
@@ -88,7 +88,7 @@ func (d *Dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 		d.totalWeight -= previousClaimerWeight
 	}
 
-	d.claimers[claimer] = calculateWeight(claimer.getSwarm())
+	d.claimers[claimer] = calculateWeight(claimer.GetSwarm())
 	d.totalWeight += d.claimers[claimer]
 }
 
@@ -105,13 +105,13 @@ func (d *Dispatcher) Release(claimer IBandwidthClaimable) {
 }
 
 func calculateWeight(swarm ISwarm) float64 {
-	if swarm == nil || swarm.getSeeders() == 0 || swarm.getLeechers() == 0 {
+	if swarm == nil || swarm.GetSeeders() == 0 || swarm.GetLeechers() == 0 {
 		return 0
 	}
-	leechersRatio := float64(swarm.getLeechers()) / float64(swarm.getSeeders()+swarm.getLeechers())
+	leechersRatio := float64(swarm.GetLeechers()) / float64(swarm.GetSeeders()+swarm.GetLeechers())
 	if leechersRatio == 0.0 {
 		return 0
 	}
 
-	return leechersRatio * 100.0 * (float64(swarm.getSeeders()) * leechersRatio) * (float64(swarm.getLeechers()) / float64(swarm.getSeeders()))
+	return leechersRatio * 100.0 * (float64(swarm.GetSeeders()) * leechersRatio) * (float64(swarm.GetLeechers()) / float64(swarm.GetSeeders()))
 }
