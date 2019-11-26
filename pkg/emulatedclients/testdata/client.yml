@@ -1,0 +1,33 @@
+---
+name: qBittorrent
+version: 3.3.1
+keyGenerator:
+  algorithm:
+    type: NUM_RANGE_ENCODED_AS_HEXADECIMAL
+    min: 0
+    max: 4294967295
+  type: TORRENT_PERSISTENT_REFRESH
+peerIdGenerator:
+  algorithm:
+    type: REGEX
+    pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
+  type: NEVER_REFRESH
+announcer:
+  http:
+    numwant: 200
+    numwantOnStop: 0
+    urlEncoder:
+      encodedHexCase: lower
+    shouldUrlEncode: false
+    query: info_hash={{urlEncode (byteArray20ToString .InfoHash)}}&peer_id={{byteArray20ToString .PeerId}}&port={{.Port}}&uploaded={{.Uploaded}}&downloaded={{.Downloaded}}&left={{.Left}}&corrupt=0&key={{withLeadingZeroes (uint32ToHexString .Key) 8}}{{if ne .Event.String "empty"}}&event={{.Event.String}}{{end}}&numwant={{.NumWant}}&compact=1&no_peer_id=1&supportcrypto=1&redundant=0
+    requestHeaders:
+      - name: User-Agent
+        value: qBittorrent v3.3.1
+      - name: Accept-Encoding
+        value: gzip
+      - name: Connection
+        value: close
+listener:
+  port:
+    min: 8999
+    max: 9100

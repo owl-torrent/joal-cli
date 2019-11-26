@@ -3,6 +3,7 @@ package emulatedclients
 import (
 	"errors"
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/announce"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclients/key/generator"
@@ -55,7 +56,7 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 	return nil
 }
 
-func (c *EmulatedClient) Announce(infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+func (c *EmulatedClient) Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
 		panic(errors.New("EmulatedClient listener is not started"))
 	}
@@ -75,7 +76,7 @@ func (c *EmulatedClient) Announce(infoHash torrent.InfoHash, uploaded int64, dow
 		announceRequest.NumWant = c.NumWantOnStop
 	}
 
-	return c.Announcer.Announce(nil, announceRequest)
+	return c.Announcer.Announce(announceList, announceRequest)
 }
 
 func (c *EmulatedClient) StartListener() error {

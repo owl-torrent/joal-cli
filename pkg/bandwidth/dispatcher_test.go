@@ -133,7 +133,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 	dispatcher.Start()
 	wg.Wait()
 	dispatcher.Stop()
-	assert.Greater(t, claimer.uploaded, uint64(0))
+	assert.Greater(t, claimer.uploaded, int64(0))
 }
 
 func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
@@ -245,5 +245,5 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 	wg.Wait()
 	dispatcher.Stop()
 	assert.Zero(t, claimer1.uploaded)
-	assert.Greater(t, claimer2.uploaded, uint64(0))
+	assert.Greater(t, claimer2.uploaded, int64(0))
 }

@@ -47,7 +47,7 @@ func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error
 			allTypes[i] = key
 			i++
 		}
-		return errors.New(fmt.Sprintf("generator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes))
+		return errors.New(fmt.Sprintf("peerIdGenerator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes))
 	}
 
 	generator := implFactory()

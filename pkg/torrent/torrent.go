@@ -18,14 +18,14 @@ const (
 )
 
 type Torrent struct {
-	metadata         *metainfo.MetaInfo
-	infoHash         *torrent.InfoHash
-	currentStatus    status
-	nextAnnounce     tracker.AnnounceEvent
-	nextAnnounceAt   time.Time
-	seedingStats     *seedStats
-	peers            bandwidth.ISwarm
-	bitTorrentClient *emulatedclients.EmulatedClient
+	infoHash          *torrent.InfoHash
+	announceList      metainfo.AnnounceList
+	currentStatus     status
+	nextAnnounce      tracker.AnnounceEvent
+	nextAnnounceAt    time.Time
+	seedingStats      *seedStats
+	peers             bandwidth.ISwarm
+	bitTorrentClient  *emulatedclients.EmulatedClient
 	lastKnownInterval time.Duration
 }
 
@@ -46,15 +46,21 @@ func LoadFromFile(file string, bitTorrentClient *emulatedclients.EmulatedClient)
 	}
 
 	infoHash := info.HashInfoBytes()
+	announceList := info.AnnounceList
+	if info.Announce != "" {
+		firstTier := make([][]string, 1)
+		firstTier[0] = []string{info.Announce}
+		announceList = append(firstTier, announceList...)
+	}
 	return &Torrent{
-		metadata:         info,
-		infoHash:         &infoHash,
-		currentStatus:    onHold,
-		nextAnnounce:     tracker.Started,
-		nextAnnounceAt:   time.Now(),
-		seedingStats:     &seedStats{Downloaded: 0, Left: 0, Uploaded: 0},
-		peers:            nil,
-		bitTorrentClient: bitTorrentClient,
+		infoHash:          &infoHash,
+		announceList:      announceList,
+		currentStatus:     onHold,
+		nextAnnounce:      tracker.Started,
+		nextAnnounceAt:    time.Now(),
+		seedingStats:      &seedStats{Downloaded: 0, Left: 0, Uploaded: 0},
+		peers:             nil,
+		bitTorrentClient:  bitTorrentClient,
 		lastKnownInterval: 5 * time.Second,
 	}, nil
 }
@@ -74,7 +80,7 @@ func (t *Torrent) Seed() {
 
 			select {
 			case <-announceAfter:
-				response, err := t.bitTorrentClient.Announce(*t.infoHash, t.seedingStats.Uploaded, t.seedingStats.Downloaded, t.seedingStats.Left, t.nextAnnounce)
+				response, err := t.bitTorrentClient.Announce(&t.announceList, *t.infoHash, t.seedingStats.Uploaded, t.seedingStats.Downloaded, t.seedingStats.Left, t.nextAnnounce)
 				if err != nil {
 					if t.nextAnnounce != tracker.None {
 						t.nextAnnounceAt = time.Now().Add(t.lastKnownInterval)
@@ -92,10 +98,10 @@ func (t *Torrent) Seed() {
 				t.nextAnnounce = tracker.None
 
 				return
-			case <-stopGracefull:
-				return
-			case <-killNow:
-				return
+				/*case <-stopGracefull:
+					return
+				case <-killNow:
+					return*/
 			}
 		}
 	}(t)

@@ -40,6 +40,8 @@ func (l *Listener) Start() error {
 	}
 	l.ip = &ip
 	// TODO: Start listening on port for peers requests and answer
+	mockedPort := uint16(9000)
+	l.listeningPort = &mockedPort
 	return nil
 }
 

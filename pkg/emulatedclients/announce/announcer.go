@@ -30,6 +30,22 @@ type Announcer struct {
 	Udp  IUdpAnnouncer  `yaml:"udp"`
 }
 
+func (a *Announcer) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	announcer := &struct {
+		Http HttpAnnouncer `yaml:"http"`
+		// TODO: Udp UdpAnnouncer `yaml:"udp"`
+	}{}
+	err := unmarshal(&announcer)
+	if err != nil {
+		return err
+	}
+
+	(*a).Http = &announcer.Http
+	//TODO: (*a).Udp = &udp
+
+	return nil
+}
+
 func (a *Announcer) AfterPropertiesSet() error {
 	if a.Http != nil {
 		if err := a.Http.AfterPropertiesSet(); err != nil {

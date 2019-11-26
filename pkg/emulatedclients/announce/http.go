@@ -36,14 +36,17 @@ type IHttpAnnouncer interface {
 
 type HttpAnnouncer struct {
 	UrlEncoder      urlencoder.UrlEncoder `yaml:"urlEncoder"`
-	ShouldUrlEncode bool                  `yaml:"shouldUrlEncode"`
-	Query           string                `yaml:"string"`
+	Query           string                `yaml:"query" validate:"required"`
 	RequestHeaders  []HttpRequestHeader   `yaml:"requestHeaders"`
 	queryTemplate   *template.Template    `yaml:"-"`
 }
 
 func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	var err error
+	if strings.Trim(a.Query, " ") == "" {
+		return errors.New("field 'query' is required in http")
+	}
+
 	a.queryTemplate, err = template.New("httpQueryTemplate").Funcs(TemplateFunctions(&a.UrlEncoder)).Parse(a.Query)
 	if err != nil {
 		return err
@@ -57,12 +60,19 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 	if err != nil {
 		return ret, errors.Wrap(err, "fail to format query string")
 	}
-	if len(_url.Query()) >= 0 {
-		queryString = fmt.Sprintf("&%s", queryString)
+	if len(_url.Query()) > 0 {
+		queryString = fmt.Sprintf("%s&%s", url.RawQuery, queryString)
 	}
 	_url.RawQuery = queryString
 
 	req, err := http.NewRequest("GET", _url.String(), nil)
+	if err != nil {
+		return
+	}
+
+	for _, v := range a.RequestHeaders {
+		req.Header.Add(v.Name, v.Value)
+	}
 
 	resp, err := (&http.Client{
 		Timeout: time.Second * 15,
