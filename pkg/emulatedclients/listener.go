@@ -10,13 +10,13 @@ import (
 )
 
 type Listener struct {
-	Port          Port    `yaml:"port"`
+	Port          Port    `yaml:"port" validate:"required"`
 	listeningPort *uint16 `yaml:"-"`
 	ip            *net.IP `yaml:"-"`
 }
 type Port struct {
-	Min uint16 `yaml:"min"`
-	Max uint16 `yaml:"max"`
+	Min uint16 `yaml:"min" validate:"min=1"`
+	Max uint16 `yaml:"max" validate:"min=1,gtefield=Min"`
 }
 
 func (l *Listener) AfterPropertiesSet() error {
