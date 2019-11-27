@@ -33,8 +33,8 @@ func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if !exist {
 		allTypes := make([]string, len(algorithmImplementations))
 		i := 0
-		for key := range algorithmImplementations {
-			allTypes[i] = key
+		for algKey := range algorithmImplementations {
+			allTypes[i] = algKey
 			i++
 		}
 		return errors.New(fmt.Sprintf("algorithm type '%s' does not exists. Possible values are: %v", algorithmType.Name, allTypes))
