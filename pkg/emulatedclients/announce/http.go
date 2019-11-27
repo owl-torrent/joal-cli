@@ -43,9 +43,6 @@ type HttpAnnouncer struct {
 
 func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	var err error
-	if strings.Trim(a.Query, " ") == "" {
-		return errors.New("field 'query' is required in http")
-	}
 
 	a.queryTemplate, err = template.New("httpQueryTemplate").Funcs(TemplateFunctions(&a.UrlEncoder)).Parse(a.Query)
 	if err != nil {

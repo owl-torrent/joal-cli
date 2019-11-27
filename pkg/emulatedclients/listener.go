@@ -20,15 +20,6 @@ type Port struct {
 }
 
 func (l *Listener) AfterPropertiesSet() error {
-	if l.Port.Min == 0 {
-		return errors.New("listener.port.min is required")
-	}
-	if l.Port.Max == 0 {
-		return errors.New("listener.port.max is required")
-	}
-	if l.Port.Min > l.Port.Max {
-		return errors.New("listener.port.max must be greater or equal to listener.port.min")
-	}
 	return nil
 }
 
