@@ -57,3 +57,20 @@ func TestHttpAnnouncer_ShouldValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestNumRangeAsHexAlgorithm_Generate(t *testing.T) {
+	alg := NumRangeAsHexAlgorithm{
+		Min: 1,
+		Max: 2,
+	}
+	err := alg.AfterPropertiesSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 500; i++ {
+		keyVal := uint32(alg.Generate())
+		assert.GreaterOrEqual(t, keyVal, uint32(1))
+		assert.LessOrEqual(t, keyVal, uint32(2))
+	}
+}
