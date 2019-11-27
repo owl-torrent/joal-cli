@@ -26,8 +26,8 @@ type AnnounceRequest struct {
 } // 82 bytes
 
 type Announcer struct {
-	Http IHttpAnnouncer `yaml:"http"`
-	Udp  IUdpAnnouncer  `yaml:"udp"`
+	Http IHttpAnnouncer `yaml:"http" validate:"required_without_all=Udp"`
+	Udp  IUdpAnnouncer  `yaml:"udp" validate:"required_without_all=Http"`
 }
 
 func (a *Announcer) UnmarshalYAML(unmarshal func(interface{}) error) error {
