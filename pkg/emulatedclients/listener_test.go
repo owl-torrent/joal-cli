@@ -84,6 +84,7 @@ func TestListener_getPublicIpShouldFallbackThroughUrl(t *testing.T) {
 	failingServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server error", 500)
 	}))
+	defer failingServ.Close()
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("1.1.1.1"))
 	}))
