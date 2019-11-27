@@ -1,6 +1,7 @@
 package emulatedclients
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"net"
@@ -55,11 +56,12 @@ var publicIpProviders = []string{
 
 func getPublicIp() (net.IP, error) {
 	for _, providerUri := range publicIpProviders {
-		client := &http.Client{Timeout: 8 * time.Second}
+		client := &http.Client{Timeout: 10 * time.Second}
 		req, err := http.NewRequest("GET", providerUri, nil)
 		resp, err := client.Do(req)
 		if err != nil {
 			// TODO: log error
+			fmt.Println(err)
 			continue
 		}
 
