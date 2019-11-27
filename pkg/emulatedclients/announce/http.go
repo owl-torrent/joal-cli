@@ -35,10 +35,10 @@ type IHttpAnnouncer interface {
 }
 
 type HttpAnnouncer struct {
-	UrlEncoder      urlencoder.UrlEncoder `yaml:"urlEncoder"`
-	Query           string                `yaml:"query" validate:"required"`
-	RequestHeaders  []HttpRequestHeader   `yaml:"requestHeaders"`
-	queryTemplate   *template.Template    `yaml:"-"`
+	UrlEncoder     urlencoder.UrlEncoder `yaml:"urlEncoder"`
+	Query          string                `yaml:"query" validate:"required"`
+	RequestHeaders []HttpRequestHeader   `yaml:"requestHeaders" validate:"dive"`
+	queryTemplate  *template.Template    `yaml:"-"`
 }
 
 func (a *HttpAnnouncer) AfterPropertiesSet() error {
@@ -125,8 +125,8 @@ func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (str
 }
 
 type HttpRequestHeader struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name  string `yaml:"name" validate:"required"`
+	Value string `yaml:"value" validate:"required"`
 }
 
 type Peers []tracker.Peer

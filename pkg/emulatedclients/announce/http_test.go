@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/urlencoder"
+	"github.com/anthonyraymond/joal-cli/pkg/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
@@ -42,12 +43,16 @@ func TestHttpAnnouncer_ShouldValidate(t *testing.T) {
 		Announcer HttpAnnouncer
 	}
 	tests := []struct {
-		name         string
-		args         args
-		wantErr      bool
-		failingField string
+		name             string
+		args             args
+		wantErr          bool
+		failingField     string
+		failingTag       string
+		errorDescription testutils.ErrorDescription
 	}{
-		{name: "shouldFailWithoutQuery", args: args{Announcer: HttpAnnouncer{Query: ""}}, wantErr: true, failingField: "Query"},
+		{name: "shouldFailWithQueryEmpty", args: args{Announcer: HttpAnnouncer{Query: ""}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "HttpAnnouncer.Query", ErrorTag: "required"}},
+		{name: "shouldFailWithRequestHeaderNameEmpty", args: args{Announcer: HttpAnnouncer{Query: "q", RequestHeaders: []HttpRequestHeader{{Name: "", Value: "d"}}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "HttpAnnouncer.RequestHeaders[0].Name", ErrorTag: "required"}},
+		{name: "shouldFailWithRequestHeaderValueEmpty", args: args{Announcer: HttpAnnouncer{Query: "q", RequestHeaders: []HttpRequestHeader{{Name: "d", Value: ""}}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "HttpAnnouncer.RequestHeaders[0].Value", ErrorTag: "required"}},
 		{name: "shouldSucceedWithQuery", args: args{Announcer: HttpAnnouncer{Query: "dd"}}, wantErr: false},
 	}
 	for _, tt := range tests {
@@ -60,16 +65,7 @@ func TestHttpAnnouncer_ShouldValidate(t *testing.T) {
 				t.Fatalf("validation failed, wantErr=false but err is : %v", err)
 			}
 			if tt.wantErr {
-				validationErrors := err.(validator.ValidationErrors)
-				fieldFound := false
-				for _, e := range validationErrors {
-					if e.Field() == tt.failingField {
-						fieldFound = true
-					}
-				}
-				if !fieldFound {
-					t.Errorf("validation failed, field=%s not found in error list : %v", tt.failingField, validationErrors)
-				}
+				testutils.AssertValidateError(t, err.(validator.ValidationErrors), tt.errorDescription)
 			}
 		})
 	}
@@ -128,7 +124,6 @@ func Test_setupQuery(t *testing.T) {
 		})
 	}
 }
-
 
 func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 	expectedResponse := tracker.AnnounceResponse{
