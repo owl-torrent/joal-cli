@@ -21,9 +21,9 @@ max: 350
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = algorithm.AfterPropertiesSet()
-	assert.IsType(t, &NumRangeAsHexAlgorithm{}, algorithm.impl)
-	assert.Equal(t, uint32(1), algorithm.impl.(*NumRangeAsHexAlgorithm).Min)
-	assert.Equal(t, uint32(350), algorithm.impl.(*NumRangeAsHexAlgorithm).Max)
+	assert.IsType(t, &NumRangeAsHexAlgorithm{}, algorithm.Impl)
+	assert.Equal(t, uint32(1), algorithm.Impl.(*NumRangeAsHexAlgorithm).Min)
+	assert.Equal(t, uint32(350), algorithm.Impl.(*NumRangeAsHexAlgorithm).Max)
 }
 
 type validAbleKeyAlg struct {
@@ -45,8 +45,8 @@ func TestKeyAlgorithm_ShouldValidate(t *testing.T) {
 		failingTag       string
 		errorDescription testutils.ErrorDescription
 	}{
-		{name: "shouldFailWithInvalidNestedField", args: args{Alg: KeyAlgorithm{impl: &validAbleKeyAlg{}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "KeyAlgorithm.Field", ErrorTag: "required"}},
-		{name: "shouldNotFailWithValidNestedField", args: args{Alg: KeyAlgorithm{impl: &validAbleKeyAlg{Field: "ok"}}}, wantErr: false},
+		{name: "shouldFailWithInvalidNestedField", args: args{Alg: KeyAlgorithm{Impl: &validAbleKeyAlg{}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "KeyAlgorithm.Impl.Field", ErrorTag: "required"}},
+		{name: "shouldNotFailWithValidNestedField", args: args{Alg: KeyAlgorithm{Impl: &validAbleKeyAlg{Field: "ok"}}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -16,7 +16,7 @@ type IKeyAlgorithm interface {
 }
 
 type KeyAlgorithm struct {
-	impl IKeyAlgorithm `yaml:",inline" validate:"required"`
+	Impl IKeyAlgorithm `yaml:",inline" validate:"required"`
 }
 
 func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -45,13 +45,13 @@ func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	a.impl = algorithm
+	a.Impl = algorithm
 	return nil
 }
 
 func (a *KeyAlgorithm) Generate() key.Key {
-	return a.impl.Generate()
+	return a.Impl.Generate()
 }
 func (a *KeyAlgorithm) AfterPropertiesSet() error {
-	return a.impl.AfterPropertiesSet()
+	return a.Impl.AfterPropertiesSet()
 }
