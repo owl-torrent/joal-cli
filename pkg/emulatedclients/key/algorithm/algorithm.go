@@ -16,7 +16,7 @@ type IKeyAlgorithm interface {
 }
 
 type KeyAlgorithm struct {
-	impl IKeyAlgorithm `yaml:",inline"`
+	impl IKeyAlgorithm `yaml:",inline" validate:"required"`
 }
 
 func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
