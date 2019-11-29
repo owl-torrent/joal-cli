@@ -10,7 +10,7 @@ import (
 
 type TimedRefreshGenerator struct {
 	value          *key.Key      `yaml:"-"`
-	RefreshEvery   time.Duration `yaml:"refreshEvery"`
+	RefreshEvery   time.Duration `yaml:"refreshEvery" validate:"required"`
 	nextGeneration time.Time     `yaml:"-"`
 }
 
