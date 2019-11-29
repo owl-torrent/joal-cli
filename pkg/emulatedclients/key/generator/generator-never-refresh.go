@@ -11,7 +11,7 @@ type NeverRefreshGenerator struct {
 	value *key.Key `yaml:"-"`
 }
 
-func (g *NeverRefreshGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
+func (g *NeverRefreshGenerator) get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
 	if g.value == nil {
 		val := algorithm.Generate()
 		g.value = &val
@@ -19,6 +19,6 @@ func (g *NeverRefreshGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash 
 	return *g.value
 }
 
-func (g *NeverRefreshGenerator) AfterPropertiesSet() error {
+func (g *NeverRefreshGenerator) afterPropertiesSet() error {
 	return nil
 }

@@ -10,10 +10,10 @@ import (
 type AlwaysRefreshGenerator struct {
 }
 
-func (g *AlwaysRefreshGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
+func (g *AlwaysRefreshGenerator) get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
 	return algorithm.Generate()
 }
 
-func (g *AlwaysRefreshGenerator) AfterPropertiesSet() error {
+func (g *AlwaysRefreshGenerator) afterPropertiesSet() error {
 	return nil
 }

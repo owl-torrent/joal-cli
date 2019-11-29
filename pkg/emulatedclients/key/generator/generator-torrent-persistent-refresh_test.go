@@ -23,36 +23,36 @@ algorithm:
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
-	_ = generator.AfterPropertiesSet()
-	assert.IsType(t, &TorrentPersistentGenerator{}, generator.impl)
+	_ = generator.afterPropertiesSet()
+	assert.IsType(t, &TorrentPersistentGenerator{}, generator.IKeyGenerator)
 }
 
 func TestGenerate_TorrentPersistentRefresh_ShouldProvideSingleValuePerTorrent(t *testing.T) {
 	generator := &TorrentPersistentGenerator{}
-	_ = generator.AfterPropertiesSet()
+	_ = generator.afterPropertiesSet()
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
-	generator.Get(dumbAlg, infoHashA, tracker.None)
+	generator.get(dumbAlg, infoHashA, tracker.None)
 	assert.Equal(t, 1, dumbAlg.counter, "Should have been called once for infohashA")
-	generator.Get(dumbAlg, infoHashB, tracker.None)
+	generator.get(dumbAlg, infoHashB, tracker.None)
 	assert.Equal(t, 2, dumbAlg.counter, "Should have been called once for infohashB")
 
 	for i := 0; i < 500; i++ {
-		generator.Get(dumbAlg, infoHashA, tracker.None)
-		generator.Get(dumbAlg, infoHashB, tracker.None)
+		generator.get(dumbAlg, infoHashA, tracker.None)
+		generator.get(dumbAlg, infoHashB, tracker.None)
 	}
 
 	assert.Equal(t, 2, dumbAlg.counter, "Should not have been called anymore")
-	assert.Equal(t, generator.entries[infoHashA].Get(), generator.Get(dumbAlg, infoHashA, tracker.None))
-	assert.Equal(t, generator.entries[infoHashB].Get(), generator.Get(dumbAlg, infoHashB, tracker.None))
+	assert.Equal(t, generator.entries[infoHashA].Get(), generator.get(dumbAlg, infoHashA, tracker.None))
+	assert.Equal(t, generator.entries[infoHashB].Get(), generator.get(dumbAlg, infoHashB, tracker.None))
 }
 
 func TestGenerate_TorrentPersistentRefresh_ShouldEvictOldEntries(t *testing.T) {
 	generator := &TorrentPersistentGenerator{}
-	_ = generator.AfterPropertiesSet()
+	_ = generator.afterPropertiesSet()
 	generator.evictAfter = 1 * time.Millisecond
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
@@ -66,7 +66,7 @@ func TestGenerate_TorrentPersistentRefresh_ShouldEvictOldEntries(t *testing.T) {
 
 	for i := 0; i < 120; i++ {
 		// work on B to ensure the cleaning counter has revolute as least once
-		_ = generator.Get(dumbAlg, infoHashB, tracker.None)
+		_ = generator.get(dumbAlg, infoHashB, tracker.None)
 	}
 
 	// pause to let the cleaning goroutine start
@@ -82,12 +82,12 @@ func TestGenerate_TorrentPersistentRefresh_ShouldEvictOldEntries(t *testing.T) {
 
 func TestGenerate_TorrentPersistentRefresh_ShouldExpendMapSize(t *testing.T) {
 	generator := &TorrentPersistentGenerator{}
-	_ = generator.AfterPropertiesSet()
+	_ = generator.afterPropertiesSet()
 
 	dumbAlg := &DumbAlgorithm{}
 	for i := 0; i < 500; i++ {
 		infoHash := metainfo.NewHashFromHex(fmt.Sprintf("%dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", i)[0:40])
-		_ = generator.Get(dumbAlg, infoHash, tracker.None)
+		_ = generator.get(dumbAlg, infoHash, tracker.None)
 	}
 
 	// ensure A is no longer present in the map

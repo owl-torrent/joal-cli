@@ -22,18 +22,18 @@ algorithm:
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
-	_ = generator.AfterPropertiesSet()
-	assert.IsType(t, &AlwaysRefreshGenerator{}, generator.impl)
+	_ = generator.afterPropertiesSet()
+	assert.IsType(t, &AlwaysRefreshGenerator{}, generator.IKeyGenerator)
 }
 
 func TestGenerateAlwaysRefresh(t *testing.T) {
 	generator := &AlwaysRefreshGenerator{}
-	_ = generator.AfterPropertiesSet()
+	_ = generator.afterPropertiesSet()
 
 	dumbAlg := &DumbAlgorithm{}
 	for i := 0; i < 500; i++ {
 		infoHash := metainfo.NewHashFromHex(fmt.Sprintf("%dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", i)[0:40])
-		_ = generator.Get(dumbAlg, infoHash, tracker.None)
+		_ = generator.get(dumbAlg, infoHash, tracker.None)
 	}
 
 	assert.Equal(t, 500, dumbAlg.counter, "Should have been called 500 times")

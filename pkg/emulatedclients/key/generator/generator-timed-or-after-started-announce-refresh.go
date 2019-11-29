@@ -5,17 +5,16 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/key"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/key/algorithm"
-	"github.com/pkg/errors"
 	"time"
 )
 
 type TimedOrAfterStartedAnnounceRefreshGenerator struct {
-	value          *key.Key       `yaml:"-"`
-	RefreshEvery   time.Duration `yaml:"refreshEvery"`
+	value          *key.Key      `yaml:"-"`
+	RefreshEvery   time.Duration `yaml:"refreshEvery" validate:"required"`
 	nextGeneration time.Time     `yaml:"-"`
 }
 
-func (g *TimedOrAfterStartedAnnounceRefreshGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
+func (g *TimedOrAfterStartedAnnounceRefreshGenerator) get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
 	if g.shouldRegenerate(event) {
 		val := algorithm.Generate()
 		g.value = &val
@@ -37,10 +36,7 @@ func (g *TimedOrAfterStartedAnnounceRefreshGenerator) shouldRegenerate(event tra
 	return false
 }
 
-func (g *TimedOrAfterStartedAnnounceRefreshGenerator) AfterPropertiesSet() error {
+func (g *TimedOrAfterStartedAnnounceRefreshGenerator) afterPropertiesSet() error {
 	g.nextGeneration = time.Now()
-	if g.RefreshEvery.Milliseconds() == 0 {
-		return errors.New("'RefreshEvery' property can not be empty in TimedRefreshGenerator")
-	}
 	return nil
 }

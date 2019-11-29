@@ -10,13 +10,13 @@ import (
 )
 
 type TorrentVolatileGenerator struct {
-	lock                sync.RWMutex                               `yaml:"-"`
+	lock                sync.RWMutex                         `yaml:"-"`
 	entries             map[torrent.InfoHash]*AccessAwareKey `yaml:"-"`
-	counterSinceCleanup int                                        `yaml:"-"`
-	evictAfter          time.Duration                              `yaml:"-"`
+	counterSinceCleanup int                                  `yaml:"-"`
+	evictAfter          time.Duration                        `yaml:"-"`
 }
 
-func (g *TorrentVolatileGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
+func (g *TorrentVolatileGenerator) get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
 	g.lock.RLock()
 	g.counterSinceCleanup += 1
 	val, ok := g.entries[infoHash]
@@ -53,7 +53,7 @@ func (g *TorrentVolatileGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHa
 	return val.Get()
 }
 
-func (g *TorrentVolatileGenerator) AfterPropertiesSet() error {
+func (g *TorrentVolatileGenerator) afterPropertiesSet() error {
 	g.lock = sync.RWMutex{}
 	g.entries = make(map[torrent.InfoHash]*AccessAwareKey, 10)
 	g.counterSinceCleanup = 0

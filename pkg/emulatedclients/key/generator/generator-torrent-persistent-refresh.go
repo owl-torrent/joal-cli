@@ -16,7 +16,7 @@ type TorrentPersistentGenerator struct {
 	evictAfter          time.Duration                        `yaml:"-"`
 }
 
-func (g *TorrentPersistentGenerator) Get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
+func (g *TorrentPersistentGenerator) get(algorithm algorithm.IKeyAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) key.Key {
 	g.lock.RLock()
 	g.counterSinceCleanup += 1
 	val, ok := g.entries[infoHash]
@@ -47,7 +47,7 @@ func (g *TorrentPersistentGenerator) Get(algorithm algorithm.IKeyAlgorithm, info
 	return val.Get()
 }
 
-func (g *TorrentPersistentGenerator) AfterPropertiesSet() error {
+func (g *TorrentPersistentGenerator) afterPropertiesSet() error {
 	g.lock = sync.RWMutex{}
 	g.entries = make(map[torrent.InfoHash]*AccessAwareKey, 10)
 	g.counterSinceCleanup = 0
