@@ -4,13 +4,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/peerid"
-	"github.com/pkg/errors"
 	"io"
 )
 
 type PoolWithChecksumAlgorithm struct {
 	randomSource   io.Reader `yaml:"-"`
-	Prefix         string    `yaml:"prefix" validate:"required"`
+	Prefix         string    `yaml:"prefix" validate:"required,lt=19"`
 	CharactersPool string    `yaml:"charactersPool" validate:"required"`
 }
 
@@ -44,12 +43,5 @@ func (a *PoolWithChecksumAlgorithm) Generate() peerid.PeerId {
 
 func (a *PoolWithChecksumAlgorithm) AfterPropertiesSet() error {
 	a.randomSource = rand.Reader
-	if len(a.Prefix) > 18 {
-		return errors.Errorf("PoolWithChecksumAlgorithm prefix is too long '%s'", a.Prefix)
-	}
-	if len(a.CharactersPool) < 1 {
-		return errors.Errorf("PoolWithChecksumAlgorithm charactersPool is too short '%s'", a.CharactersPool)
-	}
-
 	return nil
 }

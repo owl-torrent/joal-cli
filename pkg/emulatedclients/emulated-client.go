@@ -22,33 +22,21 @@ type EmulatedClient struct {
 }
 
 func (c *EmulatedClient) AfterPropertiesSet() error {
-	if c.KeyGenerator == nil {
-		return errors.New("'keyGenerator' key is required in EmulatedClient")
-	}
 	err := c.KeyGenerator.AfterPropertiesSet()
 	if err != nil {
 		return err
 	}
 
-	if c.PeerIdGenerator == nil {
-		return errors.New("'peerIdGenerator' key is required in EmulatedClient")
-	}
 	err = c.PeerIdGenerator.AfterPropertiesSet()
 	if err != nil {
 		return err
 	}
 
-	if c.Announcer == nil {
-		return errors.New("'announcer' key is required in EmulatedClient")
-	}
 	err = c.Announcer.AfterPropertiesSet()
 	if err != nil {
 		return err
 	}
 
-	if c.Listener == nil {
-		return errors.New("'announcer' key is required in EmulatedClient")
-	}
 	err = c.Listener.AfterPropertiesSet()
 	if err != nil {
 		return err

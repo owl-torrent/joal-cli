@@ -65,9 +65,6 @@ func (a *KeyGenerator) Get(infoHash torrent.InfoHash, event tracker.AnnounceEven
 }
 
 func (a *KeyGenerator) AfterPropertiesSet() error {
-	if a.Algorithm == nil {
-		return errors.New("NeverRefreshGenerator can not have a nil algorithm")
-	}
 	err := a.Algorithm.AfterPropertiesSet()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to validate generator algorithm")

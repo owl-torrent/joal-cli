@@ -39,6 +39,7 @@ func TestPoolWithChecksumAlgorithm_ShouldValidate(t *testing.T) {
 		errorDescription testutils.ErrorDescription
 	}{
 		{name: "shouldFailWithEmptyCharacterPool", args: args{Alg: PoolWithChecksumAlgorithm{Prefix: "ok"}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "PoolWithChecksumAlgorithm.CharactersPool", ErrorTag: "required"}},
+		{name: "shouldFailWithPrefixTooLong", args: args{Alg: PoolWithChecksumAlgorithm{Prefix: "aaaaaaaaaaaaaaaaaaa", CharactersPool: "ok"}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "PoolWithChecksumAlgorithm.Prefix", ErrorTag: "lt"}},
 		{name: "shouldFailWithEmptyPrefix", args: args{Alg: PoolWithChecksumAlgorithm{CharactersPool: "ok"}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "PoolWithChecksumAlgorithm.Prefix", ErrorTag: "required"}},
 		{name: "shouldValidate", args: args{Alg: PoolWithChecksumAlgorithm{Prefix: "ok", CharactersPool: "ok"}}, wantErr: false},
 	}

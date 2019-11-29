@@ -65,9 +65,6 @@ func (a *PeerIdGenerator) Get(infoHash torrent.InfoHash, event tracker.AnnounceE
 }
 
 func (a *PeerIdGenerator) AfterPropertiesSet() error {
-	if a.Algorithm == nil {
-		return errors.New("NeverRefreshGenerator can not have a nil algorithm")
-	}
 	err := a.Algorithm.AfterPropertiesSet()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to validate generator algorithm")
