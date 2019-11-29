@@ -20,9 +20,9 @@ max: 350
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = algorithm.AfterPropertiesSet()
-	assert.IsType(t, &NumRangeAsHexAlgorithm{}, algorithm.Impl)
-	assert.Equal(t, uint32(1), algorithm.Impl.(*NumRangeAsHexAlgorithm).Min)
-	assert.Equal(t, uint32(350), algorithm.Impl.(*NumRangeAsHexAlgorithm).Max)
+	assert.IsType(t, &NumRangeAsHexAlgorithm{}, algorithm.IKeyAlgorithm)
+	assert.Equal(t, uint32(1), algorithm.IKeyAlgorithm.(*NumRangeAsHexAlgorithm).Min)
+	assert.Equal(t, uint32(350), algorithm.IKeyAlgorithm.(*NumRangeAsHexAlgorithm).Max)
 }
 
 func TestHttpAnnouncer_ShouldValidate(t *testing.T) {
