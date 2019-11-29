@@ -3,6 +3,8 @@ package algorithm
 import (
 	"bytes"
 	"fmt"
+	"github.com/anthonyraymond/joal-cli/pkg/testutils"
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"testing"
@@ -19,9 +21,41 @@ charactersPool: 0123456789abcdefghijklmnopqrstuvwxyz
 	if err != nil {
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
-	assert.IsType(t, &PoolWithChecksumAlgorithm{}, algorithm.impl)
-	assert.Equal(t, algorithm.impl.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
-	assert.Equal(t, algorithm.impl.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
+	assert.IsType(t, &PoolWithChecksumAlgorithm{}, algorithm.IPeerIdAlgorithm)
+	assert.Equal(t, algorithm.IPeerIdAlgorithm.(*PoolWithChecksumAlgorithm).Prefix, `-TR284Z-`)
+	assert.Equal(t, algorithm.IPeerIdAlgorithm.(*PoolWithChecksumAlgorithm).CharactersPool, `0123456789abcdefghijklmnopqrstuvwxyz`)
+}
+
+func TestPoolWithChecksumAlgorithm_ShouldValidate(t *testing.T) {
+	type args struct {
+		Alg PoolWithChecksumAlgorithm
+	}
+	tests := []struct {
+		name             string
+		args             args
+		wantErr          bool
+		failingField     string
+		failingTag       string
+		errorDescription testutils.ErrorDescription
+	}{
+		{name: "shouldFailWithEmptyCharacterPool", args: args{Alg: PoolWithChecksumAlgorithm{Prefix: "ok"}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "PoolWithChecksumAlgorithm.CharactersPool", ErrorTag: "required"}},
+		{name: "shouldFailWithEmptyPrefix", args: args{Alg: PoolWithChecksumAlgorithm{CharactersPool: "ok"}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "PoolWithChecksumAlgorithm.Prefix", ErrorTag: "required"}},
+		{name: "shouldValidate", args: args{Alg: PoolWithChecksumAlgorithm{Prefix: "ok", CharactersPool: "ok"}}, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.New().Struct(tt.args.Alg)
+			if tt.wantErr == true && err == nil {
+				t.Fatal("validation failed, wantErr=true but err is nil")
+			}
+			if tt.wantErr == false && err != nil {
+				t.Fatalf("validation failed, wantErr=false but err is : %v", err)
+			}
+			if tt.wantErr {
+				testutils.AssertValidateError(t, err.(validator.ValidationErrors), tt.errorDescription)
+			}
+		})
+	}
 }
 
 func TestGeneratePoolWithChecksumAlgorithm(t *testing.T) {
@@ -44,7 +78,7 @@ func TestGeneratePoolWithChecksumAlgorithm(t *testing.T) {
 	}
 
 	for i := 0; i < len(scenarios); i++ {
-		alg.RandomSource = bytes.NewReader(scenarios[i].randomSource)
+		alg.randomSource = bytes.NewReader(scenarios[i].randomSource)
 		assert.Equal(t, scenarios[i].expect, fmt.Sprintf("%s", alg.Generate()))
 	}
 }

@@ -28,6 +28,7 @@ type: TORRENT_PERSISTENT_REFRESH
 	}
 	_ = generator.AfterPropertiesSet()
 	assert.IsType(t, &TorrentPersistentGenerator{}, generator.IKeyGenerator)
+	assert.NotNil(t, generator.Algorithm)
 }
 
 type validAbleKeyGenerator struct {

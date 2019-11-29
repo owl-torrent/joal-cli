@@ -9,15 +9,15 @@ import (
 )
 
 type PoolWithChecksumAlgorithm struct {
-	RandomSource   io.Reader `yaml:"-"`
-	Prefix         string    `yaml:"prefix"`
-	CharactersPool string    `yaml:"charactersPool"`
+	randomSource   io.Reader `yaml:"-"`
+	Prefix         string    `yaml:"prefix" validate:"required"`
+	CharactersPool string    `yaml:"charactersPool" validate:"required"`
 }
 
 func (a *PoolWithChecksumAlgorithm) Generate() peerid.PeerId {
 	suffixLength := peerid.Length - len(a.Prefix)
 	randomBytes := make([]byte, suffixLength-1)
-	_, err := io.ReadFull(a.RandomSource, randomBytes)
+	_, err := io.ReadFull(a.randomSource, randomBytes)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to read random bytes: %+v", err))
 	}
@@ -43,7 +43,7 @@ func (a *PoolWithChecksumAlgorithm) Generate() peerid.PeerId {
 }
 
 func (a *PoolWithChecksumAlgorithm) AfterPropertiesSet() error {
-	a.RandomSource = rand.Reader
+	a.randomSource = rand.Reader
 	if len(a.Prefix) > 18 {
 		return errors.Errorf("PoolWithChecksumAlgorithm prefix is too long '%s'", a.Prefix)
 	}

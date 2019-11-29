@@ -17,7 +17,7 @@ type IPeerIdAlgorithm interface {
 }
 
 type PeerIdAlgorithm struct {
-	impl IPeerIdAlgorithm `yaml:",inline"`
+	IPeerIdAlgorithm `yaml:",inline" validate:"required"`
 }
 
 func (a *PeerIdAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -46,13 +46,6 @@ func (a *PeerIdAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error
 	if err != nil {
 		return err
 	}
-	a.impl = algorithm
+	a.IPeerIdAlgorithm = algorithm
 	return nil
-}
-
-func (a *PeerIdAlgorithm) Generate() peerid.PeerId {
-	return a.impl.Generate()
-}
-func (a *PeerIdAlgorithm) AfterPropertiesSet() error {
-	return a.impl.AfterPropertiesSet()
 }

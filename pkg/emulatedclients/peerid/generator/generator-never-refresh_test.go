@@ -23,19 +23,19 @@ algorithm:
 		t.Fatalf("Failed to unmarshall: %+v", err)
 	}
 	_ = generator.AfterPropertiesSet()
-	assert.IsType(t, &NeverRefreshGenerator{}, generator.impl)
+	assert.IsType(t, &NeverRefreshGenerator{}, generator.IPeerIdGenerator)
 }
 
 func TestGenerateNeverRefresh(t *testing.T) {
 	generator := &NeverRefreshGenerator{
 		value: nil,
 	}
-	_ = generator.AfterPropertiesSet()
+	_ = generator.afterPropertiesSet()
 
 	dumbAlg := &DumbAlgorithm{}
 	for i := 0; i < 500; i++ {
 		infoHash := metainfo.NewHashFromHex(fmt.Sprintf("%dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", i)[0:40])
-		generator.Get(dumbAlg, infoHash, tracker.None)
+		generator.get(dumbAlg, infoHash, tracker.None)
 	}
 
 	assert.Equal(t, 1, dumbAlg.counter, "Should have been called once")

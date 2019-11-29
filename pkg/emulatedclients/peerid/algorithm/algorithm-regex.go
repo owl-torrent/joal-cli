@@ -7,7 +7,7 @@ import (
 )
 
 type RegexPatternAlgorithm struct {
-	Pattern   string            `yaml:"pattern"`
+	Pattern   string            `yaml:"pattern" validate:"required"`
 	generator *reggen.Generator `yaml:"-"`
 }
 

@@ -10,22 +10,22 @@ import (
 	"time"
 )
 
-var generatorImplementations = map[string]func() iPeerIdGenerator{
-	"NEVER_REFRESH":  func() iPeerIdGenerator { return &NeverRefreshGenerator{} },
-	"ALWAYS_REFRESH": func() iPeerIdGenerator { return &AlwaysRefreshGenerator{} },
-	"TIMED_REFRESH":  func() iPeerIdGenerator { return &TimedRefreshGenerator{} },
-	"TIMED_OR_AFTER_STARTED_ANNOUNCE_REFRESH": func() iPeerIdGenerator { return &TimedOrAfterStartedAnnounceRefreshGenerator{} },
-	"TORRENT_PERSISTENT_REFRESH":              func() iPeerIdGenerator { return &TorrentPersistentGenerator{} },
-	"TORRENT_VOLATILE_REFRESH":                func() iPeerIdGenerator { return &TorrentVolatileGenerator{} },
+var generatorImplementations = map[string]func() IPeerIdGenerator{
+	"NEVER_REFRESH":  func() IPeerIdGenerator { return &NeverRefreshGenerator{} },
+	"ALWAYS_REFRESH": func() IPeerIdGenerator { return &AlwaysRefreshGenerator{} },
+	"TIMED_REFRESH":  func() IPeerIdGenerator { return &TimedRefreshGenerator{} },
+	"TIMED_OR_AFTER_STARTED_ANNOUNCE_REFRESH": func() IPeerIdGenerator { return &TimedOrAfterStartedAnnounceRefreshGenerator{} },
+	"TORRENT_PERSISTENT_REFRESH":              func() IPeerIdGenerator { return &TorrentPersistentGenerator{} },
+	"TORRENT_VOLATILE_REFRESH":                func() IPeerIdGenerator { return &TorrentVolatileGenerator{} },
 }
 
-type iPeerIdGenerator interface {
-	Get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId
-	AfterPropertiesSet() error
+type IPeerIdGenerator interface {
+	get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId
+	afterPropertiesSet() error
 }
 type PeerIdGenerator struct {
-	impl      iPeerIdGenerator           `yaml:",inline"`
-	Algorithm algorithm.IPeerIdAlgorithm `yaml:"algorithm"`
+	IPeerIdGenerator `yaml:",inline" validate:"required"`
+	Algorithm        algorithm.IPeerIdAlgorithm `yaml:"algorithm" validate:"required"`
 }
 
 func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -55,13 +55,13 @@ func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error
 	if err != nil {
 		return err
 	}
-	a.impl = generator
+	a.IPeerIdGenerator = generator
 	a.Algorithm = unmarshalStruct.Algorithm
 	return nil
 }
 
 func (a *PeerIdGenerator) Get(infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
-	return a.impl.Get(a.Algorithm, infoHash, event)
+	return a.IPeerIdGenerator.get(a.Algorithm, infoHash, event)
 }
 
 func (a *PeerIdGenerator) AfterPropertiesSet() error {
@@ -72,7 +72,7 @@ func (a *PeerIdGenerator) AfterPropertiesSet() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to validate generator algorithm")
 	}
-	return a.impl.AfterPropertiesSet()
+	return a.IPeerIdGenerator.afterPropertiesSet()
 }
 
 type AccessAwarePeerId struct {

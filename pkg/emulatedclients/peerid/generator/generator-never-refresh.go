@@ -11,7 +11,7 @@ type NeverRefreshGenerator struct {
 	value *peerid.PeerId `yaml:"-"`
 }
 
-func (g *NeverRefreshGenerator) Get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
+func (g *NeverRefreshGenerator) get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
 	if g.value == nil {
 		val := algorithm.Generate()
 		g.value = &val
@@ -19,6 +19,6 @@ func (g *NeverRefreshGenerator) Get(algorithm algorithm.IPeerIdAlgorithm, infoHa
 	return *g.value
 }
 
-func (g *NeverRefreshGenerator) AfterPropertiesSet() error {
+func (g *NeverRefreshGenerator) afterPropertiesSet() error {
 	return nil
 }

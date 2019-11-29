@@ -16,7 +16,7 @@ type TorrentPersistentGenerator struct {
 	evictAfter          time.Duration                           `yaml:"-"`
 }
 
-func (g *TorrentPersistentGenerator) Get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
+func (g *TorrentPersistentGenerator) get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
 	g.lock.RLock()
 	g.counterSinceCleanup += 1
 	val, ok := g.entries[infoHash]
@@ -47,7 +47,7 @@ func (g *TorrentPersistentGenerator) Get(algorithm algorithm.IPeerIdAlgorithm, i
 	return val.Get()
 }
 
-func (g *TorrentPersistentGenerator) AfterPropertiesSet() error {
+func (g *TorrentPersistentGenerator) afterPropertiesSet() error {
 	g.lock = sync.RWMutex{}
 	g.entries = make(map[torrent.InfoHash]*AccessAwarePeerId, 10)
 	g.counterSinceCleanup = 0
