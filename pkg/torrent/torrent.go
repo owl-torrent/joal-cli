@@ -75,7 +75,7 @@ func (t *Torrent) Seed() {
 	t.nextAnnounceAt = time.Now()
 
 	go func(t *Torrent) {
-		for ; ; {
+		for {
 			announceAfter := time.After(time.Until(t.nextAnnounceAt))
 
 			select {

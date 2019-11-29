@@ -75,7 +75,6 @@ func (a *PeerIdGenerator) AfterPropertiesSet() error {
 	return a.impl.AfterPropertiesSet()
 }
 
-
 type AccessAwarePeerId struct {
 	lastAccessed time.Time
 	val          peerid.PeerId

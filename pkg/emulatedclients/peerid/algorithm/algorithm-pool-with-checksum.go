@@ -9,9 +9,9 @@ import (
 )
 
 type PoolWithChecksumAlgorithm struct {
-	RandomSource   io.Reader        `yaml:"-"`
-	Prefix         string           `yaml:"prefix"`
-	CharactersPool string           `yaml:"charactersPool"`
+	RandomSource   io.Reader `yaml:"-"`
+	Prefix         string    `yaml:"prefix"`
+	CharactersPool string    `yaml:"charactersPool"`
 }
 
 func (a *PoolWithChecksumAlgorithm) Generate() peerid.PeerId {

@@ -10,9 +10,9 @@ import (
 )
 
 type TimedRefreshGenerator struct {
-	value          *peerid.PeerId       `yaml:"-"`
-	RefreshEvery   time.Duration `yaml:"refreshEvery"`
-	nextGeneration time.Time     `yaml:"-"`
+	value          *peerid.PeerId `yaml:"-"`
+	RefreshEvery   time.Duration  `yaml:"refreshEvery"`
+	nextGeneration time.Time      `yaml:"-"`
 }
 
 func (g *TimedRefreshGenerator) Get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
