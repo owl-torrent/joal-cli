@@ -90,7 +90,7 @@ func TestListener_getPublicIpShouldFallbackThroughUrl(t *testing.T) {
 	}))
 	defer s.Close()
 
-	publicIpProviders = []string{"http://localhost:15915/noop", failingServ.URL, s.URL}
+	publicIpProviders = []string{failingServ.URL, s.URL}
 
 	err := listener.Start()
 	if err != nil {
