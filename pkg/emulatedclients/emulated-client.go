@@ -11,14 +11,14 @@ import (
 )
 
 type EmulatedClient struct {
-	Name            string                           `yaml:"name"`
-	Version         string                           `yaml:"version"`
-	KeyGenerator    *keygenerator.KeyGenerator       `yaml:"keyGenerator"`
-	PeerIdGenerator *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator"`
-	NumWant         int32                            `yaml:"numwant"`
+	Name            string                           `yaml:"name" validate:"required"`
+	Version         string                           `yaml:"version" validate:"required"`
+	KeyGenerator    *keygenerator.KeyGenerator       `yaml:"keyGenerator" validate:"required"`
+	PeerIdGenerator *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
+	NumWant         int32                            `yaml:"numwant" validate:"min=1"`
 	NumWantOnStop   int32                            `yaml:"numwantOnStop"`
-	Announcer       *announce.Announcer              `yaml:"announcer"`
-	Listener        *Listener                        `yaml:"listener"`
+	Announcer       *announce.Announcer              `yaml:"announcer" validate:"required"`
+	Listener        *Listener                        `yaml:"listener" validate:"required"`
 }
 
 func (c *EmulatedClient) AfterPropertiesSet() error {
