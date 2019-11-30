@@ -12,10 +12,10 @@ peerIdGenerator:
     type: REGEX
     pattern: ^-qB3310-[A-Za-z0-9_~\(\)\!\.\*-]{12}$
   type: NEVER_REFRESH
+numwant: 200
+numwantOnStop: 0
 announcer:
   http:
-    numwant: 200
-    numwantOnStop: 0
     urlEncoder:
       encodedHexCase: lower
     shouldUrlEncode: false
