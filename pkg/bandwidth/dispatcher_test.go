@@ -10,14 +10,14 @@ import (
 )
 
 type testSwarm struct {
-	seeders  uint16
-	leechers uint16
+	seeders  int32
+	leechers int32
 }
 
-func (s *testSwarm) GetSeeders() uint16 {
+func (s *testSwarm) GetSeeders() int32 {
 	return s.seeders
 }
-func (s *testSwarm) GetLeechers() uint16 {
+func (s *testSwarm) GetLeechers() int32 {
 	return s.leechers
 }
 
@@ -73,12 +73,12 @@ func Test_calculateWeightShouldProvidePreciseValues(t *testing.T) {
 }
 
 type DumbSwarm struct {
-	seeders  uint16
-	leechers uint16
+	seeders  int32
+	leechers int32
 }
 
-func (s *DumbSwarm) GetSeeders() uint16  { return s.seeders }
-func (s *DumbSwarm) GetLeechers() uint16 { return s.leechers }
+func (s *DumbSwarm) GetSeeders() int32  { return s.seeders }
+func (s *DumbSwarm) GetLeechers() int32 { return s.leechers }
 
 type DumbBandwidthClaimable struct {
 	infoHash           *torrent.InfoHash
@@ -110,7 +110,7 @@ func (s *DumbStaticSpeedProvider) GetBytesPerSeconds() int64 { return s.speed }
 func (s *DumbStaticSpeedProvider) Refresh()                  {}
 
 func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
-	dispatcher := &Dispatcher{
+	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
@@ -137,7 +137,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 }
 
 func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
-	dispatcher := &Dispatcher{
+	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
@@ -174,7 +174,7 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 }
 
 func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
-	dispatcher := &Dispatcher{
+	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
@@ -211,7 +211,7 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 }
 
 func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
-	dispatcher := &Dispatcher{
+	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},

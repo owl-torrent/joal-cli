@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/testutils"
+	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"

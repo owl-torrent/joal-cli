@@ -3,9 +3,9 @@ package announce
 import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/urlencoder"
-	"github.com/anthonyraymond/joal-cli/pkg/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"

@@ -8,8 +8,8 @@ import (
 )
 
 type ISwarm interface {
-	GetSeeders() uint16
-	GetLeechers() uint16
+	GetSeeders() int32
+	GetLeechers() int32
 }
 type IBandwidthClaimable interface {
 	InfoHash() *torrent.InfoHash
@@ -27,7 +27,7 @@ type IDispatcher interface {
 
 type Weight = float64
 
-type Dispatcher struct {
+type dispatcher struct {
 	speedProviderUpdateInterval time.Duration
 	dispatcherUpdateInterval    time.Duration
 	quit                        chan int
@@ -38,7 +38,7 @@ type Dispatcher struct {
 }
 
 func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {
-	return &Dispatcher{
+	return &dispatcher{
 		speedProviderUpdateInterval: 20 * time.Minute,
 		dispatcherUpdateInterval:    5 * time.Second,
 		randomSpeedProvider:         randomSpeedProvider,
@@ -48,7 +48,7 @@ func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {
 	}
 }
 
-func (d *Dispatcher) Start() {
+func (d *dispatcher) Start() {
 	d.quit = make(chan int)
 	go func() {
 		speedProviderChan := utils.Every(d.speedProviderUpdateInterval, func() { d.randomSpeedProvider.Refresh() })
@@ -73,13 +73,13 @@ func (d *Dispatcher) Start() {
 		}
 	}()
 }
-func (d *Dispatcher) Stop() {
+func (d *dispatcher) Stop() {
 	close(d.quit)
 }
 
 // Register a IBandwidthClaimable as a bandwidth client. Will update his uploaded stats on a timer and the amount of uploaded given depend on this ISwarm of the IBandwidthClaimable.
 // If called with an already known IBandwidthClaimable, re-calculate his bandwidth attribution based on his ISwarm. Basically this methods should be called every time the IBandwidthClaimable receives new Peers from the tracker.
-func (d *Dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
+func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -93,7 +93,7 @@ func (d *Dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 }
 
 // Unregister a IBandwidthClaimable. After being released a IBandwidthClaimable wont receive any more bandwidth
-func (d *Dispatcher) Release(claimer IBandwidthClaimable) {
+func (d *dispatcher) Release(claimer IBandwidthClaimable) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

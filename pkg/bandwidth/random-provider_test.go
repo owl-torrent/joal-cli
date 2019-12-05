@@ -23,15 +23,15 @@ func TestRandomSpeedProvider_RefreshShouldGenerateValueWithinRange(t *testing.T)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &RandomSpeedProvider{
-				minimumBytesPerSeconds: tt.fields.minimumBytesPerSeconds,
-				maximumBytesPerSeconds: tt.fields.maximumBytesPerSeconds,
+				MinimumBytesPerSeconds: tt.fields.minimumBytesPerSeconds,
+				MaximumBytesPerSeconds: tt.fields.maximumBytesPerSeconds,
 				value:                  tt.fields.value,
 			}
 			for i := 0; i < 1000; i++ {
 				r.Refresh()
 				bps := r.GetBytesPerSeconds()
-				assert.GreaterOrEqual(t, bps, r.minimumBytesPerSeconds)
-				assert.LessOrEqual(t, bps, r.maximumBytesPerSeconds)
+				assert.GreaterOrEqual(t, bps, r.MinimumBytesPerSeconds)
+				assert.LessOrEqual(t, bps, r.MaximumBytesPerSeconds)
 			}
 		})
 	}
@@ -39,8 +39,8 @@ func TestRandomSpeedProvider_RefreshShouldGenerateValueWithinRange(t *testing.T)
 
 func TestRandomSpeedProviderRefreshShouldGenerateRandomValues(t *testing.T) {
 	r := RandomSpeedProvider{
-		minimumBytesPerSeconds: 20,
-		maximumBytesPerSeconds: 100000,
+		MinimumBytesPerSeconds: 20,
+		MaximumBytesPerSeconds: 100000,
 	}
 
 	// One key for each unique value

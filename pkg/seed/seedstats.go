@@ -1,4 +1,4 @@
-package torrent
+package seed
 
 type seedStats struct {
 	Downloaded int64

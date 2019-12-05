@@ -3,9 +3,9 @@ package generator
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/peerid"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/peerid/algorithm"
-	"github.com/anthonyraymond/joal-cli/pkg/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"

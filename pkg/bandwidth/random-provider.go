@@ -7,8 +7,8 @@ type IRandomSpeedProvider interface {
 	Refresh()
 }
 type RandomSpeedProvider struct {
-	minimumBytesPerSeconds int64
-	maximumBytesPerSeconds int64
+	MinimumBytesPerSeconds int64
+	MaximumBytesPerSeconds int64
 	value                  int64
 }
 
@@ -16,5 +16,5 @@ func (r *RandomSpeedProvider) GetBytesPerSeconds() int64 {
 	return r.value
 }
 func (r *RandomSpeedProvider) Refresh() {
-	r.value = randutils.Range(r.minimumBytesPerSeconds, r.maximumBytesPerSeconds)
+	r.value = randutils.Range(r.MinimumBytesPerSeconds, r.MaximumBytesPerSeconds)
 }

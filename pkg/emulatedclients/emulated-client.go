@@ -5,9 +5,14 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/validationutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients/announce"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclients/key/generator"
 	peeridgenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclients/peerid/generator"
+	"github.com/go-playground/validator/v10"
+	"gopkg.in/yaml.v2"
+	"io"
+	"os"
 )
 
 type EmulatedClient struct {
@@ -19,6 +24,36 @@ type EmulatedClient struct {
 	NumWantOnStop   int32                            `yaml:"numwantOnStop"`
 	Announcer       *announce.Announcer              `yaml:"announcer" validate:"required"`
 	Listener        *Listener                        `yaml:"listener" validate:"required"`
+}
+
+func FromClientFile(path string) (*EmulatedClient, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return FromReader(file)
+}
+
+func FromReader(reader io.Reader) (*EmulatedClient, error) {
+	client := EmulatedClient{}
+	err := yaml.NewDecoder(reader).Decode(&client)
+	if err != nil {
+		return nil, err
+	}
+
+	validate := validator.New()
+	validate.RegisterTagNameFunc(validationutils.TagNameFunction)
+	err = validate.Struct(client)
+	if err != nil {
+		return nil, err
+	}
+
+	err = client.AfterPropertiesSet()
+	if err != nil {
+		return nil, err
+	}
+
+	return &client, nil
 }
 
 func (c *EmulatedClient) AfterPropertiesSet() error {
