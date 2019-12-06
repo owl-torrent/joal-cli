@@ -141,4 +141,5 @@ func (t *Torrent) StopSeeding(ctx context.Context) {
 		return
 	}
 
+	// TODO: implement StopSeeding with channel
 }
