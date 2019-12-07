@@ -3,6 +3,7 @@ package bandwidth
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -102,12 +103,58 @@ func (bc *DumbBandwidthClaimable) AddUploaded(bytes int64) {
 }
 func (bc *DumbBandwidthClaimable) GetSwarm() ISwarm { return bc.swarm }
 
+type WaitRefreshStaticSpeedProvider struct {
+	wgRefresh *sync.WaitGroup
+}
+
+func (s *WaitRefreshStaticSpeedProvider) GetBytesPerSeconds() int64 { return 0 }
+func (s *WaitRefreshStaticSpeedProvider) Refresh()                  { s.wgRefresh.Done() }
+
+func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
+	speedProvider := &WaitRefreshStaticSpeedProvider{wgRefresh: &sync.WaitGroup{}}
+	dispatcher := &dispatcher{
+		speedProviderUpdateInterval: 1 * time.Hour,
+		dispatcherUpdateInterval:    1 * time.Millisecond,
+		randomSpeedProvider:         speedProvider,
+		claimers:                    make(map[IBandwidthClaimable]Weight),
+		totalWeight:                 0,
+		lock:                        &sync.RWMutex{},
+	}
+
+	speedProvider.wgRefresh.Add(1)
+	dispatcher.Start()
+	defer dispatcher.Stop()
+	if err := testutils.WaitOrFailAfterTimeout(speedProvider.wgRefresh, 2*time.Second); err != nil {
+		t.Errorf("Speed was not refreshed")
+	}
+}
+
+func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
+	speedProvider := &WaitRefreshStaticSpeedProvider{wgRefresh: &sync.WaitGroup{}}
+	dispatcher := &dispatcher{
+		speedProviderUpdateInterval: 1 * time.Millisecond,
+		dispatcherUpdateInterval:    1 * time.Millisecond,
+		randomSpeedProvider:         speedProvider,
+		claimers:                    make(map[IBandwidthClaimable]Weight),
+		totalWeight:                 0,
+		lock:                        &sync.RWMutex{},
+	}
+
+	speedProvider.wgRefresh.Add(100)
+	dispatcher.Start()
+	defer dispatcher.Stop()
+	if err := testutils.WaitOrFailAfterTimeout(speedProvider.wgRefresh, 2*time.Second); err != nil {
+		t.Errorf("Speed was not refreshed")
+	}
+}
+
 type DumbStaticSpeedProvider struct {
-	speed int64
+	speed        int64
+	refreshCount int
 }
 
 func (s *DumbStaticSpeedProvider) GetBytesPerSeconds() int64 { return s.speed }
-func (s *DumbStaticSpeedProvider) Refresh()                  {}
+func (s *DumbStaticSpeedProvider) Refresh()                  { s.refreshCount += 1 }
 
 func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 	dispatcher := &dispatcher{

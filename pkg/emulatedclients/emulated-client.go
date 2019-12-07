@@ -1,6 +1,7 @@
 package emulatedclients
 
 import (
+	"context"
 	"errors"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
@@ -15,6 +16,12 @@ import (
 	"os"
 )
 
+type IEmulatedClient interface {
+	Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
+	StartListener() error
+	StopListener(ctx context.Context)
+}
+
 type EmulatedClient struct {
 	Name            string                           `yaml:"name" validate:"required"`
 	Version         string                           `yaml:"version" validate:"required"`
@@ -26,7 +33,7 @@ type EmulatedClient struct {
 	Listener        *Listener                        `yaml:"listener" validate:"required"`
 }
 
-func FromClientFile(path string) (*EmulatedClient, error) {
+func FromClientFile(path string) (IEmulatedClient, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -34,7 +41,7 @@ func FromClientFile(path string) (*EmulatedClient, error) {
 	return FromReader(file)
 }
 
-func FromReader(reader io.Reader) (*EmulatedClient, error) {
+func FromReader(reader io.Reader) (IEmulatedClient, error) {
 	client := EmulatedClient{}
 	err := yaml.NewDecoder(reader).Decode(&client)
 	if err != nil {
@@ -104,4 +111,8 @@ func (c *EmulatedClient) Announce(announceList *metainfo.AnnounceList, infoHash 
 
 func (c *EmulatedClient) StartListener() error {
 	return c.Listener.Start()
+}
+
+func (c *EmulatedClient) StopListener(ctx context.Context) {
+
 }

@@ -1,6 +1,7 @@
 package emulatedclients
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -35,6 +36,10 @@ func (l *Listener) Start() error {
 	mockedPort := uint16(9000)
 	l.listeningPort = &mockedPort
 	return nil
+}
+
+func (l *Listener) Stop(ctx context.Context) {
+	// TODO: implement
 }
 
 var publicIpProviders = []string{

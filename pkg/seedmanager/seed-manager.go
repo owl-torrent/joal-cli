@@ -58,7 +58,7 @@ type SeedManager struct {
 	seeds               map[torrent.InfoHash]*seed.Torrent
 	torrentFileWatcher  *watcher.Watcher
 	bandwidthDispatcher bandwidth.IDispatcher
-	client              *emulatedclients.EmulatedClient
+	client              emulatedclients.IEmulatedClient
 	lock                *sync.Mutex
 	//TODO: eventListeners []EventListener // joal components will publish events from a chanel and seedmanager will relegate each of them in each of these publisher
 }
@@ -109,6 +109,10 @@ func (s *SeedManager) Start() error {
 		return err
 	}
 
+	err = s.client.StartListener()
+	if err != nil {
+		return err
+	}
 	s.bandwidthDispatcher.Start()
 
 	// Trigger create events after watcher started
@@ -169,14 +173,14 @@ func (s *SeedManager) Start() error {
 func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	torrentSeed, err := seed.LoadFromFile(filePath, s.client, s.bandwidthDispatcher)
+	torrentSeed, err := seed.LoadFromFile(filePath)
 	if err != nil {
 		return errors.Wrap(err, "failed to create torrent from file")
 	}
 
 	if _, contains := s.seeds[*torrentSeed.InfoHash()]; contains {
 		s.seeds[*torrentSeed.InfoHash()] = torrentSeed
-		torrentSeed.Seed()
+		torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 	}
 
 	return nil
@@ -223,6 +227,7 @@ func (s *SeedManager) Stop(ctx context.Context) {
 		}()
 	}
 
+	s.client.StopListener(ctx)
 	s.bandwidthDispatcher.Stop()
 	s.torrentFileWatcher.Close()
 

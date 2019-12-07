@@ -51,6 +51,7 @@ func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {
 func (d *dispatcher) Start() {
 	d.quit = make(chan int)
 	go func() {
+		d.randomSpeedProvider.Refresh()
 		speedProviderChan := utils.Every(d.speedProviderUpdateInterval, func() { d.randomSpeedProvider.Refresh() })
 		defer close(speedProviderChan)
 		ticker := time.NewTicker(d.dispatcherUpdateInterval)

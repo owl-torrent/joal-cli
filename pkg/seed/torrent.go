@@ -21,18 +21,16 @@ const (
 
 type OnStopHook func()
 type Torrent struct {
-	infoHash            *torrent.InfoHash
-	announceList        metainfo.AnnounceList
-	currentStatus       status
-	nextAnnounce        tracker.AnnounceEvent
-	nextAnnounceAt      time.Time
-	seedingStats        *seedStats
-	peers               bandwidth.ISwarm
-	bitTorrentClient    *emulatedclients.EmulatedClient
-	bandwidthDispatcher bandwidth.IDispatcher
-	lastKnownInterval   time.Duration
-	consecutiveErrors   int32
-	onStopHook          OnStopHook
+	infoHash          *torrent.InfoHash
+	announceList      metainfo.AnnounceList
+	currentStatus     status
+	nextAnnounce      tracker.AnnounceEvent
+	nextAnnounceAt    time.Time
+	seedingStats      *seedStats
+	peers             bandwidth.ISwarm
+	lastKnownInterval time.Duration
+	consecutiveErrors int32
+	onStopHook        OnStopHook
 }
 
 func (t *Torrent) InfoHash() *torrent.InfoHash {
@@ -45,7 +43,7 @@ func (t *Torrent) GetSwarm() bandwidth.ISwarm {
 	return t.peers
 }
 
-func LoadFromFile(file string, bitTorrentClient *emulatedclients.EmulatedClient, dispatcher bandwidth.IDispatcher) (*Torrent, error) {
+func LoadFromFile(file string) (*Torrent, error) {
 	info, err := metainfo.LoadFromFile(file)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load torrent file: '%s'", file)
@@ -59,17 +57,15 @@ func LoadFromFile(file string, bitTorrentClient *emulatedclients.EmulatedClient,
 		announceList = append(firstTier, announceList...)
 	}
 	return &Torrent{
-		infoHash:            &infoHash,
-		announceList:        announceList,
-		currentStatus:       onHold,
-		nextAnnounce:        tracker.Started,
-		nextAnnounceAt:      time.Now(),
-		seedingStats:        &seedStats{Downloaded: 0, Left: 0, Uploaded: 0},
-		peers:               nil,
-		bitTorrentClient:    bitTorrentClient,
-		bandwidthDispatcher: dispatcher,
-		lastKnownInterval:   5 * time.Second,
-		consecutiveErrors:   0,
+		infoHash:          &infoHash,
+		announceList:      announceList,
+		currentStatus:     onHold,
+		nextAnnounce:      tracker.Started,
+		nextAnnounceAt:    time.Now(),
+		seedingStats:      &seedStats{Downloaded: 0, Left: 0, Uploaded: 0},
+		peers:             nil,
+		lastKnownInterval: 5 * time.Second,
+		consecutiveErrors: 0,
 	}, nil
 }
 
@@ -77,7 +73,7 @@ func (t *Torrent) WithHook(hook OnStopHook) {
 	t.onStopHook = hook
 }
 
-func (t *Torrent) Seed() {
+func (t *Torrent) Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
 	if t.currentStatus == seeding {
 		// TODO: log already running
 		return
@@ -98,7 +94,7 @@ func (t *Torrent) Seed() {
 			select {
 			case <-announceAfter:
 				currentAnnounceType := t.nextAnnounce
-				response, err := t.bitTorrentClient.Announce(&t.announceList, *t.infoHash, t.seedingStats.Uploaded, t.seedingStats.Downloaded, t.seedingStats.Left, currentAnnounceType)
+				response, err := bitTorrentClient.Announce(&t.announceList, *t.infoHash, t.seedingStats.Uploaded, t.seedingStats.Downloaded, t.seedingStats.Left, currentAnnounceType)
 				if err != nil {
 					t.consecutiveErrors = t.consecutiveErrors + 1
 					if currentAnnounceType == tracker.None {
@@ -112,19 +108,19 @@ func (t *Torrent) Seed() {
 					if t.consecutiveErrors > 2 && currentAnnounceType != tracker.Started {
 						t.peers = &swarm{seeders: 0, leechers: 0}
 					}
-					t.bandwidthDispatcher.ClaimOrUpdate(t)
+					dispatcher.ClaimOrUpdate(t)
 					break
 				}
 				t.consecutiveErrors = 0
 				if currentAnnounceType == tracker.Stopped {
-					t.bandwidthDispatcher.Release(t)
+					dispatcher.Release(t)
 					return
 				}
 
 				t.lastKnownInterval = time.Duration(response.Interval) * time.Second
 				t.nextAnnounce = tracker.None
 				t.peers = &swarm{leechers: response.Leechers, seeders: response.Seeders}
-				t.bandwidthDispatcher.ClaimOrUpdate(t)
+				dispatcher.ClaimOrUpdate(t)
 
 				return
 				/*case <-stopGracefull:
