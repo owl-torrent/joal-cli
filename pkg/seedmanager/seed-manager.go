@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anthonyraymond/joal-cli/internal/config"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
+	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -20,70 +20,36 @@ import (
 	"github.com/radovskyb/watcher"
 )
 
-type SeedConfig struct {
-	MinUploadRate              int64
-	MaxUploadRate              int64
-	Client                     string
-	RemoveTorrentWithZeroPeers bool
-}
-
-type seedManagerState int32
-
-const (
-	stopped seedManagerState = iota
-	started
-)
-
-type joalPaths struct {
-	torrentFolder        string
-	torrentArchiveFolder string
-	clientFileFolder     string
-}
-
-func joalPathsNew(joalWorkingDirectory string) (*joalPaths, error) {
-	if !filepath.IsAbs(joalWorkingDirectory) {
-		return nil, errors.New("joalWorkingDirectory must be an absolute path")
-	}
-	return &joalPaths{
-		torrentFolder:        filepath.Join(joalWorkingDirectory, "torrents"),
-		torrentArchiveFolder: filepath.Join(joalWorkingDirectory, "torrents", "archived"),
-		clientFileFolder:     filepath.Join(joalWorkingDirectory, "clients"),
-	}, nil
-}
-
 type SeedManager struct {
-	state               seedManagerState
-	configManager       *config.Manager
+	conf                *config.SeedConfig
 	joalPaths           *joalPaths
 	seeds               map[torrent.InfoHash]*seed.Torrent
 	torrentFileWatcher  *watcher.Watcher
 	bandwidthDispatcher bandwidth.IDispatcher
 	client              emulatedclients.IEmulatedClient
+	fileWatcherPoll     time.Duration
 	lock                *sync.Mutex
-	//TODO: eventListeners []EventListener // joal components will publish events from a chanel and seedmanager will relegate each of them in each of these publisher
 }
 
-func SeedManagerNew(joalWorkingDirectory string, configManager *config.Manager) (*SeedManager, error) {
-	paths, err := joalPathsNew(joalWorkingDirectory)
-	if err != nil {
-		return nil, err
-	}
+func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager, error) {
+	dispatcher := bandwidth.DispatcherNew(&bandwidth.RandomSpeedProvider{
+		MinimumBytesPerSeconds: conf.MinUploadRate,
+		MaximumBytesPerSeconds: conf.MaxUploadRate,
+	})
 
-	torrentFileWatcher := watcher.New()
-	torrentFileWatcher.AddFilterHook(watcher.RegexFilterHook(regexp.MustCompile(`.+\.torrent$`), false))
-	err = torrentFileWatcher.Add(paths.torrentFolder)
+	client, err := emulatedclients.FromClientFile(path.Join(joalPaths.clientFileFolder, conf.Client))
 	if err != nil {
 		return nil, err
 	}
 
 	return &SeedManager{
-		state:               stopped,
-		configManager:       configManager,
-		joalPaths:           paths,
+		conf:                &conf,
+		joalPaths:           joalPaths,
 		seeds:               make(map[torrent.InfoHash]*seed.Torrent),
-		torrentFileWatcher:  torrentFileWatcher,
-		bandwidthDispatcher: nil,
-		client:              nil,
+		torrentFileWatcher:  nil,
+		bandwidthDispatcher: dispatcher,
+		client:              client,
+		fileWatcherPoll:     1 * time.Second,
 		lock:                &sync.Mutex{},
 	}, nil
 }
@@ -91,23 +57,14 @@ func SeedManagerNew(joalWorkingDirectory string, configManager *config.Manager) 
 func (s *SeedManager) Start() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if s.state == started {
-		return errors.New("seedmanager is already started")
-	}
 
-	conf, err := s.configManager.Get()
+	torrentFileWatcher := watcher.New()
+	torrentFileWatcher.AddFilterHook(torrentFileFilter())
+	err := torrentFileWatcher.Add(s.joalPaths.torrentFolder)
 	if err != nil {
 		return err
 	}
-	s.bandwidthDispatcher = bandwidth.DispatcherNew(&bandwidth.RandomSpeedProvider{
-		MinimumBytesPerSeconds: conf.MinUploadRate,
-		MaximumBytesPerSeconds: conf.MaxUploadRate,
-	})
-
-	s.client, err = emulatedclients.FromClientFile(path.Join(s.joalPaths.clientFileFolder, conf.Client))
-	if err != nil {
-		return err
-	}
+	s.torrentFileWatcher = torrentFileWatcher
 
 	err = s.client.StartListener()
 	if err != nil {
@@ -118,27 +75,37 @@ func (s *SeedManager) Start() error {
 	// Trigger create events after watcher started
 	go func() {
 		s.torrentFileWatcher.Wait()
-		for _, f := range s.torrentFileWatcher.WatchedFiles() {
-			s.torrentFileWatcher.TriggerEvent(watcher.Create, f)
+		for fullPath, info := range s.torrentFileWatcher.WatchedFiles() {
+			if info.IsDir() { // TODO: remove this test when https://github.com/radovskyb/watcher/pull/88 gets merged and published
+				continue
+			}
+			s.torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
 	}()
 
-	if err := s.torrentFileWatcher.Start(1 * time.Second); err != nil {
-		return err
-	}
+	go func() {
+		if err := s.torrentFileWatcher.Start(s.fileWatcherPoll); err != nil {
+			// TODO: log error
+		}
+	}()
 	go func() {
 		for {
 			select {
 			case event := <-s.torrentFileWatcher.Event:
-				fmt.Println(event) // Print the event's info.
+				if event.FileInfo.IsDir() { // TODO: remove this test when https://github.com/radovskyb/watcher/pull/88 gets merged and published
+					continue
+				}
+				fmt.Println(event)
 				switch event.Op {
 				case watcher.Create:
+					//TODO: logger.info(event) // Print the event's info.
 					e := s.onTorrentFileCreate(event.Path)
 					if e != nil {
 						//TODO: log error
 						continue
 					}
 				case watcher.Rename, watcher.Write:
+					//TODO: logger.info(event) // Print the event's info.
 					e := s.onTorrentFileRemoved(event.Path)
 					if e != nil {
 						//TODO: log error
@@ -150,6 +117,7 @@ func (s *SeedManager) Start() error {
 						continue
 					}
 				case watcher.Remove:
+					//TODO: logger.info(event) // Print the event's info.
 					e := s.onTorrentFileRemoved(event.Path)
 					if e != nil {
 						//TODO: log error
@@ -166,7 +134,6 @@ func (s *SeedManager) Start() error {
 		}
 	}()
 
-	s.state = started
 	return nil
 }
 
@@ -178,7 +145,7 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 		return errors.Wrap(err, "failed to create torrent from file")
 	}
 
-	if _, contains := s.seeds[*torrentSeed.InfoHash()]; contains {
+	if _, contains := s.seeds[*torrentSeed.InfoHash()]; !contains {
 		s.seeds[*torrentSeed.InfoHash()] = torrentSeed
 		torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 	}
@@ -189,18 +156,17 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	info, err := metainfo.LoadFromFile(filePath)
-	if err != nil {
-		return errors.Wrap(err, "failed to create torrent metadata from file")
+	for _, v := range s.seeds {
+		filename := filepath.Base(filePath)
+		if filepath.Base(v.FilePath()) == filename {
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			v.StopSeeding(ctx)
+			delete(s.seeds, *v.InfoHash())
+			return nil
+		}
 	}
 
-	if v, contains := s.seeds[info.HashInfoBytes()]; contains {
-		ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-		v.StopSeeding(ctx)
-		delete(s.seeds, *v.InfoHash())
-	}
-
-	return nil
+	return errors.New("cannot remove torrent '%s' from seeding list: not found in list")
 }
 
 func (s *SeedManager) onSeedStopHook(torrentSeed *seed.Torrent) seed.OnStopHook {
@@ -213,10 +179,6 @@ func (s *SeedManager) onSeedStopHook(torrentSeed *seed.Torrent) seed.OnStopHook 
 func (s *SeedManager) Stop(ctx context.Context) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if s.state != started {
-		return
-	}
-	s.state = stopped
 
 	wg := sync.WaitGroup{}
 	for _, v := range s.seeds {
@@ -230,9 +192,26 @@ func (s *SeedManager) Stop(ctx context.Context) {
 	s.client.StopListener(ctx)
 	s.bandwidthDispatcher.Stop()
 	s.torrentFileWatcher.Close()
+	s.torrentFileWatcher = nil
 
 	wg.Wait()
 	s.seeds = make(map[torrent.InfoHash]*seed.Torrent)
-	s.bandwidthDispatcher = nil
-	s.torrentFileWatcher = nil
+}
+
+func torrentFileFilter() watcher.FilterFileHookFunc {
+	nameFilter := watcher.RegexFilterHook(regexp.MustCompile(`.+\.torrent$`), false)
+	fileFilter := func(info os.FileInfo, fullPath string) error {
+		if info.IsDir() {
+			return watcher.ErrSkip
+		}
+		return nil
+	}
+
+	return func(info os.FileInfo, fullPath string) error {
+		err := fileFilter(info, fullPath)
+		if err != nil {
+			return err
+		}
+		return nameFilter(info, fullPath)
+	}
 }

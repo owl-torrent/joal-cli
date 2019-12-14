@@ -15,22 +15,28 @@ type SeedConfig struct {
 	RemoveTorrentWithZeroPeers bool   `json:"removeTorrentWithZeroPeers" yaml:"removeTorrentWithZeroPeers"`
 }
 
-type Manager struct {
+type IManager interface {
+	Save(config SeedConfig) error
+	Load() (SeedConfig, error)
+	Get() (SeedConfig, error)
+}
+
+type manager struct {
 	configPath string
 	seedConfig *SeedConfig
 }
 
-func ConfigManagerNew(configFilePath string) (*Manager, error) {
+func ConfigManagerNew(configFilePath string) (IManager, error) {
 	if !filepath.IsAbs(configFilePath) {
 		return nil, errors.New("config file path must be an absolute path")
 	}
-	return &Manager{
+	return &manager{
 		configPath: configFilePath,
 		seedConfig: nil,
 	}, nil
 }
 
-func (c *Manager) Save(config SeedConfig) error {
+func (c *manager) Save(config SeedConfig) error {
 	jsonStr, err := json.Marshal(config)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshall config")
@@ -43,7 +49,7 @@ func (c *Manager) Save(config SeedConfig) error {
 	return nil
 }
 
-func (c *Manager) Load() (SeedConfig, error) {
+func (c *manager) Load() (SeedConfig, error) {
 	jsonFile, err := os.Open(c.configPath)
 	if err != nil {
 		return SeedConfig{}, errors.Wrapf(err, "failed to open file '%s'", c.configPath)
@@ -65,7 +71,7 @@ func (c *Manager) Load() (SeedConfig, error) {
 	return seedConfig, nil
 }
 
-func (c *Manager) Get() (SeedConfig, error) {
+func (c *manager) Get() (SeedConfig, error) {
 	if c.seedConfig == nil {
 		_, err := c.Load()
 		if err != nil {

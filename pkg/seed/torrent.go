@@ -21,6 +21,7 @@ const (
 
 type OnStopHook func()
 type Torrent struct {
+	path              string
 	infoHash          *torrent.InfoHash
 	announceList      metainfo.AnnounceList
 	currentStatus     status
@@ -31,6 +32,10 @@ type Torrent struct {
 	lastKnownInterval time.Duration
 	consecutiveErrors int32
 	onStopHook        OnStopHook
+}
+
+func (t *Torrent) FilePath() string {
+	return t.path
 }
 
 func (t *Torrent) InfoHash() *torrent.InfoHash {
@@ -57,6 +62,7 @@ func LoadFromFile(file string) (*Torrent, error) {
 		announceList = append(firstTier, announceList...)
 	}
 	return &Torrent{
+		path:              file,
 		infoHash:          &infoHash,
 		announceList:      announceList,
 		currentStatus:     onHold,
@@ -119,6 +125,7 @@ func (t *Torrent) Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatc
 
 				t.lastKnownInterval = time.Duration(response.Interval) * time.Second
 				t.nextAnnounce = tracker.None
+				t.nextAnnounceAt = time.Now().Add(t.lastKnownInterval)
 				t.peers = &swarm{leechers: response.Leechers, seeders: response.Seeders}
 				dispatcher.ClaimOrUpdate(t)
 
