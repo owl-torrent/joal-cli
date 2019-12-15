@@ -2,13 +2,13 @@ package seedmanager
 
 import (
 	"context"
-	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"os"
 	"path"
 	"path/filepath"
@@ -73,50 +73,67 @@ func (s *SeedManager) Start() error {
 	// Trigger create events after watcher started
 	go func() {
 		s.torrentFileWatcher.Wait()
+		logrus.Debug("File watcher started, dispatching event for already present torrent files")
 		for fullPath, info := range s.torrentFileWatcher.WatchedFiles() {
 			s.torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
 	}()
 
 	go func() {
+		logrus.Debug("Starting file watcher")
 		if err := s.torrentFileWatcher.Start(s.fileWatcherPoll); err != nil {
-			// TODO: log error
+			logrus.WithError(err).Error("File watcher has stopped with an error")
 		}
 	}()
 	go func() {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			defer logrus.Debug("Exiting file watcher loop")
+		}
 		for {
 			select {
 			case event := <-s.torrentFileWatcher.Event:
-				fmt.Println(event)
 				switch event.Op {
 				case watcher.Create:
-					//TODO: logger.info(event) // Print the event's info.
+					logrus.Info(event)
 					e := s.onTorrentFileCreate(event.Path)
 					if e != nil {
-						//TODO: log error
+						logrus.WithFields(logrus.Fields{
+							"file": filepath.Base(event.Path),
+							"event": event.Op,
+						}).WithError(err).Error("Error in file creation callback")
 						continue
 					}
 				case watcher.Rename:
-					//TODO: logger.info(event) // Print the event's info.
+					logrus.Info(event)
 					e := s.onTorrentFileRenamed(event.OldPath, event.Path)
 					if e != nil {
-						//TODO: log error
+						logrus.WithFields(logrus.Fields{
+							"file": filepath.Base(event.Path),
+							"event": event.Op,
+						}).WithError(err).Error("Error in file rename callback")
 						continue
 					}
 				case watcher.Remove:
-					//TODO: logger.info(event) // Print the event's info.
+					logrus.Info(event)
 					e := s.onTorrentFileRemoved(event.Path)
 					if e != nil {
-						//TODO: log error
+						logrus.WithFields(logrus.Fields{
+							"file": filepath.Base(event.Path),
+							"event": event.Op,
+						}).WithError(err).Error("Error in file remove callback")
 						continue
 					}
 				default:
 					// does not handle WRITE since the write may occur while the file is being written before CREATE
-					// TODO: log action not handled
+					logrus.WithFields(logrus.Fields{
+						"file": filepath.Base(event.Path),
+						"event": event.Op,
+					}).WithError(err).Info("Event is ignored")
 				}
 			case err := <-s.torrentFileWatcher.Error:
-				fmt.Println(fmt.Sprintf("filewatcher has reported an error : %v", err))
+				logrus.WithError(err).Error("File watcher has reported an error")
 			case <-s.torrentFileWatcher.Closed:
+				logrus.Info("File watcher stopped")
 				return
 			}
 		}
@@ -131,7 +148,11 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 
 	f, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
-		time.Sleep(5 * time.Second) // File was most likely created but not written yet, let's wait just a bit
+		sleep := 5 * time.Second
+		logrus.WithFields(logrus.Fields{
+			"file": filePath,
+		}).Warnf("File is already in use, wait %s before proceed", sleep)
+		time.Sleep(sleep) // File was most likely created but not written yet, let's wait just a bit
 	} else {
 		_ = f.Close()
 	}
@@ -194,9 +215,13 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 }
 
 func (s *SeedManager) Stop(ctx context.Context) {
+	logrus.Info("Stopping seedmanager gracefully")
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	logrus.WithFields(logrus.Fields{
+		"seedCount": len(s.seeds),
+	}).Info("Trigger seeds shutdown")
 	wg := sync.WaitGroup{}
 	for _, v := range s.seeds {
 		wg.Add(1)
