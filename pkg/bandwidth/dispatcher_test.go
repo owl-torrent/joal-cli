@@ -140,7 +140,7 @@ func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 		lock:                        &sync.RWMutex{},
 	}
 
-	speedProvider.wgRefresh.Add(100)
+	speedProvider.wgRefresh.Add(10)
 	dispatcher.Start()
 	defer dispatcher.Stop()
 	if err := testutils.WaitOrFailAfterTimeout(speedProvider.wgRefresh, 2*time.Second); err != nil {

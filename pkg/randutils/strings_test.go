@@ -37,7 +37,7 @@ func TestStringUniformDistribution(t *testing.T) {
 	}
 
 	const (
-		iterations       = 5000
+		iterations       = 500
 		randStringLength = 500
 	)
 

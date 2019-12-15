@@ -9,11 +9,8 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
-	"log"
-	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"time"
 
@@ -23,7 +20,7 @@ import (
 type SeedManager struct {
 	conf                *config.SeedConfig
 	joalPaths           *joalPaths
-	seeds               map[torrent.InfoHash]*seed.Torrent
+	seeds               map[torrent.InfoHash]seed.ISeed
 	torrentFileWatcher  *watcher.Watcher
 	bandwidthDispatcher bandwidth.IDispatcher
 	client              emulatedclients.IEmulatedClient
@@ -45,7 +42,7 @@ func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager,
 	return &SeedManager{
 		conf:                &conf,
 		joalPaths:           joalPaths,
-		seeds:               make(map[torrent.InfoHash]*seed.Torrent),
+		seeds:               make(map[torrent.InfoHash]seed.ISeed),
 		torrentFileWatcher:  nil,
 		bandwidthDispatcher: dispatcher,
 		client:              client,
@@ -104,14 +101,9 @@ func (s *SeedManager) Start() error {
 						//TODO: log error
 						continue
 					}
-				case watcher.Rename, watcher.Write:
+				case watcher.Rename:
 					//TODO: logger.info(event) // Print the event's info.
-					e := s.onTorrentFileRemoved(event.Path)
-					if e != nil {
-						//TODO: log error
-						continue
-					}
-					e = s.onTorrentFileCreate(event.Path)
+					e := s.onTorrentFileRenamed(event.OldPath, event.Path)
 					if e != nil {
 						//TODO: log error
 						continue
@@ -124,10 +116,11 @@ func (s *SeedManager) Start() error {
 						continue
 					}
 				default:
+					// does not handle WRITE since the write may occur while the file is being written before CREATE
 					// TODO: log action not handled
 				}
 			case err := <-s.torrentFileWatcher.Error:
-				log.Fatalln(err)
+				fmt.Println(fmt.Sprintf("filewatcher has reported an error : %v", err))
 			case <-s.torrentFileWatcher.Closed:
 				return
 			}
@@ -140,6 +133,12 @@ func (s *SeedManager) Start() error {
 func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	/*_, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
+	if a != nil {
+		panic(a)
+	}*/
+
 	torrentSeed, err := seed.LoadFromFile(filePath)
 	if err != nil {
 		return errors.Wrap(err, "failed to create torrent from file")
@@ -147,10 +146,40 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 
 	if _, contains := s.seeds[*torrentSeed.InfoHash()]; !contains {
 		s.seeds[*torrentSeed.InfoHash()] = torrentSeed
-		torrentSeed.Seed(s.client, s.bandwidthDispatcher)
+		go func() {
+			defer func() {
+				s.lock.Lock()
+				delete(s.seeds, *torrentSeed.InfoHash())
+				fmt.Println("Removed from map " + filepath.Base(filePath))
+				fmt.Println(fmt.Sprintf("remaining %d", len(s.seeds)))
+				s.lock.Unlock()
+			}()
+			torrentSeed.Seed(s.client, s.bandwidthDispatcher)
+			fmt.Println("exited Seed " + filepath.Base(filePath))
+		}()
 	}
 
 	return nil
+}
+func (s *SeedManager) onTorrentFileRenamed(oldFilePath string, newFilesPath string) error {
+	s.lock.Lock()
+	// Run the stop synchronously to ensure the STOP will be send before the START
+	found := false
+	for _, v := range s.seeds {
+		filename := filepath.Base(oldFilePath)
+		if filepath.Base(v.FilePath()) == filename {
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			v.StopSeeding(ctx)
+			found = true
+			break
+		}
+	}
+	s.lock.Unlock()
+	if !found {
+		return errors.New("cannot remove torrent '%s' from seeding list: not found in list")
+	}
+
+	return s.onTorrentFileCreate(newFilesPath)
 }
 func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 	s.lock.Lock()
@@ -159,21 +188,15 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 	for _, v := range s.seeds {
 		filename := filepath.Base(filePath)
 		if filepath.Base(v.FilePath()) == filename {
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-			v.StopSeeding(ctx)
-			delete(s.seeds, *v.InfoHash())
+			go func() {
+				ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+				v.StopSeeding(ctx)
+			}()
 			return nil
 		}
 	}
 
 	return errors.New("cannot remove torrent '%s' from seeding list: not found in list")
-}
-
-func (s *SeedManager) onSeedStopHook(torrentSeed *seed.Torrent) seed.OnStopHook {
-	return func() {
-		// not lock to prevent dead lock when SeedManager.Stop() is called. This callback will be fired durnt the Stop() process
-		delete(s.seeds, *torrentSeed.InfoHash())
-	}
 }
 
 func (s *SeedManager) Stop(ctx context.Context) {
@@ -195,23 +218,5 @@ func (s *SeedManager) Stop(ctx context.Context) {
 	s.torrentFileWatcher = nil
 
 	wg.Wait()
-	s.seeds = make(map[torrent.InfoHash]*seed.Torrent)
-}
-
-func torrentFileFilter() watcher.FilterFileHookFunc {
-	nameFilter := watcher.RegexFilterHook(regexp.MustCompile(`.+\.torrent$`), false)
-	fileFilter := func(info os.FileInfo, fullPath string) error {
-		if info.IsDir() {
-			return watcher.ErrSkip
-		}
-		return nil
-	}
-
-	return func(info os.FileInfo, fullPath string) error {
-		err := fileFilter(info, fullPath)
-		if err != nil {
-			return err
-		}
-		return nameFilter(info, fullPath)
-	}
+	s.seeds = make(map[torrent.InfoHash]seed.ISeed)
 }

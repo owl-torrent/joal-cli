@@ -27,7 +27,7 @@ func TestRandomSpeedProvider_RefreshShouldGenerateValueWithinRange(t *testing.T)
 				MaximumBytesPerSeconds: tt.fields.maximumBytesPerSeconds,
 				value:                  tt.fields.value,
 			}
-			for i := 0; i < 1000; i++ {
+			for i := 0; i < 100; i++ {
 				r.Refresh()
 				bps := r.GetBytesPerSeconds()
 				assert.GreaterOrEqual(t, bps, r.MinimumBytesPerSeconds)
