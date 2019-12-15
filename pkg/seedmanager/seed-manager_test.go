@@ -198,7 +198,7 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 		lock:            &sync.Mutex{},
 	}
 
-	fileCount := 300
+	fileCount := 4
 
 	files := make([]string, fileCount)
 	for i := 0; i < fileCount; i++ {

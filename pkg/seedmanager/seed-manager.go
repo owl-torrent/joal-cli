@@ -150,12 +150,9 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 			defer func() {
 				s.lock.Lock()
 				delete(s.seeds, *torrentSeed.InfoHash())
-				fmt.Println("Removed from map " + filepath.Base(filePath))
-				fmt.Println(fmt.Sprintf("remaining %d", len(s.seeds)))
 				s.lock.Unlock()
 			}()
 			torrentSeed.Seed(s.client, s.bandwidthDispatcher)
-			fmt.Println("exited Seed " + filepath.Base(filePath))
 		}()
 	}
 
