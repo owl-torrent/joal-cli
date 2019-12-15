@@ -135,9 +135,11 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	_, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
+	f, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
-		panic(a) // TODO: do not panic but wait for x seconds the file being written
+		time.Sleep(5 * time.Second) // File was most likely created but not written yet, let's wait just a bit
+	} else {
+		_ = f.Close()
 	}
 
 	torrentSeed, err := seed.LoadFromFile(filePath)
