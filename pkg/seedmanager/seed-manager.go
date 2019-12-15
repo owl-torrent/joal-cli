@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/radovskyb/watcher"
+	"github.com/anthonyraymond/watcher"
 )
 
 type SeedManager struct {
@@ -74,9 +74,6 @@ func (s *SeedManager) Start() error {
 	go func() {
 		s.torrentFileWatcher.Wait()
 		for fullPath, info := range s.torrentFileWatcher.WatchedFiles() {
-			if info.IsDir() { // TODO: remove this test when https://github.com/radovskyb/watcher/pull/88 gets merged and published
-				continue
-			}
 			s.torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
 	}()
@@ -90,9 +87,6 @@ func (s *SeedManager) Start() error {
 		for {
 			select {
 			case event := <-s.torrentFileWatcher.Event:
-				if event.FileInfo.IsDir() { // TODO: remove this test when https://github.com/radovskyb/watcher/pull/88 gets merged and published
-					continue
-				}
 				fmt.Println(event)
 				switch event.Op {
 				case watcher.Create:

@@ -1,7 +1,7 @@
 package seedmanager
 
 import (
-	"github.com/radovskyb/watcher"
+	"github.com/anthonyraymond/watcher"
 	"os"
 	"regexp"
 )
