@@ -9,6 +9,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
+	"os"
 	"path"
 	"path/filepath"
 	"sync"
@@ -134,10 +135,10 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	/*_, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
+	_, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
-		panic(a)
-	}*/
+		panic(a) // TODO: do not panic but wait for x seconds the file being written
+	}
 
 	torrentSeed, err := seed.LoadFromFile(filePath)
 	if err != nil {
