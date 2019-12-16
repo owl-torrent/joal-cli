@@ -88,10 +88,13 @@ type DumbBandwidthClaimable struct {
 	onFirstAddUploaded func()
 	uploadedWasCalled  bool
 	addOnlyOnce        bool
+	lock               *sync.Mutex
 }
 
 func (bc *DumbBandwidthClaimable) InfoHash() *torrent.InfoHash { return bc.infoHash }
 func (bc *DumbBandwidthClaimable) AddUploaded(bytes int64) {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
 	if bc.addOnlyOnce && bc.uploadedWasCalled {
 		return
 	}
@@ -172,6 +175,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 		uploaded:           0,
 		swarm:              &DumbSwarm{seeders: 100, leechers: 100},
 		onFirstAddUploaded: func() { wg.Done() },
+		lock:               &sync.Mutex{},
 	}
 
 	wg.Add(1)
@@ -200,6 +204,7 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 100, leechers: 2500},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 	ih2 := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	claimer2 := &DumbBandwidthClaimable{
@@ -208,6 +213,7 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 10, leechers: 5},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 
 	wg.Add(2)
@@ -237,6 +243,7 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 100, leechers: 2500},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 	ih2 := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	claimer2 := &DumbBandwidthClaimable{
@@ -245,6 +252,7 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 100, leechers: 2500},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 
 	wg.Add(2)
@@ -274,6 +282,7 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 0, leechers: 0},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 	ih2 := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	claimer2 := &DumbBandwidthClaimable{
@@ -282,6 +291,7 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 		swarm:              &DumbSwarm{seeders: 100, leechers: 2500},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
+		lock:               &sync.Mutex{},
 	}
 
 	wg.Add(2)
