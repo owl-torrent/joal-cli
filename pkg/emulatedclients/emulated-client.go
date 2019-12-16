@@ -114,5 +114,5 @@ func (c *EmulatedClient) StartListener() error {
 }
 
 func (c *EmulatedClient) StopListener(ctx context.Context) {
-
+	c.Listener.Stop(ctx)
 }
