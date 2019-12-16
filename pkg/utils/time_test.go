@@ -2,13 +2,11 @@ package utils
 
 import (
 	"github.com/stretchr/testify/assert"
-	"sync"
 	"testing"
 	"time"
 )
 
 func TestEvery_shouldCallMethodAtIntervalUntilStop(t *testing.T) {
-	wg := sync.WaitGroup{}
 	duration := 1 * time.Millisecond
 	counter := 0
 	f := func() {
