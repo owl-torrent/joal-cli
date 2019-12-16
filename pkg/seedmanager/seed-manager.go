@@ -98,7 +98,7 @@ func (s *SeedManager) Start() error {
 					e := s.onTorrentFileCreate(event.Path)
 					if e != nil {
 						logrus.WithFields(logrus.Fields{
-							"file": filepath.Base(event.Path),
+							"file":  filepath.Base(event.Path),
 							"event": event.Op,
 						}).WithError(err).Error("Error in file creation callback")
 						continue
@@ -108,7 +108,7 @@ func (s *SeedManager) Start() error {
 					e := s.onTorrentFileRenamed(event.OldPath, event.Path)
 					if e != nil {
 						logrus.WithFields(logrus.Fields{
-							"file": filepath.Base(event.Path),
+							"file":  filepath.Base(event.Path),
 							"event": event.Op,
 						}).WithError(err).Error("Error in file rename callback")
 						continue
@@ -118,7 +118,7 @@ func (s *SeedManager) Start() error {
 					e := s.onTorrentFileRemoved(event.Path)
 					if e != nil {
 						logrus.WithFields(logrus.Fields{
-							"file": filepath.Base(event.Path),
+							"file":  filepath.Base(event.Path),
 							"event": event.Op,
 						}).WithError(err).Error("Error in file remove callback")
 						continue
@@ -126,7 +126,7 @@ func (s *SeedManager) Start() error {
 				default:
 					// does not handle WRITE since the write may occur while the file is being written before CREATE
 					logrus.WithFields(logrus.Fields{
-						"file": filepath.Base(event.Path),
+						"file":  filepath.Base(event.Path),
 						"event": event.Op,
 					}).WithError(err).Info("Event is ignored")
 				}
@@ -143,9 +143,6 @@ func (s *SeedManager) Start() error {
 }
 
 func (s *SeedManager) onTorrentFileCreate(filePath string) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	f, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
 		sleep := 5 * time.Second
@@ -162,6 +159,8 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 		return errors.Wrap(err, "failed to create torrent from file")
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if _, contains := s.seeds[*torrentSeed.InfoHash()]; !contains {
 		s.seeds[*torrentSeed.InfoHash()] = torrentSeed
 		go func() {
@@ -172,6 +171,10 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 			}()
 			torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 		}()
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"file": filepath.Base(filePath),
+		}).Warn("Seed was not not started, seed map already contains this infohash.")
 	}
 
 	return nil

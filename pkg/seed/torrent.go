@@ -8,7 +8,9 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"math"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -18,12 +20,14 @@ type status int
 type ISeed interface {
 	FilePath() string
 	InfoHash() *torrent.InfoHash
+	TorrentName() string
 	GetSwarm() bandwidth.ISwarm
 	Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatcher bandwidth.IDispatcher)
 	StopSeeding(ctx context.Context)
 }
 type seed struct {
 	path              string
+	torrentSpecs      *torrent.TorrentSpec
 	infoHash          *torrent.InfoHash
 	announceList      metainfo.AnnounceList
 	seeding           bool
@@ -33,7 +37,7 @@ type seed struct {
 	peers             bandwidth.ISwarm
 	lastKnownInterval time.Duration
 	consecutiveErrors int32
-	stop              chan struct{} // channel to stop the seed
+	stop              chan bool     // channel to stop the seed
 	stopped           chan struct{} // channel that receives a signal when to seed has been fully terminated
 	lock              *sync.Mutex
 }
@@ -44,6 +48,9 @@ func (t *seed) FilePath() string {
 
 func (t *seed) InfoHash() *torrent.InfoHash {
 	return t.infoHash
+}
+func (t *seed) TorrentName() string {
+	return t.torrentSpecs.DisplayName
 }
 func (t *seed) AddUploaded(bytes int64) {
 	t.seedingStats.AddUploaded(bytes)
@@ -67,6 +74,7 @@ func LoadFromFile(file string) (ISeed, error) {
 	}
 	return &seed{
 		path:              file,
+		torrentSpecs:      torrent.TorrentSpecFromMetaInfo(info),
 		infoHash:          &infoHash,
 		announceList:      announceList,
 		seeding:           false,
@@ -76,7 +84,7 @@ func LoadFromFile(file string) (ISeed, error) {
 		peers:             nil,
 		lastKnownInterval: 5 * time.Second,
 		consecutiveErrors: 0,
-		stop:              make(chan struct{}),
+		stop:              make(chan bool),
 		stopped:           make(chan struct{}),
 		lock:              &sync.Mutex{},
 	}, nil
@@ -89,6 +97,9 @@ func (t *seed) Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatcher
 		t.lock.Unlock()
 		return
 	}
+	logrus.WithFields(logrus.Fields{
+		"torrent": filepath.Base(t.path),
+	}).Warn("Start seed")
 
 	defer func() {
 		t.seeding = false
@@ -160,14 +171,20 @@ func (t *seed) StopSeeding(ctx context.Context) {
 		return
 	}
 
-	close(t.stop)
+	// prefer sending a value to the channel over closing the channel. Since the select is in a loop, when the channel is closed the select will go automatically to the closed chan case most of the time and will almost never announce stop
+	t.stop <- true
+
 	t.seeding = false
 
 	// Wait till context expires or the seed has exited
 	select {
 	case <-ctx.Done():
-		//TODO: log return by timeout
+		logrus.WithFields(logrus.Fields{
+			"torrent": filepath.Base(t.path),
+		}).Warn("Seed has not stopped gracefully exiting due to context timeout")
 	case <-t.stopped:
-		//TODO: log gracefully shutted down
+		logrus.WithFields(logrus.Fields{
+			"torrent": filepath.Base(t.path),
+		}).Info("Seed stopped gracefully")
 	}
 }

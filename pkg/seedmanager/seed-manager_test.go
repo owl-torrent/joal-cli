@@ -10,6 +10,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
+	assert "github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -144,6 +145,7 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal("timeout reached")
 	}
+	assert.Len(t, manager.seeds, fileCount)
 }
 
 func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
@@ -181,7 +183,9 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 	if err != nil {
 		t.Fatal("timeout reached")
 	}
+	assert.Len(t, manager.seeds, fileCount)
 }
+
 func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -231,10 +235,56 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatal("timeout reached")
 	}
+	assert.Len(t, manager.seeds, 0)
 }
 
-/*
+func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
+	folder, clean := setupTestFolder(t)
+	defer clean()
+
+	announceWg := sync.WaitGroup{}
+	manager := &SeedManager{
+		client:              &WaitAbleClient{&announceWg},
+		bandwidthDispatcher: &DumbDispatcher{},
+		joalPaths: &joalPaths{
+			torrentFolder: folder,
+		},
+		seeds:           make(map[torrent.InfoHash]seed.ISeed),
+		fileWatcherPoll: 1 * time.Millisecond,
+		lock:            &sync.Mutex{},
+	}
+
+	fileCount := 1
+
+	file := createTorrentFile(t, folder)
+
+	err := manager.Start()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	defer manager.torrentFileWatcher.Close()
+
+	manager.torrentFileWatcher.Wait()
+
+	announceWg.Add(fileCount)
+	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second) // wait for creation to be triggered
+	if err != nil {
+		t.Fatal("timeout reached")
+	}
+
+	announceWg.Add(2)
+	err = os.Rename(file, filepath.Join(filepath.Dir(file), "copy-"+filepath.Base(file)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second)
+	if err != nil {
+		t.Fatal("timeout reached")
+	}
+	assert.Len(t, manager.seeds, 1)
+}
+
 func TestSeedManager_Stop(t *testing.T) {
 	t.Fatal("implement")
 }
-*/
