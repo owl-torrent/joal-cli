@@ -94,6 +94,8 @@ func (s *AccessAwarePeerId) Get() peerid.PeerId {
 	s.lastAccessed = time.Now()
 	return s.val
 }
+
+// time elapsed since last access
 func (s *AccessAwarePeerId) LastAccess() time.Duration {
 	return time.Now().Sub(s.lastAccessed)
 }

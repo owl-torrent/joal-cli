@@ -94,6 +94,8 @@ func (s *AccessAwareKey) Get() key.Key {
 	s.lastAccessed = time.Now()
 	return s.val
 }
+
+// time elapsed since last access
 func (s *AccessAwareKey) LastAccess() time.Duration {
 	return time.Now().Sub(s.lastAccessed)
 }

@@ -53,7 +53,7 @@ func TestStringUniformDistribution(t *testing.T) {
 		expectedDistribution[charset[i]] = (iterations * randStringLength) / int64(len(charset))
 	}
 
-	acceptedDeviation := float64((iterations*randStringLength)/int64(len(charset))) * 0.05 // 5%
+	acceptedDeviation := float64((iterations*randStringLength)/int64(len(charset))) * 0.08 // 8%
 
 	assert.InDeltaMapValues(t, expectedDistribution, actualDistribution, acceptedDeviation)
 }

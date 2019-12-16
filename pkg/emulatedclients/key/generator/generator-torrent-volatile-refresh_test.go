@@ -54,7 +54,7 @@ func TestGenerate_TorrentVolatileRefresh_ShouldProvideSingleValuePerTorrent(t *t
 func TestGenerate_TorrentVolatileRefresh_ShouldEvictOldEntries(t *testing.T) {
 	generator := &TorrentVolatileGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 1 * time.Millisecond
+	generator.evictAfter = 3600 * time.Second
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")

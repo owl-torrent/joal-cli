@@ -3,7 +3,6 @@ package bandwidth
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -106,15 +105,15 @@ func (bc *DumbBandwidthClaimable) AddUploaded(bytes int64) {
 }
 func (bc *DumbBandwidthClaimable) GetSwarm() ISwarm { return bc.swarm }
 
-type WaitRefreshStaticSpeedProvider struct {
-	wgRefresh *sync.WaitGroup
+type CounterSpeedProvider struct {
+	counter int
 }
 
-func (s *WaitRefreshStaticSpeedProvider) GetBytesPerSeconds() int64 { return 0 }
-func (s *WaitRefreshStaticSpeedProvider) Refresh()                  { s.wgRefresh.Done() }
+func (s *CounterSpeedProvider) GetBytesPerSeconds() int64 { return 0 }
+func (s *CounterSpeedProvider) Refresh()                  { s.counter++ }
 
 func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
-	speedProvider := &WaitRefreshStaticSpeedProvider{wgRefresh: &sync.WaitGroup{}}
+	speedProvider := &CounterSpeedProvider{}
 	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
@@ -124,16 +123,15 @@ func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 		lock:                        &sync.RWMutex{},
 	}
 
-	speedProvider.wgRefresh.Add(1)
 	dispatcher.Start()
+	time.Sleep(10 * time.Millisecond)
 	defer dispatcher.Stop()
-	if err := testutils.WaitOrFailAfterTimeout(speedProvider.wgRefresh, 2*time.Second); err != nil {
-		t.Errorf("Speed was not refreshed")
-	}
+
+	assert.Equal(t, 1, speedProvider.counter)
 }
 
 func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
-	speedProvider := &WaitRefreshStaticSpeedProvider{wgRefresh: &sync.WaitGroup{}}
+	speedProvider := &CounterSpeedProvider{}
 	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Millisecond,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
@@ -143,12 +141,11 @@ func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 		lock:                        &sync.RWMutex{},
 	}
 
-	speedProvider.wgRefresh.Add(10)
 	dispatcher.Start()
+	time.Sleep(20 * time.Millisecond)
 	defer dispatcher.Stop()
-	if err := testutils.WaitOrFailAfterTimeout(speedProvider.wgRefresh, 2*time.Second); err != nil {
-		t.Errorf("Speed was not refreshed")
-	}
+
+	assert.GreaterOrEqual(t, speedProvider.counter, 2)
 }
 
 type DumbStaticSpeedProvider struct {
