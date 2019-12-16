@@ -3,7 +3,6 @@ package announce
 import (
 	"bytes"
 	"fmt"
-	"github.com/anacrolix/dht/v2/krpc"
 	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
@@ -17,17 +16,6 @@ import (
 	"text/template"
 	"time"
 )
-
-type httpResponse struct {
-	FailureReason string `bencode:"failure reason"`
-	Interval      int32  `bencode:"interval"`
-	TrackerId     string `bencode:"tracker id"`
-	Complete      int32  `bencode:"complete"`
-	Incomplete    int32  `bencode:"incomplete"`
-	Peers         Peers  `bencode:"peers"`
-	// BEP 7
-	Peers6 krpc.CompactIPv6NodeAddrs `bencode:"peers6"`
-}
 
 type IHttpAnnouncer interface {
 	Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error)
@@ -90,7 +78,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 		err = fmt.Errorf("response from tracker: %s: %s", resp.Status, buf.String())
 		return
 	}
-	var trackerResponse httpResponse
+	var trackerResponse tracker.HttpResponse
 	err = bencode.Unmarshal(buf.Bytes(), &trackerResponse)
 	if _, ok := err.(bencode.ErrUnusedTrailingBytes); ok {
 		err = nil
@@ -124,46 +112,4 @@ func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (str
 type HttpRequestHeader struct {
 	Name  string `yaml:"name" validate:"required"`
 	Value string `yaml:"value" validate:"required"`
-}
-
-type Peers []tracker.Peer
-
-func (p *Peers) UnmarshalBencode(b []byte) (err error) {
-	var _v interface{}
-	err = bencode.Unmarshal(b, &_v)
-	if err != nil {
-		return
-	}
-	switch v := _v.(type) {
-	case string:
-		var cnas krpc.CompactIPv4NodeAddrs
-		err = cnas.UnmarshalBinary([]byte(v))
-		if err != nil {
-			return
-		}
-		for _, cp := range cnas {
-			localP := Peer{
-				IP:   cp.IP[:],
-				Port: cp.Port,
-			}
-			*p = append(*p, tracker.Peer{
-				IP:   localP.IP,
-				Port: localP.Port,
-			})
-		}
-		return
-	case []interface{}:
-		for _, i := range v {
-			var localP Peer
-			localP.FromDictInterface(i.(map[string]interface{}))
-			*p = append(*p, tracker.Peer{
-				IP:   localP.IP,
-				Port: localP.Port,
-			})
-		}
-		return
-	default:
-		err = fmt.Errorf("unsupported type: %T", _v)
-		return
-	}
 }
