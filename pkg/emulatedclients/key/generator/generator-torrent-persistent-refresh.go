@@ -31,17 +31,11 @@ func (g *TorrentPersistentGenerator) get(algorithm algorithm.IKeyAlgorithm, info
 	// Once in a while clean the map
 	if g.counterSinceCleanup > 100 {
 		g.lock.Lock()
-		g.counterSinceCleanup = 0
+		if g.counterSinceCleanup > 100 {
+			g.counterSinceCleanup = 0
+			evictOldEntries(g.entries, g.evictAfter)
+		}
 		g.lock.Unlock()
-		go func() {
-			g.lock.Lock()
-			defer g.lock.Unlock()
-			for k, accessAware := range g.entries {
-				if accessAware.LastAccess() > g.evictAfter {
-					delete(g.entries, k)
-				}
-			}
-		}()
 	}
 
 	return val.Get()

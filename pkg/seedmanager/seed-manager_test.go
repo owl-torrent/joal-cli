@@ -9,6 +9,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	assert "github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -84,15 +85,27 @@ func createTorrentFile(t *testing.T, directory string) string {
 }
 
 type WaitAbleClient struct {
-	wg *sync.WaitGroup
+	wgAnnounce *sync.WaitGroup
+	wgListener *sync.WaitGroup
 }
 
 func (w *WaitAbleClient) Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
-	w.wg.Done()
+	if w.wgAnnounce != nil {
+		w.wgAnnounce.Done()
+	}
 	return tracker.AnnounceResponse{Interval: 1800}, nil
 }
-func (w *WaitAbleClient) StartListener() error             { return nil }
-func (w *WaitAbleClient) StopListener(ctx context.Context) {}
+func (w *WaitAbleClient) StartListener() error {
+	if w.wgListener != nil {
+		w.wgListener.Done()
+	}
+	return nil
+}
+func (w *WaitAbleClient) StopListener(ctx context.Context) {
+	if w.wgListener != nil {
+		w.wgListener.Done()
+	}
+}
 
 type DumbDispatcher struct {
 	wgStart *sync.WaitGroup
@@ -118,7 +131,7 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 
 	announceWg := sync.WaitGroup{}
 	manager := &SeedManager{
-		client:              &WaitAbleClient{&announceWg},
+		client:              &WaitAbleClient{wgAnnounce: &announceWg},
 		bandwidthDispatcher: &DumbDispatcher{},
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
@@ -154,7 +167,7 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 
 	announceWg := sync.WaitGroup{}
 	manager := &SeedManager{
-		client:              &WaitAbleClient{&announceWg},
+		client:              &WaitAbleClient{wgAnnounce: &announceWg},
 		bandwidthDispatcher: &DumbDispatcher{},
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
@@ -192,7 +205,7 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 
 	announceWg := sync.WaitGroup{}
 	manager := &SeedManager{
-		client:              &WaitAbleClient{&announceWg},
+		client:              &WaitAbleClient{wgAnnounce: &announceWg},
 		bandwidthDispatcher: &DumbDispatcher{},
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
@@ -244,7 +257,7 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 
 	announceWg := sync.WaitGroup{}
 	manager := &SeedManager{
-		client:              &WaitAbleClient{&announceWg},
+		client:              &WaitAbleClient{wgAnnounce: &announceWg},
 		bandwidthDispatcher: &DumbDispatcher{},
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
@@ -285,6 +298,90 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	assert.Len(t, manager.seeds, 1)
 }
 
-func TestSeedManager_Stop(t *testing.T) {
-	t.Fatal("implement")
+type DumbSeed struct {
+	wgStop *sync.WaitGroup
+}
+
+func (d *DumbSeed) FilePath() string {
+	return ""
+}
+func (d *DumbSeed) InfoHash() *torrent.InfoHash {
+	return nil
+}
+func (d *DumbSeed) TorrentName() string {
+	return ""
+}
+func (d *DumbSeed) GetSwarm() bandwidth.ISwarm {
+	return nil
+}
+func (d *DumbSeed) Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
+}
+func (d *DumbSeed) StopSeeding(ctx context.Context) {
+	if d.wgStop != nil {
+		d.wgStop.Done()
+	}
+}
+
+func TestSeedManager_StartAndStop(t *testing.T) {
+	folder, clean := setupTestFolder(t)
+	defer clean()
+
+	wgListener := sync.WaitGroup{}
+	wgDispatcherStart := sync.WaitGroup{}
+	wgDispatcherStop := sync.WaitGroup{}
+	manager := &SeedManager{
+		client:              &WaitAbleClient{wgListener: &wgListener},
+		bandwidthDispatcher: &DumbDispatcher{wgStart: &wgDispatcherStart, wgStop: &wgDispatcherStop},
+		joalPaths: &joalPaths{
+			torrentFolder: folder,
+		},
+		seeds:           make(map[torrent.InfoHash]seed.ISeed),
+		fileWatcherPoll: 1 * time.Millisecond,
+		lock:            &sync.Mutex{},
+	}
+
+	wgListener.Add(1)
+	wgDispatcherStart.Add(1)
+
+	err := manager.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = testutils.WaitOrFailAfterTimeout(&wgListener, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = testutils.WaitOrFailAfterTimeout(&wgDispatcherStart, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seeds := make([]seed.ISeed, 255)
+	for i := 0; i < 255; i++ {
+		s := DumbSeed{wgStop: &sync.WaitGroup{}}
+		seeds[i] = &s
+		manager.seeds[[20]byte{byte(i)}] = &s
+		s.wgStop.Add(1)
+	}
+
+	wgListener.Add(1)
+	wgDispatcherStop.Add(1)
+
+	manager.Stop(context.Background())
+
+	for i := 0; i < 255; i++ {
+		err = testutils.WaitOrFailAfterTimeout(seeds[i].(*DumbSeed).wgStop, 5*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = testutils.WaitOrFailAfterTimeout(&wgListener, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = testutils.WaitOrFailAfterTimeout(&wgDispatcherStop, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

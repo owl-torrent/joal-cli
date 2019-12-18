@@ -99,3 +99,11 @@ func (s *AccessAwarePeerId) Get() peerid.PeerId {
 func (s *AccessAwarePeerId) LastAccess() time.Duration {
 	return time.Now().Sub(s.lastAccessed)
 }
+
+func evictOldEntries(entries map[torrent.InfoHash]*AccessAwarePeerId, evictAfter time.Duration) {
+	for key, accessAware := range entries {
+		if accessAware.LastAccess() > evictAfter {
+			delete(entries, key)
+		}
+	}
+}

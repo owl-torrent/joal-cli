@@ -69,12 +69,6 @@ func TestGenerate_TorrentPersistentRefresh_ShouldEvictOldEntries(t *testing.T) {
 		_ = generator.get(dumbAlg, infoHashB, tracker.None)
 	}
 
-	// pause to let the cleaning goroutine start
-	time.Sleep(5 * time.Millisecond)
-	// claim a write lock to ensure that the cleaning goroutine is over
-	generator.lock.Lock()
-	generator.lock.Unlock()
-
 	// ensure A is no longer present in the map
 	assert.Len(t, generator.entries, 1)
 	assert.NotContains(t, generator.entries, infoHashA)

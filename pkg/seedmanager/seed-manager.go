@@ -128,7 +128,7 @@ func (s *SeedManager) Start() error {
 					logrus.WithFields(logrus.Fields{
 						"file":  filepath.Base(event.Path),
 						"event": event.Op,
-					}).WithError(err).Info("Event is ignored")
+					}).Info("Event is ignored")
 				}
 			case err := <-s.torrentFileWatcher.Error:
 				logrus.WithError(err).Error("File watcher has reported an error")
@@ -206,10 +206,10 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 	for _, v := range s.seeds {
 		filename := filepath.Base(filePath)
 		if filepath.Base(v.FilePath()) == filename {
-			go func() {
+			go func(s seed.ISeed) {
 				ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-				v.StopSeeding(ctx)
-			}()
+				s.StopSeeding(ctx)
+			}(v)
 			return nil
 		}
 	}
@@ -225,13 +225,14 @@ func (s *SeedManager) Stop(ctx context.Context) {
 	logrus.WithFields(logrus.Fields{
 		"seedCount": len(s.seeds),
 	}).Info("Trigger seeds shutdown")
+
 	wg := sync.WaitGroup{}
 	for _, v := range s.seeds {
 		wg.Add(1)
-		go func() {
-			v.StopSeeding(ctx)
-			wg.Done()
-		}()
+		go func(s seed.ISeed) {
+			defer wg.Done()
+			s.StopSeeding(ctx)
+		}(v)
 	}
 
 	s.client.StopListener(ctx)

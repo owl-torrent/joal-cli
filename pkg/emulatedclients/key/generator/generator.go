@@ -99,3 +99,11 @@ func (s *AccessAwareKey) Get() key.Key {
 func (s *AccessAwareKey) LastAccess() time.Duration {
 	return time.Now().Sub(s.lastAccessed)
 }
+
+func evictOldEntries(entries map[torrent.InfoHash]*AccessAwareKey, evictAfter time.Duration) {
+	for k, accessAware := range entries {
+		if accessAware.LastAccess() > evictAfter {
+			delete(entries, k)
+		}
+	}
+}

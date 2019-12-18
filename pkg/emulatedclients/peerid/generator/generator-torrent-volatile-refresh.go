@@ -37,17 +37,11 @@ func (g *TorrentVolatileGenerator) get(algorithm algorithm.IPeerIdAlgorithm, inf
 	// Once in a while clean the map
 	if g.counterSinceCleanup > 100 {
 		g.lock.Lock()
-		g.counterSinceCleanup = 0
+		if g.counterSinceCleanup > 100 {
+			g.counterSinceCleanup = 0
+			evictOldEntries(g.entries, g.evictAfter)
+		}
 		g.lock.Unlock()
-		go func() {
-			g.lock.Lock()
-			defer g.lock.Unlock()
-			for key, accessAware := range g.entries {
-				if accessAware.LastAccess() > g.evictAfter {
-					delete(g.entries, key)
-				}
-			}
-		}()
 	}
 
 	return val.Get()
