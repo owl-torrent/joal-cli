@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -57,6 +58,10 @@ func (s *seed) AddUploaded(bytes int64) {
 }
 func (s *seed) GetSwarm() bandwidth.ISwarm {
 	return s.peers
+}
+
+func (s *seed) String() string {
+	return fmt.Sprintf("%v", &s)
 }
 
 func LoadFromFile(file string) (ISeed, error) {
@@ -126,15 +131,15 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 					// we already had an interval returned by the tracker, just reuse it
 					s.nextAnnounceAt = time.Now().Add(s.lastKnownInterval)
 				} else {
-					// increment announce time from 10 sec up to 1800 s (
+					// When error occurs, increment announce time from 10 sec up to 1800 s (
 					progressiveDuration := math.Min(1800, float64(10*(s.consecutiveErrors*s.consecutiveErrors)))
 					s.nextAnnounceAt = time.Now().Add(time.Duration(progressiveDuration) * time.Second)
 				}
 				// TODO: log announce error
-				if s.consecutiveErrors > 2 && currentAnnounceType != tracker.Started {
+				if s.consecutiveErrors >= 2 && currentAnnounceType != tracker.Started {
 					s.peers = &swarm{seeders: 0, leechers: 0}
+					dispatcher.ClaimOrUpdate(s)
 				}
-				dispatcher.ClaimOrUpdate(s)
 				continue
 			}
 			s.consecutiveErrors = 0
@@ -145,7 +150,8 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 			s.lastKnownInterval = time.Duration(response.Interval) * time.Second
 			s.nextAnnounce = tracker.None
 			s.nextAnnounceAt = time.Now().Add(s.lastKnownInterval)
-			s.peers = &swarm{leechers: response.Leechers, seeders: response.Seeders}
+			// seeders = seeders -1 because we count as one
+			s.peers = &swarm{leechers: response.Leechers, seeders: int32(math.Max(0, float64(response.Seeders)-1))}
 			dispatcher.ClaimOrUpdate(s)
 
 			continue
