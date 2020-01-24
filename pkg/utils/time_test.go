@@ -1,20 +1,21 @@
 package utils
 
 import (
-	"github.com/stretchr/testify/assert"
+	"github.com/nvn1729/congo"
 	"testing"
 	"time"
 )
 
 func TestEvery_shouldCallMethodAtIntervalUntilStop(t *testing.T) {
 	duration := 1 * time.Millisecond
-	counter := 0
+	latch := congo.NewCountDownLatch(3)
 	f := func() {
-		counter++
+		_ = latch.CountDown()
 	}
 
 	quit := Every(duration, f)
-	time.Sleep(10 * time.Millisecond)
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch has timed out")
+	}
 	close(quit)
-	assert.GreaterOrEqual(t, counter, 3) // check greater than 30 because running 100 times in 100 milliseconds is a bit too much
 }

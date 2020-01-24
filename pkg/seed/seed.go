@@ -1,5 +1,7 @@
 package seed
 
+//go:generate mockgen -destination=../../mocks/mock_seed.go -package=mocks github.com/anthonyraymond/joal-cli/pkg/seed ISeed
+
 import (
 	"context"
 	"fmt"

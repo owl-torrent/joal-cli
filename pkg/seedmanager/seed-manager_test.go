@@ -7,11 +7,11 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
+	"github.com/anthonyraymond/joal-cli/mocks"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
-	assert "github.com/stretchr/testify/assert"
+	"github.com/golang/mock/gomock"
+	"github.com/nvn1729/congo"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -39,7 +39,7 @@ func setupTestFolder(t *testing.T) (absPath string, cleanFunction func()) {
 	}
 }
 
-func createTorrentFile(t *testing.T, directory string) string {
+func createTorrentFile(t *testing.T, directory string) (string, torrent.InfoHash) {
 	name := make([]byte, 180)
 	rand.Read(name)
 	info := metainfo.Info{
@@ -81,7 +81,7 @@ func createTorrentFile(t *testing.T, directory string) string {
 		t.Fatal(err)
 	}
 
-	return file.Name()
+	return file.Name(), meta.HashInfoBytes()
 }
 
 type WaitAbleClient struct {
@@ -129,24 +129,39 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
-	announceWg := sync.WaitGroup{}
+	ctrl := gomock.NewController(t)
+	client := mocks.NewMockIEmulatedClient(ctrl)
+	dispatcher := mocks.NewMockIDispatcher(ctrl)
+
 	manager := &SeedManager{
-		client:              &WaitAbleClient{wgAnnounce: &announceWg},
-		bandwidthDispatcher: &DumbDispatcher{},
+		client:              client,
+		bandwidthDispatcher: dispatcher,
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
 		seeds:           make(map[torrent.InfoHash]seed.ISeed),
-		fileWatcherPoll: 1 * time.Millisecond,
+		fileWatcherPoll: 5 * time.Millisecond,
 		lock:            &sync.Mutex{},
 	}
 
-	fileCount := 4
-	announceWg.Add(fileCount)
+	fileCount := uint(4)
+	latch := congo.NewCountDownLatch(fileCount)
 
-	for i := 0; i < fileCount; i++ {
-		createTorrentFile(t, folder)
+	for i := uint(0); i < fileCount; i++ {
+		_, infoHash := createTorrentFile(t, folder)
+		client.
+			EXPECT().
+			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started)).
+			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+				_ = latch.CountDown()
+				return tracker.AnnounceResponse{Interval: 1000}, nil
+			}).
+			Times(1)
 	}
+	client.EXPECT().StartListener().Times(1)
+	dispatcher.EXPECT().Start().AnyTimes()
+	dispatcher.EXPECT().ClaimOrUpdate(gomock.Any()).AnyTimes()
+	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()
 
 	err := manager.Start()
 	if err != nil {
@@ -154,29 +169,32 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	}
 	defer manager.torrentFileWatcher.Close()
 
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second)
-	if err != nil {
-		t.Fatal("timeout reached")
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	assert.Len(t, manager.seeds, fileCount)
 }
 
 func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
-	announceWg := sync.WaitGroup{}
+	ctrl := gomock.NewController(t)
+	client := mocks.NewMockIEmulatedClient(ctrl)
+	dispatcher := mocks.NewMockIDispatcher(ctrl)
+
 	manager := &SeedManager{
-		client:              &WaitAbleClient{wgAnnounce: &announceWg},
+		client:              client,
 		bandwidthDispatcher: &DumbDispatcher{},
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
 		seeds:           make(map[torrent.InfoHash]seed.ISeed),
-		fileWatcherPoll: 1 * time.Millisecond,
+		fileWatcherPoll: 5 * time.Millisecond,
 		lock:            &sync.Mutex{},
 	}
 
+	client.EXPECT().StartListener().Times(1)
+	dispatcher.EXPECT().Start().AnyTimes()
 	err := manager.Start()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -185,42 +203,68 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 
 	manager.torrentFileWatcher.Wait()
 
-	fileCount := 4
-	announceWg.Add(fileCount)
+	fileCount := uint(4)
+	latch := congo.NewCountDownLatch(fileCount)
 
-	for i := 0; i < fileCount; i++ {
-		createTorrentFile(t, folder)
+	for i := uint(0); i < fileCount; i++ {
+		_, infoHash := createTorrentFile(t, folder)
+		client.
+			EXPECT().
+			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started)).
+			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+				_ = latch.CountDown()
+				return tracker.AnnounceResponse{Interval: 1000}, nil
+			}).
+			Times(1)
 	}
+	dispatcher.EXPECT().ClaimOrUpdate(gomock.Any()).AnyTimes()
+	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()
 
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second)
-	if err != nil {
-		t.Fatal("timeout reached")
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	assert.Len(t, manager.seeds, fileCount)
 }
 
 func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
-	announceWg := sync.WaitGroup{}
+	ctrl := gomock.NewController(t)
+	client := mocks.NewMockIEmulatedClient(ctrl)
+	dispatcher := mocks.NewMockIDispatcher(ctrl)
+
 	manager := &SeedManager{
-		client:              &WaitAbleClient{wgAnnounce: &announceWg},
-		bandwidthDispatcher: &DumbDispatcher{},
+		client:              client,
+		bandwidthDispatcher: dispatcher,
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
 		seeds:           make(map[torrent.InfoHash]seed.ISeed),
-		fileWatcherPoll: 1 * time.Millisecond,
+		fileWatcherPoll: 5 * time.Millisecond,
 		lock:            &sync.Mutex{},
 	}
 
-	fileCount := 4
+	fileCount := uint(4)
+	latch := congo.NewCountDownLatch(fileCount)
 
-	files := make([]string, fileCount)
-	for i := 0; i < fileCount; i++ {
-		files[i] = createTorrentFile(t, folder)
+	files := make(map[string]torrent.InfoHash, fileCount)
+	for i := uint(0); i < fileCount; i++ {
+		file, infoHash := createTorrentFile(t, folder)
+		files[file] = infoHash
+		client.
+			EXPECT().
+			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started)).
+			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+				_ = latch.CountDown()
+				return tracker.AnnounceResponse{Interval: 1000}, nil
+			}).
+			Times(1)
 	}
+
+	client.EXPECT().StartListener().Times(1)
+	dispatcher.EXPECT().Start().AnyTimes()
+	dispatcher.EXPECT().ClaimOrUpdate(gomock.Any()).AnyTimes()
+	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()
 
 	err := manager.Start()
 	if err != nil {
@@ -230,46 +274,66 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 
 	manager.torrentFileWatcher.Wait()
 
-	announceWg.Add(fileCount)
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second) // wait for creation to be triggered
-	if err != nil {
-		t.Fatal("timeout reached")
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
 
-	for _, f := range files {
-		announceWg.Add(1)
-		err = os.Remove(f)
+	latch = congo.NewCountDownLatch(uint(len(files)))
+	for file, infoHash := range files {
+		err = os.Remove(file)
 		if err != nil {
 			t.Fatal(err)
 		}
+		client.
+			EXPECT().
+			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Stopped)).
+			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+				_ = latch.CountDown()
+				return tracker.AnnounceResponse{Interval: 1000}, nil
+			}).
+			Times(1)
 	}
 
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second)
-	if err != nil {
-		t.Fatal("timeout reached")
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	assert.Len(t, manager.seeds, 0)
 }
 
 func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
-	announceWg := sync.WaitGroup{}
+	ctrl := gomock.NewController(t)
+	client := mocks.NewMockIEmulatedClient(ctrl)
+	dispatcher := mocks.NewMockIDispatcher(ctrl)
+
 	manager := &SeedManager{
-		client:              &WaitAbleClient{wgAnnounce: &announceWg},
-		bandwidthDispatcher: &DumbDispatcher{},
+		client:              client,
+		bandwidthDispatcher: dispatcher,
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
 		seeds:           make(map[torrent.InfoHash]seed.ISeed),
-		fileWatcherPoll: 1 * time.Millisecond,
+		fileWatcherPoll: 5 * time.Millisecond,
 		lock:            &sync.Mutex{},
 	}
 
-	fileCount := 1
+	latch := congo.NewCountDownLatch(1)
 
-	file := createTorrentFile(t, folder)
+	file, infoHash := createTorrentFile(t, folder)
+	client.
+		EXPECT().
+		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started)).
+		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			_ = latch.CountDown()
+			return tracker.AnnounceResponse{Interval: 1000}, nil
+		}).
+		Times(1)
+
+	client.EXPECT().StartListener().Times(1)
+	dispatcher.EXPECT().Start().AnyTimes()
+	dispatcher.EXPECT().ClaimOrUpdate(gomock.Any()).AnyTimes()
+	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()
 
 	err := manager.Start()
 	if err != nil {
@@ -279,46 +343,34 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 
 	manager.torrentFileWatcher.Wait()
 
-	announceWg.Add(fileCount)
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second) // wait for creation to be triggered
-	if err != nil {
-		t.Fatal("timeout reached")
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
 
-	announceWg.Add(2)
+	latch = congo.NewCountDownLatch(2)
 	err = os.Rename(file, filepath.Join(filepath.Dir(file), "copy-"+filepath.Base(file)))
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.
+		EXPECT().
+		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Stopped)).
+		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			_ = latch.CountDown()
+			return tracker.AnnounceResponse{Interval: 1000}, nil
+		}).
+		Times(1)
+	client.
+		EXPECT().
+		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started)).
+		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			_ = latch.CountDown()
+			return tracker.AnnounceResponse{Interval: 1000}, nil
+		}).
+		Times(1)
 
-	err = testutils.WaitOrFailAfterTimeout(&announceWg, 5*time.Second)
-	if err != nil {
-		t.Fatal("timeout reached")
-	}
-	assert.Len(t, manager.seeds, 1)
-}
-
-type DumbSeed struct {
-	wgStop *sync.WaitGroup
-}
-
-func (d *DumbSeed) FilePath() string {
-	return ""
-}
-func (d *DumbSeed) InfoHash() *torrent.InfoHash {
-	return nil
-}
-func (d *DumbSeed) TorrentName() string {
-	return ""
-}
-func (d *DumbSeed) GetSwarm() bandwidth.ISwarm {
-	return nil
-}
-func (d *DumbSeed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-}
-func (d *DumbSeed) StopSeeding(ctx context.Context) {
-	if d.wgStop != nil {
-		d.wgStop.Done()
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
 }
 
@@ -326,62 +378,79 @@ func TestSeedManager_StartAndStop(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
-	wgListener := sync.WaitGroup{}
-	wgDispatcherStart := sync.WaitGroup{}
-	wgDispatcherStop := sync.WaitGroup{}
+	ctrl := gomock.NewController(t)
+	client := mocks.NewMockIEmulatedClient(ctrl)
+	dispatcher := mocks.NewMockIDispatcher(ctrl)
+
 	manager := &SeedManager{
-		client:              &WaitAbleClient{wgListener: &wgListener},
-		bandwidthDispatcher: &DumbDispatcher{wgStart: &wgDispatcherStart, wgStop: &wgDispatcherStop},
+		client:              client,
+		bandwidthDispatcher: dispatcher,
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
 		seeds:           make(map[torrent.InfoHash]seed.ISeed),
-		fileWatcherPoll: 1 * time.Millisecond,
+		fileWatcherPoll: 5 * time.Millisecond,
 		lock:            &sync.Mutex{},
 	}
 
-	wgListener.Add(1)
-	wgDispatcherStart.Add(1)
+	listenerLatch := congo.NewCountDownLatch(1)
+	dispatcherLatch := congo.NewCountDownLatch(1)
+	client.EXPECT().StartListener().Do(func() { _ = listenerLatch.CountDown() }).Times(1)
+	dispatcher.EXPECT().Start().Do(func() { _ = dispatcherLatch.CountDown() }).Times(1)
 
 	err := manager.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = testutils.WaitOrFailAfterTimeout(&wgListener, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
+	if !listenerLatch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	err = testutils.WaitOrFailAfterTimeout(&wgDispatcherStart, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
+	if !dispatcherLatch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
 
 	seeds := make([]seed.ISeed, 255)
+	stopSeedLatch := congo.NewCountDownLatch(255)
 	for i := 0; i < 255; i++ {
-		s := DumbSeed{wgStop: &sync.WaitGroup{}}
-		seeds[i] = &s
-		manager.seeds[[20]byte{byte(i)}] = &s
-		s.wgStop.Add(1)
-	}
+		s := mocks.NewMockISeed(ctrl)
+		seeds[i] = s
+		manager.seeds[[20]byte{byte(i)}] = s
 
-	wgListener.Add(1)
-	wgDispatcherStop.Add(1)
+		s.
+			EXPECT().
+			StopSeeding(gomock.Any()).
+			Do(func(e interface{}) { _ = stopSeedLatch.CountDown() }).
+			Times(1)
+	}
+	dispatcher.
+		EXPECT().
+		Release(gomock.Any()).
+		Do(func(e interface{}) { _ = dispatcherLatch.CountDown() }).
+		Times(255)
+	dispatcher.
+		EXPECT().
+		Stop().
+		Do(func() { _ = dispatcherLatch.CountDown() }).
+		Times(1)
+	client.
+		EXPECT().
+		StopListener(gomock.Any()).
+		Do(func(e interface{}) { _ = listenerLatch.CountDown() }).
+		Times(1)
+
+	dispatcherLatch = congo.NewCountDownLatch(1)
+	listenerLatch = congo.NewCountDownLatch(1)
 
 	manager.Stop(context.Background())
 
-	for i := 0; i < 255; i++ {
-		err = testutils.WaitOrFailAfterTimeout(seeds[i].(*DumbSeed).wgStop, 5*time.Second)
-		if err != nil {
-			t.Fatal(err)
-		}
+	if !stopSeedLatch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	err = testutils.WaitOrFailAfterTimeout(&wgListener, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
+	if !listenerLatch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
-	err = testutils.WaitOrFailAfterTimeout(&wgDispatcherStop, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
+	if !dispatcherLatch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch timed out")
 	}
 }
