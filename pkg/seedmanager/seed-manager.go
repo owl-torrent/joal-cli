@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
@@ -24,7 +24,7 @@ type SeedManager struct {
 	seeds               map[torrent.InfoHash]seed.ISeed
 	torrentFileWatcher  *watcher.Watcher
 	bandwidthDispatcher bandwidth.IDispatcher
-	client              emulatedclients.IEmulatedClient
+	client              emulatedclient.IEmulatedClient
 	fileWatcherPoll     time.Duration
 	lock                *sync.Mutex
 }
@@ -35,7 +35,7 @@ func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager,
 		MaximumBytesPerSeconds: conf.MaxUploadRate,
 	})
 
-	client, err := emulatedclients.FromClientFile(path.Join(joalPaths.clientFileFolder, conf.Client))
+	client, err := emulatedclient.FromClientFile(path.Join(joalPaths.clientFileFolder, conf.Client))
 	if err != nil {
 		return nil, err
 	}

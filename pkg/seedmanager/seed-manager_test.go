@@ -9,7 +9,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclients"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	assert "github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -314,7 +314,7 @@ func (d *DumbSeed) TorrentName() string {
 func (d *DumbSeed) GetSwarm() bandwidth.ISwarm {
 	return nil
 }
-func (d *DumbSeed) Seed(bitTorrentClient emulatedclients.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
+func (d *DumbSeed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
 }
 func (d *DumbSeed) StopSeeding(ctx context.Context) {
 	if d.wgStop != nil {

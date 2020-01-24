@@ -4,7 +4,7 @@ package main
 // especially for bencode and tracker subpackages
 
 func main() {
-	/*var client emulatedclients.EmulatedClient
+	/*var client emulatedclient.EmulatedClient
 	clientFile, err := os.Open("C:/Users/raymo/Desktop/joal3/clients/qbittorrent.yml")
 	if err != nil {
 		panic(err)

@@ -111,3 +111,5 @@ fabric.properties
 .idea/**/markdown-navigator/
 
 # End of https://www.gitignore.io/api/go,jetbrains
+
+mocks/
