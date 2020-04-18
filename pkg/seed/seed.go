@@ -1,6 +1,6 @@
 package seed
 
-//go:generate mockgen -destination=../../mocks/mock_seed.go -package=mocks github.com/anthonyraymond/joal-cli/pkg/seed ISeed
+//go:generate mockgen -destination=./seed_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/seed -package=seed github.com/anthonyraymond/joal-cli/pkg/seed ISeed
 
 import (
 	"context"
@@ -17,8 +17,6 @@ import (
 	"sync"
 	"time"
 )
-
-type status int
 
 type ISeed interface {
 	FilePath() string

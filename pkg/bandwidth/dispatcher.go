@@ -1,6 +1,6 @@
 package bandwidth
 
-//go:generate mockgen -destination=../../mocks/mock_dispatcher.go -package=mocks github.com/anthonyraymond/joal-cli/pkg/bandwidth ISwarm,IBandwidthClaimable,IDispatcher
+//go:generate mockgen -destination=./dispatcher_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/bandwidth -package=bandwidth github.com/anthonyraymond/joal-cli/pkg/bandwidth ISwarm,IBandwidthClaimable,IDispatcher
 
 import (
 	"github.com/anacrolix/torrent"

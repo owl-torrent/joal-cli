@@ -3,6 +3,9 @@ package bandwidth
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anthonyraymond/joal-cli/internal/gomockutils"
+	"github.com/golang/mock/gomock"
+	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -105,15 +108,10 @@ func (bc *DumbBandwidthClaimable) AddUploaded(bytes int64) {
 }
 func (bc *DumbBandwidthClaimable) GetSwarm() ISwarm { return bc.swarm }
 
-type CounterSpeedProvider struct {
-	counter int
-}
-
-func (s *CounterSpeedProvider) GetBytesPerSeconds() int64 { return 0 }
-func (s *CounterSpeedProvider) Refresh()                  { s.counter++ }
-
 func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
-	speedProvider := &CounterSpeedProvider{}
+	ctrl := gomock.NewController(t)
+
+	speedProvider := NewMockIRandomSpeedProvider(ctrl)
 	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
@@ -123,15 +121,21 @@ func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 		lock:                        &sync.RWMutex{},
 	}
 
+	latch := congo.NewCountDownLatch(1)
+	speedProvider.EXPECT().Refresh().Do(func() { _ = latch.CountDown() }).Times(1)
+
 	dispatcher.Start()
-	time.Sleep(10 * time.Millisecond)
 	defer dispatcher.Stop()
 
-	assert.Equal(t, 1, speedProvider.counter)
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch has timed out")
+	}
 }
 
 func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
-	speedProvider := &CounterSpeedProvider{}
+	ctrl := gomock.NewController(t)
+
+	speedProvider := NewMockIRandomSpeedProvider(ctrl)
 	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Millisecond,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
@@ -141,11 +145,15 @@ func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 		lock:                        &sync.RWMutex{},
 	}
 
+	latch := congo.NewCountDownLatch(1)
+	speedProvider.EXPECT().Refresh().Do(func() { _ = latch.CountDown() }).MinTimes(4)
+
 	dispatcher.Start()
-	time.Sleep(20 * time.Millisecond)
 	defer dispatcher.Stop()
 
-	assert.GreaterOrEqual(t, speedProvider.counter, 2)
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch has timed out")
+	}
 }
 
 type DumbStaticSpeedProvider struct {
@@ -157,31 +165,36 @@ func (s *DumbStaticSpeedProvider) GetBytesPerSeconds() int64 { return s.speed }
 func (s *DumbStaticSpeedProvider) Refresh()                  { s.refreshCount += 1 }
 
 func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	speedProvider := NewMockIRandomSpeedProvider(ctrl)
+
 	dispatcher := &dispatcher{
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
+		randomSpeedProvider:         speedProvider,
 		claimers:                    make(map[IBandwidthClaimable]Weight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
-	wg := sync.WaitGroup{}
-	ih1 := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	claimer := &DumbBandwidthClaimable{
-		infoHash:           &ih1,
-		uploaded:           0,
-		swarm:              &DumbSwarm{seeders: 100, leechers: 100},
-		onFirstAddUploaded: func() { wg.Done() },
-		lock:               &sync.Mutex{},
-	}
 
-	wg.Add(1)
+	speedProvider.EXPECT().Refresh().AnyTimes()
+	speedProvider.EXPECT().GetBytesPerSeconds().Return(int64(10000000)).AnyTimes()
+
+	latch := congo.NewCountDownLatch(1)
+	ih1 := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+	claimer := NewMockIBandwidthClaimable(ctrl)
+	claimer.EXPECT().InfoHash().Return(&ih1).AnyTimes()
+	claimer.EXPECT().GetSwarm().Return(&DumbSwarm{seeders: 100, leechers: 100})
+	claimer.EXPECT().AddUploaded(gomockutils.NewGreaterThanMatcher(0)).Do(func(e interface{}) { _ = latch.CountDown() }).MinTimes(1)
+
 	dispatcher.ClaimOrUpdate(claimer)
 
 	dispatcher.Start()
-	wg.Wait()
+	if !latch.WaitTimeout(5 * time.Second) {
+		t.Fatal("latch has timed out")
+	}
 	dispatcher.Stop()
-	assert.Greater(t, claimer.uploaded, int64(0))
 }
 
 func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {

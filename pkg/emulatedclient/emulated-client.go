@@ -1,6 +1,6 @@
 package emulatedclient
 
-//go:generate mockgen -destination=../../mocks/mock_emulated-client.go -package=mocks github.com/anthonyraymond/joal-cli/pkg/emulatedclient IEmulatedClient
+//go:generate mockgen -destination=./emulated-client_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/emulatedclient -package=emulatedclient github.com/anthonyraymond/joal-cli/pkg/emulatedclient IEmulatedClient
 
 import (
 	"context"

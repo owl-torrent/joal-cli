@@ -7,8 +7,8 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/mocks"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
@@ -84,54 +84,13 @@ func createTorrentFile(t *testing.T, directory string) (string, torrent.InfoHash
 	return file.Name(), meta.HashInfoBytes()
 }
 
-type WaitAbleClient struct {
-	wgAnnounce *sync.WaitGroup
-	wgListener *sync.WaitGroup
-}
-
-func (w *WaitAbleClient) Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
-	if w.wgAnnounce != nil {
-		w.wgAnnounce.Done()
-	}
-	return tracker.AnnounceResponse{Interval: 1800}, nil
-}
-func (w *WaitAbleClient) StartListener() error {
-	if w.wgListener != nil {
-		w.wgListener.Done()
-	}
-	return nil
-}
-func (w *WaitAbleClient) StopListener(ctx context.Context) {
-	if w.wgListener != nil {
-		w.wgListener.Done()
-	}
-}
-
-type DumbDispatcher struct {
-	wgStart *sync.WaitGroup
-	wgStop  *sync.WaitGroup
-}
-
-func (d *DumbDispatcher) Start() {
-	if d.wgStart != nil {
-		d.wgStart.Done()
-	}
-}
-func (d *DumbDispatcher) Stop() {
-	if d.wgStop != nil {
-		d.wgStop.Done()
-	}
-}
-func (d *DumbDispatcher) ClaimOrUpdate(claimer bandwidth.IBandwidthClaimable) {}
-func (d *DumbDispatcher) Release(claimer bandwidth.IBandwidthClaimable)       {}
-
 func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
 
 	ctrl := gomock.NewController(t)
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 
 	manager := &SeedManager{
 		client:              client,
@@ -179,12 +138,12 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 	defer clean()
 
 	ctrl := gomock.NewController(t)
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 
 	manager := &SeedManager{
 		client:              client,
-		bandwidthDispatcher: &DumbDispatcher{},
+		bandwidthDispatcher: dispatcher,
 		joalPaths: &joalPaths{
 			torrentFolder: folder,
 		},
@@ -195,6 +154,8 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 
 	client.EXPECT().StartListener().Times(1)
 	dispatcher.EXPECT().Start().AnyTimes()
+	dispatcher.EXPECT().ClaimOrUpdate(gomock.Any()).AnyTimes()
+	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()
 	err := manager.Start()
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -230,8 +191,8 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	defer clean()
 
 	ctrl := gomock.NewController(t)
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 
 	manager := &SeedManager{
 		client:              client,
@@ -304,8 +265,8 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	defer clean()
 
 	ctrl := gomock.NewController(t)
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 
 	manager := &SeedManager{
 		client:              client,
@@ -379,8 +340,8 @@ func TestSeedManager_StartAndStop(t *testing.T) {
 	defer clean()
 
 	ctrl := gomock.NewController(t)
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 
 	manager := &SeedManager{
 		client:              client,
@@ -413,7 +374,7 @@ func TestSeedManager_StartAndStop(t *testing.T) {
 	seeds := make([]seed.ISeed, 255)
 	stopSeedLatch := congo.NewCountDownLatch(255)
 	for i := 0; i < 255; i++ {
-		s := mocks.NewMockISeed(ctrl)
+		s := seed.NewMockISeed(ctrl)
 		seeds[i] = s
 		manager.seeds[[20]byte{byte(i)}] = s
 

@@ -6,8 +6,8 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/mocks"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"github.com/pkg/errors"
@@ -46,9 +46,8 @@ func TestSeed_SeedShouldAnnounceInLoopAndUpdateDispatcher(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 	claimLatch := congo.NewCountDownLatch(3)
 
 	client.
@@ -84,8 +83,8 @@ func TestSeed_SeedShouldAnnounceStopOnStopAndReleaseDispatcher(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 	announceLatch := congo.NewCountDownLatch(3)
 	stopLatch := congo.NewCountDownLatch(1)
 
@@ -139,8 +138,8 @@ func TestSeed_SeedShouldUpdateSeedSwarmWithAnnounceResponse(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 	claimLatch := congo.NewCountDownLatch(3)
 
 	client.
@@ -182,8 +181,8 @@ func TestSeed_SeedResetSwarmWhenAnnounceErrorMoreThanTwice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 	announceLatch := congo.NewCountDownLatch(3)
 	claimLatch := congo.NewCountDownLatch(2)
 
@@ -220,8 +219,8 @@ func TestSeed_SeedShouldNotFailIfAnnounceStartedIsAnError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	client := mocks.NewMockIEmulatedClient(ctrl)
-	dispatcher := mocks.NewMockIDispatcher(ctrl)
+	client := emulatedclient.NewMockIEmulatedClient(ctrl)
+	dispatcher := bandwidth.NewMockIDispatcher(ctrl)
 	announceLatch := congo.NewCountDownLatch(1)
 
 	client.

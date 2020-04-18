@@ -3,7 +3,6 @@ package announce
 import (
 	"bytes"
 	"fmt"
-	"github.com/anacrolix/missinggo/httptoo"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/urlencoder"
@@ -40,7 +39,7 @@ func (a *HttpAnnouncer) AfterPropertiesSet() error {
 }
 
 func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
-	_url := httptoo.CopyURL(&url)
+	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
 	if err != nil {
 		return ret, errors.Wrap(err, "fail to format query string")
@@ -112,4 +111,14 @@ func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (str
 type HttpRequestHeader struct {
 	Name  string `yaml:"name" validate:"required"`
 	Value string `yaml:"value" validate:"required"`
+}
+
+func copyURL(u *url.URL) (ret *url.URL) {
+	ret = new(url.URL)
+	*ret = *u
+	if u.User != nil {
+		ret.User = new(url.Userinfo)
+		*ret.User = *u.User
+	}
+	return
 }
