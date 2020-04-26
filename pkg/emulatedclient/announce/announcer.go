@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"net"
 	"net/url"
 	"strings"
@@ -86,6 +87,12 @@ func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceReq
 				announceErrors = append(announceErrors, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported", announceUrl.String(), announceUrl.Scheme)))
 				continue
 			}
+
+			logrus.
+				WithField("event", announceRequest.Event).
+				WithField("infohash", announceRequest.InfoHash).
+				WithField("uploaded", announceRequest.Uploaded).
+				Info("announcing to tracker")
 
 			ret, err := currentAnnouncer.Announce(*announceUrl, announceRequest)
 			if err == nil {

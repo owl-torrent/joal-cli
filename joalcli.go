@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
-	seed2 "github.com/anthonyraymond/joal-cli/pkg/seed"
-	"gopkg.in/yaml.v2"
+	"context"
+	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
+	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
+	"github.com/sirupsen/logrus"
 	"os"
 	"time"
 )
@@ -12,40 +12,35 @@ import (
 // torrent base library : https://github.com/anacrolix/torrent
 // especially for bencode and tracker subpackages
 
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetOutput(os.Stdout)
+	logrus.Info("init log to prevent race exception in logrus")
+	logrus.Info("")
+}
+
 func main() {
-	var client emulatedclient.EmulatedClient
-	clientFile, err := os.Open("C:/Users/raymo/Desktop/joal3/clients/qbittorrent.yml")
+
+	conf, err := config.ConfigManagerNew("C:/Users/raymo/Desktop/joal3/config.json")
+	if err != nil {
+		panic(err)
+	}
+	joal, err := seedmanager.JoalNew("C:/Users/raymo/Desktop/joal3", conf)
 	if err != nil {
 		panic(err)
 	}
 
-	decoder := yaml.NewDecoder(clientFile)
-	decoder.SetStrict(true)
-	err = decoder.Decode(&client)
+	err = joal.Start()
 	if err != nil {
 		panic(err)
 	}
-	err = client.AfterPropertiesSet()
-	if err != nil {
-		panic(err)
-	}
-	err = client.StartListener()
-	if err != nil {
-		panic(err)
-	}
-
-	dispatcher := bandwidth.DispatcherNew(&bandwidth.RandomSpeedProvider{
-		MinimumBytesPerSeconds: 0,
-		MaximumBytesPerSeconds: 10,
-	})
-
-	seed, err := seed2.LoadFromFile(`C:/Users/raymo/Desktop/joal3/torrents/a.torrent`)
-	if err != nil {
-		panic(err)
-	}
-
-	seed.Seed(&client, dispatcher)
 
 	timer := time.NewTimer(10 * time.Second)
 	<-timer.C
+	joal.Stop(nonCancellableTimeoutContext(5 * time.Second))
+}
+
+func nonCancellableTimeoutContext(duration time.Duration) context.Context {
+	ctx, _ := context.WithTimeout(context.Background(), duration)
+	return ctx
 }

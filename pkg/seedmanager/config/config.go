@@ -9,10 +9,9 @@ import (
 )
 
 type SeedConfig struct {
-	MinUploadRate              int64  `json:"minUploadRate" yaml:"maxUploadRate"`
-	MaxUploadRate              int64  `json:"maxUploadRate" yaml:"maxUploadRate"`
-	Client                     string `json:"clientFile" yaml:"clientFile"`
-	RemoveTorrentWithZeroPeers bool   `json:"removeTorrentWithZeroPeers" yaml:"removeTorrentWithZeroPeers"`
+	MinUploadRate int64  `json:"minUploadRate" yaml:"maxUploadRate"`
+	MaxUploadRate int64  `json:"maxUploadRate" yaml:"maxUploadRate"`
+	Client        string `json:"clientFile" yaml:"clientFile"`
 }
 
 type IManager interface {

@@ -1,6 +1,5 @@
 {
   "minUploadRate" : 2,
   "maxUploadRate" : 30,
-  "clientFile" : "qbittorrent-4.1.5.client",
-  "removeTorrentWithZeroPeers" : false
+  "clientFile" : "qbittorrent-4.1.5.client"
 }

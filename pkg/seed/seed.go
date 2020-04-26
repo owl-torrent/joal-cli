@@ -104,7 +104,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 	}
 	logrus.WithFields(logrus.Fields{
 		"torrent": filepath.Base(s.path),
-	}).Warn("Start seed")
+	}).Info("Start seed")
 
 	defer func() {
 		s.seeding = false
@@ -135,7 +135,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 					progressiveDuration := math.Min(1800, float64(10*(s.consecutiveErrors*s.consecutiveErrors)))
 					s.nextAnnounceAt = time.Now().Add(time.Duration(progressiveDuration) * time.Second)
 				}
-				// TODO: log announce error
+				logrus.WithError(err).WithField("infohash", s.infoHash).Warn("failed to announce")
 				if s.consecutiveErrors >= 2 && currentAnnounceType != tracker.Started {
 					s.peers = &swarm{seeders: 0, leechers: 0}
 					dispatcher.ClaimOrUpdate(s)

@@ -1,6 +1,8 @@
 package announce
 
 import (
+	"bytes"
+	"compress/gzip"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
@@ -145,6 +147,60 @@ func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 		UrlEncoder:     urlencoder.UrlEncoder{},
 		Query:          "info_hash={{urlEncode (byteArray20ToString .InfoHash)}}",
 		RequestHeaders: []HttpRequestHeader{},
+	}
+	err := announcer.AfterPropertiesSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	announceRequest := AnnounceRequest{
+		InfoHash:   [20]byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		PeerId:     [20]byte{},
+		Downloaded: 0,
+		Left:       0,
+		Uploaded:   0,
+		Event:      0,
+		IPAddress:  nil,
+		Key:        0,
+		NumWant:    0,
+		Port:       0,
+	}
+	url, _ := url2.Parse(s.URL)
+	response, err := announcer.Announce(*url, announceRequest)
+	if err != nil {
+		t.Fatalf("httpAnnouncer.Announce() has failed: %v", err)
+	}
+
+	assert.Equal(t, response, response)
+}
+
+func TestHttpAnnouncer_AnnounceShouldUnderstandAndDecodeGzip(t *testing.T) {
+	expectedResponse := tracker.AnnounceResponse{
+		Interval: 150,
+		Leechers: 10,
+		Seeders:  20,
+		Peers:    tracker.Peers{tracker.Peer{IP: net.IPv4(10, 10, 10, 10), Port: 2501, ID: []byte{1}}},
+	}
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		respBytes, err := bencode.Marshal(expectedResponse)
+		if err != nil {
+			t.Errorf("failed to encode http announce response")
+		}
+
+		var b bytes.Buffer
+		gz := gzip.NewWriter(&b)
+		_, err = gz.Write(respBytes)
+		_ = gz.Close()
+
+		w.Header().Add("Content-Encoding", "gzip")
+		_, _ = w.Write(b.Bytes())
+	}))
+	defer s.Close()
+
+	announcer := HttpAnnouncer{
+		UrlEncoder:     urlencoder.UrlEncoder{},
+		Query:          "info_hash={{urlEncode (byteArray20ToString .InfoHash)}}",
+		RequestHeaders: []HttpRequestHeader{{"Accept-Encoding", "gzip"}},
 	}
 	err := announcer.AfterPropertiesSet()
 	if err != nil {

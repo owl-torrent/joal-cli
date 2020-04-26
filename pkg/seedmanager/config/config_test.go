@@ -25,7 +25,6 @@ func TestConfigManager_Load(t *testing.T) {
 	assert.NotZero(t, conf.MinUploadRate)
 	assert.NotZero(t, conf.MaxUploadRate)
 	assert.NotEmpty(t, conf.Client)
-	assert.False(t, conf.RemoveTorrentWithZeroPeers)
 
 	confFromGet, _ := manager.Get()
 	assert.Equal(t, confFromGet, conf)
@@ -48,7 +47,6 @@ func TestConfigManager_Get_ShouldLoadIfNotLoadedYet(t *testing.T) {
 	assert.NotZero(t, conf.MinUploadRate)
 	assert.NotZero(t, conf.MaxUploadRate)
 	assert.NotEmpty(t, conf.Client)
-	assert.False(t, conf.RemoveTorrentWithZeroPeers)
 }
 
 func TestConfigManager_Save(t *testing.T) {
@@ -67,10 +65,9 @@ func TestConfigManager_Save(t *testing.T) {
 	}
 
 	err = manager.Save(SeedConfig{
-		MinUploadRate:              10,
-		MaxUploadRate:              10,
-		Client:                     "a",
-		RemoveTorrentWithZeroPeers: true,
+		MinUploadRate: 10,
+		MaxUploadRate: 10,
+		Client:        "a",
 	})
 	if err != nil {
 		t.Fatal(err)

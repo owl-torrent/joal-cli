@@ -1,13 +1,14 @@
 package announce
 
 import (
-	"bytes"
+	"compress/gzip"
 	"fmt"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/urlencoder"
 	"github.com/pkg/errors"
-	"io"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -58,9 +59,18 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 		req.Header.Add(v.Name, v.Value)
 	}
 
+	logrus.
+		WithField("infohash", announceRequest.InfoHash).
+		WithField("protocol", req.Proto).
+		WithField("method", req.Method).
+		WithField("url", req.URL.String()).
+		WithField("headers", req.Header).
+		Debug("announce details")
+
 	resp, err := (&http.Client{
 		Timeout: time.Second * 15,
 		Transport: &http.Transport{
+			DisableCompression: true, // Disable auto send of Accept-Encoding gzip header. Since the lib dont add the header on it's own we'll have to handle the gzip decompression on our own
 			DialContext: (&net.Dialer{
 				Timeout: 15 * time.Second,
 			}).DialContext,
@@ -71,18 +81,21 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
-	var buf bytes.Buffer
-	io.Copy(&buf, resp.Body)
+	bodyBytes, err := readResponseBody(resp)
+	if err != nil {
+		err = errors.Wrap(err, "failed to read response body")
+		return
+	}
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("response from tracker: %s: %s", resp.Status, buf.String())
+		err = fmt.Errorf("response from tracker: %s: %s", resp.Status, fmt.Sprintf("%x", bodyBytes))
 		return
 	}
 	var trackerResponse tracker.HttpResponse
-	err = bencode.Unmarshal(buf.Bytes(), &trackerResponse)
+	err = bencode.Unmarshal(bodyBytes, &trackerResponse)
 	if _, ok := err.(bencode.ErrUnusedTrailingBytes); ok {
 		err = nil
 	} else if err != nil {
-		err = fmt.Errorf("error decoding %q: %s", buf.Bytes(), err)
+		err = errors.Wrapf(err, "error decoding %q", bodyBytes)
 		return
 	}
 	if trackerResponse.FailureReason != "" {
@@ -106,6 +119,20 @@ func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (str
 	sb := strings.Builder{}
 	err := queryTemplate.Execute(&sb, ar)
 	return sb.String(), err
+}
+
+func readResponseBody(response *http.Response) (bodyBytes []byte, err error) {
+	var reader = response.Body
+
+	if response.Header.Get("Content-Encoding") == "gzip" {
+		reader, err = gzip.NewReader(response.Body)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode gzip body content")
+		}
+		defer func() { _ = reader.Close() }()
+	}
+
+	return ioutil.ReadAll(reader)
 }
 
 type HttpRequestHeader struct {

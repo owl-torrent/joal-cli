@@ -29,8 +29,6 @@ func main() {
 		panic(err)
 	}
 
-	//TODO:read config file
-
 	//seedmanager.SeedManagerNew(configPath, seedConfig)
 
 }
