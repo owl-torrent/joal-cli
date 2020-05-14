@@ -33,9 +33,13 @@ func setupTestFolder(t *testing.T) (absPath string, cleanFunction func()) {
 		t.Fatal(err)
 	}
 	return absPath, func() {
-		if err = os.RemoveAll(testDir); err != nil {
-			t.Fatal(err)
+		for attempts := 0; attempts < 8; attempts++ {
+			if err = os.RemoveAll(testDir); err == nil {
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
+		t.Fatal(err)
 	}
 }
 

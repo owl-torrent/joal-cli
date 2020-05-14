@@ -75,6 +75,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 				Timeout: 15 * time.Second,
 			}).DialContext,
 			TLSHandshakeTimeout: 15 * time.Second,
+			DisableKeepAlives: true, // see https://github.com/anacrolix/torrent/commit/04ff050ecd5f5beab9b20a0f4170fda1e71062a4
 		},
 	}).Do(req)
 	if err != nil {
