@@ -24,12 +24,12 @@ func Test_newTierAnnouncer(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    TierAnnouncer
+		want    TiersAnnouncer
 		wantErr bool
 	}{
 		{name: "shouldFailWhenEmpty", args: args{announceList: [][]string{}, announceToAllTiers: true, announceToAllTrackersInTier: true}, want: nil, wantErr: true},
 		{name: "shouldFailWhenEmpty", args: args{announceList: [][]string{{}}, announceToAllTiers: true, announceToAllTrackersInTier: true}, want: nil, wantErr: true},
-		{name: "shouldFailWhenEmpty", args: args{announceList: [][]string{{},{}}, announceToAllTiers: true, announceToAllTrackersInTier: true}, want: nil, wantErr: true},
+		{name: "shouldFailWhenEmpty", args: args{announceList: [][]string{{}, {}}, announceToAllTiers: true, announceToAllTrackersInTier: true}, want: nil, wantErr: true},
 		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
@@ -46,7 +46,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"},{"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
+		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
 					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
@@ -55,7 +55,6 @@ func Test_newTierAnnouncer(t *testing.T) {
 			},
 			wantErr: false,
 		},
-
 
 		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
 			want: &AllTiersAnnouncer{
@@ -73,7 +72,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"},{"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
+		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
 					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
@@ -98,7 +97,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "shouldCreateFallbackTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"},{"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: true},
+		{name: "shouldCreateFallbackTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: true},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
 					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
@@ -123,7 +122,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{name: "shouldCreateFallbackTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"},{"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: false},
+		{name: "shouldCreateFallbackTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: false},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
 					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
@@ -135,7 +134,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := newTierAnnouncer(tt.args.announceList, tt.args.announceToAllTiers, tt.args.announceToAllTrackersInTier)
+			got, err := newTierAnnouncer(nil, tt.args.announceList, tt.args.announceToAllTiers, tt.args.announceToAllTrackersInTier)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("newTierAnnouncer() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -151,7 +150,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 	}
 }
 
-func sortTrackerUris(i TierAnnouncer) {
+func sortTrackerUris(i TiersAnnouncer) {
 	if i == nil {
 		return
 	}
@@ -181,6 +180,4 @@ func sortTrackerUris(i TierAnnouncer) {
 			}
 		}
 	}
-
-
 }

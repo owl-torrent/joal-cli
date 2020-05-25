@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/anacrolix/dht/v2 v2.5.1 // indirect
-	github.com/anacrolix/missinggo/v2 v2.4.1-0.20200227072623-f02f6484f997 // indirect
+	github.com/anacrolix/missinggo/v2 v2.4.1-0.20200227072623-f02f6484f997
 	github.com/anacrolix/torrent v1.14.0
 	github.com/anthonyraymond/watcher v1.0.8-0.20200326230057-d944578ac457
 	github.com/go-playground/validator/v10 v10.0.1
