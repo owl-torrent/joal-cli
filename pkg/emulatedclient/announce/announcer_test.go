@@ -1,6 +1,7 @@
 package announce
 
 import (
+	"context"
 	"errors"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -37,7 +38,7 @@ type validAbleAnnouncer struct {
 }
 
 func (a *validAbleAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *validAbleAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *validAbleAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
 	return tracker.AnnounceResponse{}, nil
 }
 
@@ -81,19 +82,19 @@ func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T
 		Udp:  &DumbUdpAnnouncer{},
 	}
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"http://localhost.fr"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"http://localhost.fr"}}, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"https://localhost.fr"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"https://localhost.fr"}}, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp://localhost.fr"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp://localhost.fr"}}, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp4://localhost.fr"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp4://localhost.fr"}}, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 2, announcer.Udp.(*DumbUdpAnnouncer).counter)
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp6://localhost.fr"}}, AnnounceRequest{})
+	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp6://localhost.fr"}}, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 3, announcer.Udp.(*DumbUdpAnnouncer).counter)
 }
 
@@ -105,7 +106,7 @@ func TestAnnouncer_Announce_ShouldNotDemoteIfSucceed(t *testing.T) {
 
 	urls := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
 	expected := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
-	_, _ = announcer.Announce(&urls, AnnounceRequest{})
+	_, _ = announcer.Announce(&urls, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, expected, urls)
 	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
@@ -125,7 +126,7 @@ func TestAnnouncer_Announce_ShouldPromoteTierAndUrlInTierIfSucceed(t *testing.T)
 		{"http://localhost.fr/t2/y", "http://localhost.fr/t2/fail", "http://localhost.fr/t2/x/fail"},
 		{"http://localhost.fr/fail", "http://localhost.fr/x/fail", "http://localhost.fr/y/fail"},
 	}
-	_, _ = announcer.Announce(&urls, AnnounceRequest{})
+	_, _ = announcer.Announce(&urls, AnnounceRequest{}, context.Background())
 	assert.Equal(t, 6, announcer.Http.(*DumbHttpAnnouncer).counter)
 	assert.Equal(t, expected, urls)
 	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
@@ -136,7 +137,7 @@ type DumbHttpAnnouncer struct {
 }
 
 func (a *DumbHttpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {
 		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")
@@ -149,7 +150,7 @@ type DumbUdpAnnouncer struct {
 }
 
 func (a *DumbUdpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
 	a.counter++
 	if strings.Contains(url.String(), "fail") {
 		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")

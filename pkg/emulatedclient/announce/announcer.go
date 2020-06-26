@@ -1,6 +1,7 @@
 package announce
 
 import (
+	"context"
 	"fmt"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -64,7 +65,7 @@ func (a *Announcer) AfterPropertiesSet() error {
 // Announce to the announceURLs in order until one answer properly.
 // The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
 // If none of the trackers respond the methods returns an error.
-func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error) {
+func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
 	var announceErrors = make([]error, 0)
 
 	for iTier, tier := range *announceUrlList {
@@ -75,7 +76,7 @@ func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceReq
 				continue
 			}
 			var currentAnnouncer interface {
-				Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error)
+				Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
 			}
 			if strings.HasPrefix(announceUrl.Scheme, "http") {
 				currentAnnouncer = a.Http
@@ -94,7 +95,7 @@ func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceReq
 				WithField("uploaded", announceRequest.Uploaded).
 				Info("announcing to tracker")
 
-			ret, err := currentAnnouncer.Announce(*announceUrl, announceRequest)
+			ret, err := currentAnnouncer.Announce(*announceUrl, announceRequest, ctx)
 			if err == nil {
 				promoteUrlInTier(announceUrlList, iTier, iUrl)
 				promoteTier(announceUrlList, iTier)

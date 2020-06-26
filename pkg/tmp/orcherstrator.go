@@ -7,44 +7,27 @@ import (
 	"math"
 	"math/rand"
 	"net/url"
+	"sync"
 	"time"
 )
 
 type TiersAnnouncer interface {
-}
-
-type AllTiersAnnouncer struct {
-	t        *Torrent
-	tiers    []TrackersAnnouncer
-	announce TorrentAwareAnnounceFunc
-}
-
-type FallbackTiersAnnouncer struct {
-	t        *Torrent
-	tiers    []TrackersAnnouncer
-	announce TorrentAwareAnnounceFunc
+	startAnnouncing()
+	awaitTermination()
 }
 
 type TrackersAnnouncer interface {
+	startAnnouncing()
+	awaitTermination()
 }
 
-type AllTrackersAnnouncer struct {
-	t        *Torrent
-	trackers []url.URL
-	announce TorrentAwareAnnounceFunc
-}
-
-type FallbackTrackersAnnouncer struct {
-	t        *Torrent
-	trackers []url.URL
-	announce TorrentAwareAnnounceFunc
-}
+// TODO: il ne faudrait pas que les TrackersAnnouncer créer des goroutines, car le TiersAnnouncer a besoin de feedback pour orchestrer les autres tiers (backup, ...) Il faudrait que ca fasse les annonces et que ca renvoi le resultat. Puis on fera une pause arbitraire d'une interval renvoyé par un des tracker.
 
 type AnnounceOrchestrator struct {
 	t              *Torrent
 	tiersAnnouncer TiersAnnouncer
 }
-type TorrentAwareAnnounceFunc = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult
+type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult
 
 func NewAnnounceOrchestrator(t *Torrent, announceToAllTiers bool, announceToAllTrackersInTier bool) (*AnnounceOrchestrator, error) {
 	var annList [][]string = t.metaInfo.AnnounceList
@@ -88,13 +71,15 @@ func newTierAnnouncer(t *Torrent, announceList [][]string, announceToAllTiers bo
 			var tier TiersAnnouncer
 			if announceToAllTrackersInTier {
 				tier = &AllTrackersAnnouncer{
-					t:        t,
-					trackers: trackers,
+					shutdownWg: &sync.WaitGroup{},
+					t:          t,
+					trackers:   trackers,
 				}
 			} else {
 				tier = &FallbackTrackersAnnouncer{
-					t:        t,
-					trackers: trackers,
+					shutdownWg: &sync.WaitGroup{},
+					t:          t,
+					trackers:   trackers,
 				}
 			}
 			tiers = append(tiers, tier)
@@ -118,24 +103,34 @@ func newTierAnnouncer(t *Torrent, announceList [][]string, announceToAllTiers bo
 	}
 }
 
-func (a AnnounceOrchestrator) Run() {
+func (a *AnnounceOrchestrator) Run() {
 
 }
 
-func (a AnnounceOrchestrator) Stop() {
-
+func (a *AnnounceOrchestrator) AwaitTermination() {
+	a.tiersAnnouncer.awaitTermination()
 }
 
-func (a *AllTrackersAnnouncer) startAnnouncing(announce TorrentAwareAnnounceFunc) {
+type AllTrackersAnnouncer struct {
+	shutdownWg *sync.WaitGroup
+	t          *Torrent
+	trackers   []url.URL
+}
+
+func (a *AllTrackersAnnouncer) startAnnouncing() {
 	for _, u := range a.trackers {
-		go func(announce TorrentAwareAnnounceFunc, u url.URL) {
-			defer func() { _ = announce(u, tracker.Stopped) }() //TODO: this may cause a problem, it is executed after the torrent has closed his chan, and some resources may already have been released, i can result in a panic at some point
+		go func(u url.URL) {
+			a.shutdownWg.Add(1)
+			defer a.shutdownWg.Done()
+			defer func() {
+				_ = a.t.announce(u, tracker.Stopped)
+			}()
 
 			// create a mocked last announce with a default interval
 			lastAnnounce := trackerAnnounceResult{Interval: 5 * time.Minute, Completed: time.Now()}
 			event := tracker.Started
 
-			announceResult := announce(u, event)
+			announceResult := a.t.announce(u, event)
 			if announceResult.Err != nil {
 				announceResult.Interval = calculateNextAnnounceDelayAfterError(lastAnnounce)
 			} else {
@@ -150,7 +145,55 @@ func (a *AllTrackersAnnouncer) startAnnouncing(announce TorrentAwareAnnounceFunc
 				return
 			case <-time.After(time.Until(announceResult.Completed.Add(announceResult.Interval))):
 			}
-		}(announce, u)
+		}(u)
+	}
+}
+
+func (a *AllTrackersAnnouncer) awaitTermination() {
+	a.shutdownWg.Wait()
+}
+
+type FallbackTrackersAnnouncer struct {
+	shutdownWg *sync.WaitGroup
+	t          *Torrent
+	trackers   []url.URL
+}
+
+func (a *FallbackTrackersAnnouncer) startAnnouncing() {
+}
+
+func (a *FallbackTrackersAnnouncer) awaitTermination() {
+	a.shutdownWg.Wait()
+}
+
+type AllTiersAnnouncer struct {
+	t        *Torrent
+	tiers    []TrackersAnnouncer
+	announce AnnouncingFunction
+}
+
+func (a *AllTiersAnnouncer) startAnnouncing() {
+
+}
+
+func (a *AllTiersAnnouncer) awaitTermination() {
+	for _, tier := range a.tiers {
+		tier.awaitTermination()
+	}
+}
+
+type FallbackTiersAnnouncer struct {
+	t        *Torrent
+	tiers    []TrackersAnnouncer
+	announce AnnouncingFunction
+}
+
+func (a *FallbackTiersAnnouncer) startAnnouncing() {
+}
+
+func (a *FallbackTiersAnnouncer) awaitTermination() {
+	for _, tier := range a.tiers {
+		tier.awaitTermination()
 	}
 }
 

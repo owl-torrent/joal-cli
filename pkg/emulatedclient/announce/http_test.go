@@ -3,6 +3,7 @@ package announce
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
@@ -166,7 +167,7 @@ func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 		Port:       0,
 	}
 	url, _ := url2.Parse(s.URL)
-	response, err := announcer.Announce(*url, announceRequest)
+	response, err := announcer.Announce(*url, announceRequest, context.Background())
 	if err != nil {
 		t.Fatalf("httpAnnouncer.Announce() has failed: %v", err)
 	}
@@ -220,7 +221,7 @@ func TestHttpAnnouncer_AnnounceShouldUnderstandAndDecodeGzip(t *testing.T) {
 		Port:       0,
 	}
 	url, _ := url2.Parse(s.URL)
-	response, err := announcer.Announce(*url, announceRequest)
+	response, err := announcer.Announce(*url, announceRequest, context.Background())
 	if err != nil {
 		t.Fatalf("httpAnnouncer.Announce() has failed: %v", err)
 	}
@@ -249,7 +250,7 @@ func TestHttpAnnouncer_Announce_ShouldNotPrefixWithAmpersandIfQueryHasNoValues(t
 
 	url, _ := url2.Parse(s.URL)
 
-	_, _ = announcer.Announce(*url, AnnounceRequest{})
+	_, _ = announcer.Announce(*url, AnnounceRequest{}, context.Background())
 }
 
 func TestHttpAnnouncer_Announce_ShouldPrefixWithAmpersandQueryHasValues(t *testing.T) {
@@ -273,7 +274,7 @@ func TestHttpAnnouncer_Announce_ShouldPrefixWithAmpersandQueryHasValues(t *testi
 
 	url, _ := url2.Parse(s.URL + "?k=v")
 
-	_, _ = announcer.Announce(*url, AnnounceRequest{})
+	_, _ = announcer.Announce(*url, AnnounceRequest{}, context.Background())
 }
 
 func TestHttpAnnouncer_Announce_ShouldSendHttpHeaders(t *testing.T) {
@@ -300,5 +301,5 @@ func TestHttpAnnouncer_Announce_ShouldSendHttpHeaders(t *testing.T) {
 
 	url, _ := url2.Parse(s.URL + "?k=v")
 
-	_, _ = announcer.Announce(*url, AnnounceRequest{})
+	_, _ = announcer.Announce(*url, AnnounceRequest{}, context.Background())
 }

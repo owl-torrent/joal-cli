@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-func mustParseUrl(str string) *url.URL {
-	u, err := url.Parse(str)
-	if err != nil {
-		panic(err)
-	}
-	return u
-}
-
 func Test_newTierAnnouncer(t *testing.T) {
 	type args struct {
 		announceList                [][]string

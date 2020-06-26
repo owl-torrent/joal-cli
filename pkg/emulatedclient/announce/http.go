@@ -2,6 +2,7 @@ package announce
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
@@ -18,7 +19,7 @@ import (
 )
 
 type IHttpAnnouncer interface {
-	Announce(url url.URL, announceRequest AnnounceRequest) (tracker.AnnounceResponse, error)
+	Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
 	AfterPropertiesSet() error
 }
 
@@ -39,7 +40,7 @@ func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	return nil
 }
 
-func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (ret tracker.AnnounceResponse, err error) {
+func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (ret tracker.AnnounceResponse, err error) {
 	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
 	if err != nil {
@@ -50,7 +51,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 	}
 	_url.RawQuery = queryString
 
-	req, err := http.NewRequest("GET", _url.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", _url.String(), nil)
 	if err != nil {
 		return
 	}
@@ -75,7 +76,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest) (
 				Timeout: 15 * time.Second,
 			}).DialContext,
 			TLSHandshakeTimeout: 15 * time.Second,
-			DisableKeepAlives: true, // see https://github.com/anacrolix/torrent/commit/04ff050ecd5f5beab9b20a0f4170fda1e71062a4
+			DisableKeepAlives:   true, // see https://github.com/anacrolix/torrent/commit/04ff050ecd5f5beab9b20a0f4170fda1e71062a4
 		},
 	}).Do(req)
 	if err != nil {
