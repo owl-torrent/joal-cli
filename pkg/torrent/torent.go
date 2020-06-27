@@ -1,6 +1,7 @@
-package tmp
+package torrent
 
 import (
+	"context"
 	"github.com/anacrolix/missinggo/v2"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -20,7 +21,7 @@ type trackerAnnounceResult struct {
 	Completed time.Time
 }
 
-func (t *Torrent) announce(u url.URL, event tracker.AnnounceEvent) (ret trackerAnnounceResult) {
+func (t *Torrent) announce(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (ret trackerAnnounceResult) {
 	defer func() {
 		ret.Completed = time.Now()
 	}()

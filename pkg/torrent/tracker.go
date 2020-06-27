@@ -1,6 +1,7 @@
-package tmp
+package torrent
 
 import (
+	"context"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/google/uuid"
 	"net/url"
@@ -36,8 +37,9 @@ func (t trackerAnnouncer) Responses() <-chan trackerAwareAnnounceResult {
 }
 
 func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAwareAnnounceResult {
+	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
 	return trackerAwareAnnounceResult{
-		trackerAnnounceResult: announce(t.url, event),
+		trackerAnnounceResult: announce(t.url, event, ctx),
 		trackerUuid:           t.uuid,
 	}
 }
@@ -48,6 +50,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	event := firstEvent
 
 	var announceDone chan trackerAwareAnnounceResult
+	var cancelRunningAnnounce context.CancelFunc
 	var pending []trackerAwareAnnounceResult
 
 	for {
@@ -56,7 +59,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 			announceDelay = next.Sub(now)
 		}
 
-		// Prevent enque another request if the previous one is still on the way
+		// Prevent enqueue another request if the previous one is still on the way
 		var announceTime <-chan time.Time
 		if announceDone == nil {
 			announceTime = time.After(announceDelay)
@@ -74,13 +77,16 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 		case <-announceTime:
 			announceDone = make(chan trackerAwareAnnounceResult, 1)
 			go func(t trackerAnnouncer) {
-				response := announce(t.url, event)
+				var ctx context.Context
+				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())
+				response := announce(t.url, event, ctx)
 				announceDone <- trackerAwareAnnounceResult{
 					trackerAnnounceResult: response,
 					trackerUuid:           t.uuid,
 				}
 			}(*t)
 		case response := <-announceDone:
+			cancelRunningAnnounce = nil
 			announceDone = nil
 			event = tracker.None
 			lastAnnounce = response
@@ -96,6 +102,9 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 
 			pending = append(pending, response) // enqueue event here and the select will distribute the response as soon as someone is able to read
 		case stopDone := <-t.stoppingLoop:
+			if cancelRunningAnnounce != nil {
+				cancelRunningAnnounce()
+			}
 			stopDone <- struct{}{}
 			return
 		case responses <- first:

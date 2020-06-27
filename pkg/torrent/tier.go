@@ -1,4 +1,4 @@
-package tmp
+package torrent
 
 import (
 	"github.com/anacrolix/torrent/tracker"
@@ -7,26 +7,18 @@ import (
 )
 
 type AllTrackersTierAnnouncer struct {
-	uuid           uuid.UUID
-	trackers       []ITrackerAnnouncer
-	trackersStates map[uuid.UUID]tierState
-	state          chan tierState
-	stoppingLoop   chan chan struct{}
+	uuid         uuid.UUID
+	trackers     []ITrackerAnnouncer
+	state        chan tierState
+	stoppingLoop chan chan struct{}
 }
 
-func newAllTrackersTierAnnouncer(trackers []ITrackerAnnouncer) ITierAnnouncer {
+func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) ITierAnnouncer {
 	t := &AllTrackersTierAnnouncer{
-		uuid:           uuid.New(),
-		trackers:       trackers,
-		trackersStates: nil,
-		state:          make(chan tierState),
-		stoppingLoop:   make(chan chan struct{}),
-	}
-
-	// All trackers starts alive
-	t.trackersStates = make(map[uuid.UUID]tierState)
-	for _, tr := range trackers {
-		t.trackersStates[tr.Uuid()] = ALIVE
+		uuid:         uuid.New(),
+		trackers:     trackers,
+		state:        make(chan tierState),
+		stoppingLoop: make(chan chan struct{}),
 	}
 
 	return t
@@ -72,35 +64,50 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 		go tr.startAnnounceLoop(announce, firstEvent)
 	}
 
+	lock := &sync.RWMutex{}
+	trackersStates := make(map[uuid.UUID]tierState)
+	// All trackers starts alive
 	for _, tr := range t.trackers {
-		go func(t *AllTrackersTierAnnouncer, tr ITrackerAnnouncer) {
+		trackersStates[tr.Uuid()] = ALIVE
+	}
+
+	for _, tr := range t.trackers {
+		go func(ti *AllTrackersTierAnnouncer, tr ITrackerAnnouncer) {
 			for {
 				select {
 				case resp := <-tr.Responses():
 					if resp.Err != nil {
-						t.trackersStates[resp.trackerUuid] = DEAD
+						lock.Lock()
+						trackersStates[resp.trackerUuid] = DEAD
+						lock.Unlock()
 						break
 					}
-					t.trackersStates[resp.trackerUuid] = ALIVE
-				case doneStopping := <-t.stoppingLoop:
-					t.stopAnnounceLoop()
+					lock.Lock()
+					trackersStates[resp.trackerUuid] = ALIVE
+					lock.Unlock()
+				case doneStopping := <-ti.stoppingLoop:
+					tr.stopAnnounceLoop()
 					doneStopping <- struct{}{}
+					return
 				}
 
 				// if any tracker is alive, consider the tier alive
 				var state tierState = DEAD
-				for _, tState := range t.trackersStates {
+				lock.RLock()
+				for _, tState := range trackersStates {
 					if tState == ALIVE {
 						state = ALIVE
 						break
 					}
 				}
+				lock.RUnlock()
 
 				select {
-				case t.state <- state:
-				case doneStopping := <-t.stoppingLoop:
-					t.stopAnnounceLoop()
+				case ti.state <- state:
+				case doneStopping := <-ti.stoppingLoop:
+					tr.stopAnnounceLoop()
 					doneStopping <- struct{}{}
+					return
 				}
 			}
 		}(t, tr)

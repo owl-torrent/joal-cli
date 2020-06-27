@@ -1,6 +1,7 @@
-package tmp
+package torrent
 
 import (
+	"context"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 func Test_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	latch := congo.NewCountDownLatch(2)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
 		defer func() { _ = latch.CountDown() }()
 		announceEvents = append(announceEvents, event)
 		return trackerAnnounceResult{
@@ -38,7 +39,7 @@ func Test_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
 	endedLatch := congo.NewCountDownLatch(1)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
 		return trackerAnnounceResult{
@@ -69,7 +70,7 @@ func Test_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) {
 func Test_ShouldBeReusableAfterStopLoop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
 		return trackerAnnounceResult{
@@ -100,7 +101,7 @@ func Test_ShouldBeReusableAfterStopLoop(t *testing.T) {
 }
 
 func Test_ShouldFeedChannelWithResponse(t *testing.T) {
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
 		return trackerAnnounceResult{Err: nil, Interval: 1 * time.Millisecond, Completed: time.Now()}
 	}
 
@@ -120,12 +121,4 @@ func Test_ShouldFeedChannelWithResponse(t *testing.T) {
 	}
 
 	assert.Len(t, resps, 10)
-}
-
-func mustParseUrl(str string) *url.URL {
-	u, err := url.Parse(str)
-	if err != nil {
-		panic(err)
-	}
-	return u
 }

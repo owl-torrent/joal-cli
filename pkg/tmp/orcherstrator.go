@@ -1,7 +1,10 @@
 package tmp
 
+/*
 import (
+	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/torrent"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"math"
@@ -24,12 +27,11 @@ type TrackersAnnouncer interface {
 // TODO: il ne faudrait pas que les TrackersAnnouncer créer des goroutines, car le TiersAnnouncer a besoin de feedback pour orchestrer les autres tiers (backup, ...) Il faudrait que ca fasse les annonces et que ca renvoi le resultat. Puis on fera une pause arbitraire d'une interval renvoyé par un des tracker.
 
 type AnnounceOrchestrator struct {
-	t              *Torrent
+	t              *torrent.Torrent
 	tiersAnnouncer TiersAnnouncer
 }
-type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent) trackerAnnounceResult
 
-func NewAnnounceOrchestrator(t *Torrent, announceToAllTiers bool, announceToAllTrackersInTier bool) (*AnnounceOrchestrator, error) {
+func NewAnnounceOrchestrator(t *torrent.Torrent, announceToAllTiers bool, announceToAllTrackersInTier bool) (*AnnounceOrchestrator, error) {
 	var annList [][]string = t.metaInfo.AnnounceList
 
 	if t.metaInfo.AnnounceList != nil && len(t.metaInfo.AnnounceList) == 0 {
@@ -48,7 +50,7 @@ func NewAnnounceOrchestrator(t *Torrent, announceToAllTiers bool, announceToAllT
 	}, nil
 }
 
-func newTierAnnouncer(t *Torrent, announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (TiersAnnouncer, error) {
+func newTierAnnouncer(t *torrent.Torrent, announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (TiersAnnouncer, error) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	var tiers []TrackersAnnouncer
 	for _, tier := range announceList {
@@ -113,7 +115,7 @@ func (a *AnnounceOrchestrator) AwaitTermination() {
 
 type AllTrackersAnnouncer struct {
 	shutdownWg *sync.WaitGroup
-	t          *Torrent
+	t          *torrent.Torrent
 	trackers   []url.URL
 }
 
@@ -127,7 +129,7 @@ func (a *AllTrackersAnnouncer) startAnnouncing() {
 			}()
 
 			// create a mocked last announce with a default interval
-			lastAnnounce := trackerAnnounceResult{Interval: 5 * time.Minute, Completed: time.Now()}
+			lastAnnounce := torrent.trackerAnnounceResult{Interval: 5 * time.Minute, Completed: time.Now()}
 			event := tracker.Started
 
 			announceResult := a.t.announce(u, event)
@@ -155,7 +157,7 @@ func (a *AllTrackersAnnouncer) awaitTermination() {
 
 type FallbackTrackersAnnouncer struct {
 	shutdownWg *sync.WaitGroup
-	t          *Torrent
+	t          *torrent.Torrent
 	trackers   []url.URL
 }
 
@@ -167,7 +169,7 @@ func (a *FallbackTrackersAnnouncer) awaitTermination() {
 }
 
 type AllTiersAnnouncer struct {
-	t        *Torrent
+	t        *torrent.Torrent
 	tiers    []TrackersAnnouncer
 	announce AnnouncingFunction
 }
@@ -183,7 +185,7 @@ func (a *AllTiersAnnouncer) awaitTermination() {
 }
 
 type FallbackTiersAnnouncer struct {
-	t        *Torrent
+	t        *torrent.Torrent
 	tiers    []TrackersAnnouncer
 	announce AnnouncingFunction
 }
@@ -197,7 +199,7 @@ func (a *FallbackTiersAnnouncer) awaitTermination() {
 	}
 }
 
-func calculateNextAnnounceDelayAfterError(lastAnnounce trackerAnnounceResult) time.Duration {
+func calculateNextAnnounceDelayAfterError(lastAnnounce torrent.trackerAnnounceResult) time.Duration {
 	// On first error, retry fast
 	if lastAnnounce.Err == nil {
 		return 5 * time.Minute
@@ -206,3 +208,4 @@ func calculateNextAnnounceDelayAfterError(lastAnnounce trackerAnnounceResult) ti
 		return time.Duration(delay) * time.Second
 	}
 }
+*/

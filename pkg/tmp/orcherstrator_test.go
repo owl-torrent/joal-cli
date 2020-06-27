@@ -1,6 +1,8 @@
 package tmp
 
+/*
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/torrent"
 	"net/url"
 	"reflect"
 	"sort"
@@ -25,7 +27,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost")}},
 				},
 			},
 			wantErr: false,
@@ -33,7 +35,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
 				},
 			},
 			wantErr: false,
@@ -41,8 +43,8 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: true},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t2-1"), *mustParseUrl("http://localhost-t2-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t2-1"), *torrent.mustParseUrl("http://localhost-t2-2")}},
 				},
 			},
 			wantErr: false,
@@ -51,7 +53,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost")}},
 				},
 			},
 			wantErr: false,
@@ -59,7 +61,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
 				},
 			},
 			wantErr: false,
@@ -67,8 +69,8 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateAllTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: true, announceToAllTrackersInTier: false},
 			want: &AllTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t2-1"), *mustParseUrl("http://localhost-t2-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t2-1"), *torrent.mustParseUrl("http://localhost-t2-2")}},
 				},
 			},
 			wantErr: false,
@@ -76,7 +78,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierAllTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: false, announceToAllTrackersInTier: true},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost")}},
 				},
 			},
 			wantErr: false,
@@ -84,7 +86,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: true},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
 				},
 			},
 			wantErr: false,
@@ -92,8 +94,8 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierAllTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: true},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
-					&AllTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t2-1"), *mustParseUrl("http://localhost-t2-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
+					&AllTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t2-1"), *torrent.mustParseUrl("http://localhost-t2-2")}},
 				},
 			},
 			wantErr: false,
@@ -101,7 +103,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost"}}, announceToAllTiers: false, announceToAllTrackersInTier: false},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost")}},
 				},
 			},
 			wantErr: false,
@@ -109,7 +111,7 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: false},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
 				},
 			},
 			wantErr: false,
@@ -117,8 +119,8 @@ func Test_newTierAnnouncer(t *testing.T) {
 		{name: "shouldCreateFallbackTierFallbackTracker", args: args{announceList: [][]string{{"http://localhost-t1-1", "http://localhost-t1-2"}, {"http://localhost-t2-1", "http://localhost-t2-2"}}, announceToAllTiers: false, announceToAllTrackersInTier: false},
 			want: &FallbackTiersAnnouncer{
 				tiers: []TrackersAnnouncer{
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t1-1"), *mustParseUrl("http://localhost-t1-2")}},
-					&FallbackTrackersAnnouncer{trackers: []url.URL{*mustParseUrl("http://localhost-t2-1"), *mustParseUrl("http://localhost-t2-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t1-1"), *torrent.mustParseUrl("http://localhost-t1-2")}},
+					&FallbackTrackersAnnouncer{trackers: []url.URL{*torrent.mustParseUrl("http://localhost-t2-1"), *torrent.mustParseUrl("http://localhost-t2-2")}},
 				},
 			},
 			wantErr: false,
@@ -173,3 +175,4 @@ func sortTrackerUris(i TiersAnnouncer) {
 		}
 	}
 }
+*/
