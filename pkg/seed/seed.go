@@ -124,7 +124,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 		select {
 		case <-announceAfter.C:
 			currentAnnounceType := s.nextAnnounce
-			response, err := bitTorrentClient.Announce(&s.announceList, *s.infoHash, s.seedingStats.Uploaded, s.seedingStats.Downloaded, s.seedingStats.Left, currentAnnounceType)
+			response, err := bitTorrentClient.Announce(&s.announceList, *s.infoHash, s.seedingStats.Uploaded, s.seedingStats.Downloaded, s.seedingStats.Left, currentAnnounceType, context.Background())
 			if err != nil {
 				s.consecutiveErrors = s.consecutiveErrors + 1
 				if currentAnnounceType == tracker.None {

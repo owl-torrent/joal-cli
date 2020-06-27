@@ -3,6 +3,7 @@ package testutils
 import (
 	"errors"
 	"github.com/go-playground/validator/v10"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,8 @@ func AssertValidateError(t *testing.T, validationErrors validator.ValidationErro
 	}
 }
 
+// Await for the WaitGroup to unlock until the timeout occurs.
+// If the WaitGroup unlock no error is returned, if the timeout occurs first an error is returned
 func WaitOrFailAfterTimeout(wg *sync.WaitGroup, timeout time.Duration) error {
 	c := make(chan struct{})
 	go func() {
@@ -41,4 +44,12 @@ func WaitOrFailAfterTimeout(wg *sync.WaitGroup, timeout time.Duration) error {
 	case <-time.After(timeout):
 		return errors.New("WaitGroup.Wait() timeout") // timed out
 	}
+}
+
+func MustParseUrl(str string) *url.URL {
+	parse, err := url.Parse(str)
+	if err != nil {
+		panic(err)
+	}
+	return parse
 }
