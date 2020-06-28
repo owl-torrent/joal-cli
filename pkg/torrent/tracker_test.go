@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func Test_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
+func Test_TrackerAnnouncer_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	latch := congo.NewCountDownLatch(2)
 	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
@@ -35,7 +35,7 @@ func Test_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
 	assert.Equal(t, announceEvents[1], tracker.None)
 }
 
-func Test_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) {
+func Test_TrackerAnnouncer_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
 	endedLatch := congo.NewCountDownLatch(1)
@@ -67,7 +67,7 @@ func Test_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) {
 	assert.Equal(t, announceEvents[0], tracker.None)
 }
 
-func Test_ShouldBeReusableAfterStopLoop(t *testing.T) {
+func Test_TrackerAnnouncer_ShouldBeReusableAfterStopLoop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
 	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
@@ -100,7 +100,7 @@ func Test_ShouldBeReusableAfterStopLoop(t *testing.T) {
 	assert.Greater(t, len(announceEvents), numberOfAnnounceFirstTime)
 }
 
-func Test_ShouldFeedChannelWithResponse(t *testing.T) {
+func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
 	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
 		return trackerAnnounceResult{Err: nil, Interval: 1 * time.Millisecond, Completed: time.Now()}
 	}
