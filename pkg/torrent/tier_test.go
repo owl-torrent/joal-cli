@@ -286,3 +286,27 @@ func Test_AllTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *test
 		t.Fatal("should have failed to build with empty tracker list")
 	}
 }
+
+func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTierWasNotStarted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var trackers []ITrackerAnnouncer
+
+	for i := 0; i < 1; i++ {
+		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
+		trackers = append(trackers, newTracker(*trackerUrl))
+	}
+
+	tier, _ := newAllTrackersTierAnnouncer(trackers...)
+
+	latch := congo.NewCountDownLatch(1)
+	go func () {
+		tier.stopAnnounceLoop()
+		latch.CountDown()
+	}()
+
+	if !latch.WaitTimeout(500 * time.Millisecond) {
+		t.Fatal("Should not have blocked")
+	}
+}

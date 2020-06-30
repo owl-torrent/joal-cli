@@ -3,6 +3,7 @@ package torrent
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
 	"net/url"
@@ -121,4 +122,22 @@ func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
 	}
 
 	assert.Len(t, resps, 10)
+}
+
+
+func Test_TrackerAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTrackerWasNotStarted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tr := NewMockITrackerAnnouncer(ctrl)
+
+	latch := congo.NewCountDownLatch(1)
+	go func () {
+		tr.stopAnnounceLoop()
+		latch.CountDown()
+	}()
+
+	if !latch.WaitTimeout(500 * time.Millisecond) {
+		t.Fatal("Should not have blocked")
+	}
 }
