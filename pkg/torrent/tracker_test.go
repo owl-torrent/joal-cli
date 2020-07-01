@@ -3,6 +3,7 @@ package torrent
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
@@ -129,10 +130,16 @@ func Test_TrackerAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTrack
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	tr := NewMockITrackerAnnouncer(ctrl)
+
+	tr := newTracker(*testutils.MustParseUrl("http://localhost"))
 
 	latch := congo.NewCountDownLatch(1)
 	go func () {
+		tr.stopAnnounceLoop()
+		tr.stopAnnounceLoop()
+		tr.stopAnnounceLoop()
+		tr.stopAnnounceLoop()
+		tr.stopAnnounceLoop()
 		tr.stopAnnounceLoop()
 		latch.CountDown()
 	}()

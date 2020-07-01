@@ -5,14 +5,25 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/google/uuid"
 	"sync"
+	"time"
 )
 
 type AllTrackersTierAnnouncer struct {
-	uuid          uuid.UUID
-	trackers      []ITrackerAnnouncer
-	state         chan tierState
-	stoppingLoops chan chan struct{}
-	stoppingTier  chan chan struct{}
+	uuid              uuid.UUID
+	trackers          []ITrackerAnnouncer
+	state             chan tierState
+	stoppingLoops     chan chan struct{}
+	stoppingTier      chan chan struct{}
+	loopInProgress    bool
+	lock              *sync.RWMutex
+	lastKnownInterval time.Duration
+}
+
+func (t AllTrackersTierAnnouncer) LastKnownInterval() (time.Duration, error) {
+	if t.lastKnownInterval == 0 {
+		return 0 * time.Nanosecond, errors.New("no interval received from trackers yet")
+	}
+	return t.lastKnownInterval, nil
 }
 
 func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer, error) {
@@ -20,11 +31,14 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 		return nil, errors.New("a tier can not have an empty tracker list")
 	}
 	t := &AllTrackersTierAnnouncer{
-		uuid:          uuid.New(),
-		trackers:      trackers,
-		state:         make(chan tierState),
-		stoppingLoops: make(chan chan struct{}),
-		stoppingTier:  make(chan chan struct{}),
+		uuid:              uuid.New(),
+		trackers:          trackers,
+		state:             make(chan tierState),
+		stoppingLoops:     make(chan chan struct{}),
+		stoppingTier:      make(chan chan struct{}),
+		loopInProgress:    false,
+		lock:              &sync.RWMutex{},
+		lastKnownInterval: 0 * time.Nanosecond,
 	}
 
 	return t, nil
@@ -66,6 +80,14 @@ func (t AllTrackersTierAnnouncer) States() <-chan tierState {
 }
 
 func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
+	t.lock.Lock()
+	if t.loopInProgress {
+		t.lock.Unlock()
+		return
+	}
+	t.loopInProgress = true
+	t.lock.Unlock()
+
 	for _, tr := range t.trackers {
 		go tr.startAnnounceLoop(announce, firstEvent)
 	}
@@ -96,15 +118,23 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 
 	// this chan will be allocated once every time the tier changes his state to prevent spamming the receiver with the same message at every turn of fhe for loop.
 	var stateUpdated chan tierState = nil
+	firstStateReported := false // the default state is ALIVE, but we need to report that the tracker is ALIVE on the first success or DEAD after all failed
 
 	for {
 		select {
 		case resp := <-responseReceived:
-			var ts tierState = DEAD
+			var ts trackerState = DEAD
 			if resp.Err == nil {
 				ts = ALIVE
+				t.lastKnownInterval = resp.Interval
 			}
 			trackersStates[resp.trackerUuid] = ts
+			if !firstStateReported && ts == ALIVE {
+				currentTierState = ALIVE
+				stateUpdated = t.state
+				continue
+			}
+
 			if ts == currentTierState {
 				continue
 			}
@@ -120,11 +150,11 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 			if stateAfterUpdate == currentTierState {
 				continue
 			}
-			currentTierState = stateAfterUpdate
 
-			// if the state has changed make the chan non-nil to allow read from it (on the next loop it will go trough the case in the select
+			currentTierState = stateAfterUpdate
 			stateUpdated = t.state
 		case stateUpdated <- currentTierState:
+			firstStateReported = true
 			stateUpdated = nil
 		case doneStopping := <-t.stoppingTier:
 			doneStopping <- struct{}{}
@@ -134,6 +164,13 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 }
 
 func (t *AllTrackersTierAnnouncer) stopAnnounceLoop() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if !t.loopInProgress {
+		return
+	}
+	t.loopInProgress = false
+
 	wg := sync.WaitGroup{}
 
 	for range t.trackers {
@@ -153,10 +190,3 @@ func (t *AllTrackersTierAnnouncer) stopAnnounceLoop() {
 	t.stoppingTier <- done
 	<-done
 }
-
-type tierState = byte
-
-const (
-	ALIVE tierState = iota
-	DEAD            = 0x01
-)

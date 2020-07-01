@@ -1,6 +1,8 @@
 package torrent
 
-import "errors"
+import (
+	"errors"
+)
 
 type linkedTierList struct {
 	ITierAnnouncer

@@ -60,9 +60,6 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 	var wg sync.WaitGroup
 
@@ -90,9 +87,6 @@ func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 30; i++ {
@@ -125,10 +119,73 @@ func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *te
 	}
 }
 
-func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSingleTracker(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func Test_AllTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedButOtherNotAnswered(t *testing.T) {
+	var trackers []ITrackerAnnouncer
 
+	for i := 0; i < 30; i++ {
+		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
+		trackers = append(trackers, newTracker(*trackerUrl))
+	}
+
+	tier, _ := newAllTrackersTierAnnouncer(trackers...)
+	lock := &sync.Mutex{}
+	latch := congo.NewCountDownLatch(1)
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
+		lock.Lock() // first call lock the mutex to prevent any other announce to run
+		defer latch.CountDown()
+		return trackerAnnounceResult{Err: errors.New("nop")}
+	}
+
+	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	defer tier.stopAnnounceLoop()
+
+	if !latch.WaitTimeout(50 * time.Millisecond) {
+		t.Fatalf("should have released the latch")
+	}
+
+	select {
+	case <-time.After(50 * time.Millisecond):
+		// perfect, it has not reported his state
+	case <-tier.States():
+		t.Fatalf("should not have reported his state yet")
+	}
+}
+
+func Test_AllTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t *testing.T) {
+	var trackers []ITrackerAnnouncer
+
+	for i := 0; i < 30; i++ {
+		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
+		trackers = append(trackers, newTracker(*trackerUrl))
+	}
+
+	tier, _ := newAllTrackersTierAnnouncer(trackers...)
+	lock := &sync.Mutex{}
+	latch := congo.NewCountDownLatch(1)
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
+		lock.Lock() // first call lock the mutex to prevent any other announce to run
+		defer latch.CountDown()
+		return trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
+	}
+
+	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	defer tier.stopAnnounceLoop()
+
+	if !latch.WaitTimeout(50 * time.Millisecond) {
+		t.Fatalf("should have released the latch")
+	}
+
+	select {
+	case <-time.After(50 * time.Millisecond):
+		t.Fatalf("should have reported")
+	case s := <-tier.States():
+		if s != ALIVE {
+			t.Fatalf("should have reported state ALIVE")
+		}
+	}
+}
+
+func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSingleTracker(t *testing.T) {
 	var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 1; i++ {
@@ -162,9 +219,6 @@ func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSi
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 10; i++ {
@@ -219,9 +273,6 @@ func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucc
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForeverToAnnounce(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 10; i++ {
@@ -257,9 +308,6 @@ func Test_AllTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForever
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTrackers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 	var latch *congo.CountDownLatch
 
@@ -288,9 +336,6 @@ func Test_AllTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *test
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTierWasNotStarted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 1; i++ {
@@ -303,10 +348,131 @@ func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledBut
 	latch := congo.NewCountDownLatch(1)
 	go func () {
 		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
 		latch.CountDown()
 	}()
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("Should not have blocked")
 	}
+}
+
+
+
+
+
+
+
+func Test_FallbackTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSingleTracker(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucceed(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForeverToAnnounce(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTrackers(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTierWasNotStarted(t *testing.T) {
+	t.Fatal("Not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceed(t *testing.T) {
+	t.Fatal("not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSuccess(t *testing.T) {
+	t.Fatal("not implemented")
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedButOtherNotAnswered(t *testing.T) {
+	/*var trackers []ITrackerAnnouncer
+
+	for i := 0; i < 30; i++ {
+		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
+		trackers = append(trackers, newTracker(*trackerUrl))
+	}
+
+	tier, _ := newAllTrackersTierAnnouncer(trackers...)
+	lock := &sync.Mutex{}
+	latch := congo.NewCountDownLatch(1)
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
+		lock.Lock() // first call lock the mutex to prevent any other announce to run
+		defer latch.CountDown()
+		return trackerAnnounceResult{Err: errors.New("nop")}
+	}
+
+	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	defer tier.stopAnnounceLoop()
+
+	if !latch.WaitTimeout(50 * time.Millisecond) {
+		t.Fatalf("should have released the latch")
+	}
+
+	select {
+	case <-time.After(50 * time.Millisecond):
+		// perfect, it has not reported his state
+	case <-tier.States():
+		t.Fatalf("should not have reported his state yet")
+	}*/
+}
+
+func Test_FallbackTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t *testing.T) {
+	/*var trackers []ITrackerAnnouncer
+
+	for i := 0; i < 30; i++ {
+		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
+		trackers = append(trackers, newTracker(*trackerUrl))
+	}
+
+	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
+	lock := &sync.Mutex{}
+	latch := congo.NewCountDownLatch(1)
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
+		lock.Lock() // first call lock the mutex to prevent any other announce to run
+		defer latch.CountDown()
+		return trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
+	}
+
+	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	defer tier.stopAnnounceLoop()
+
+	if !latch.WaitTimeout(50 * time.Millisecond) {
+		t.Fatalf("should have released the latch")
+	}
+
+	select {
+	case <-time.After(50 * time.Millisecond):
+		// perfect, it has not reported his state
+	case s := <-tier.States():
+		if s != ALIVE {
+			t.Fatalf("should have reported state ALIVE")
+		}
+	}*/
 }

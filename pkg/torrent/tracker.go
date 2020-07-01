@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/google/uuid"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -13,18 +14,22 @@ var (
 )
 
 type trackerAnnouncer struct {
-	uuid         uuid.UUID
-	url          url.URL
-	responses    chan trackerAwareAnnounceResult
-	stoppingLoop chan chan struct{}
+	uuid           uuid.UUID
+	url            url.URL
+	responses      chan trackerAwareAnnounceResult
+	stoppingLoop   chan chan struct{}
+	loopInProgress bool
+	lock           *sync.RWMutex
 }
 
 func newTracker(url url.URL) *trackerAnnouncer {
 	return &trackerAnnouncer{
-		uuid:         uuid.New(),
-		url:          url,
-		responses:    make(chan trackerAwareAnnounceResult),
-		stoppingLoop: make(chan chan struct{}),
+		uuid:           uuid.New(),
+		url:            url,
+		responses:      make(chan trackerAwareAnnounceResult),
+		stoppingLoop:   make(chan chan struct{}),
+		loopInProgress: false,
+		lock:           &sync.RWMutex{},
 	}
 }
 
@@ -45,6 +50,14 @@ func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracke
 }
 
 func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
+	t.lock.Lock()
+	if t.loopInProgress {
+		t.lock.Unlock()
+		return
+	}
+	t.loopInProgress = true
+	t.lock.Unlock()
+
 	var next time.Time
 	var lastAnnounce trackerAwareAnnounceResult
 	event := firstEvent
@@ -114,6 +127,13 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 }
 
 func (t *trackerAnnouncer) stopAnnounceLoop() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if !t.loopInProgress {
+		return
+	}
+	t.loopInProgress = false
+
 	done := make(chan struct{})
 	t.stoppingLoop <- done
 	<-done

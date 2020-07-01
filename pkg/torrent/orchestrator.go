@@ -26,6 +26,7 @@ type ITierAnnouncer interface {
 	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
 	States() <-chan tierState
+	LastKnownInterval() (time.Duration, error)
 	stopAnnounceLoop()
 }
 
@@ -39,7 +40,7 @@ type FallbackBackOrchestrator struct {
 	stopping chan chan struct{}
 }
 
-func NewFallBackOrchestrator(tiers []ITierAnnouncer) (Orchestrator, error) {
+func NewFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, errors.New("tiers list can not be empty")
 	}
@@ -54,42 +55,52 @@ func NewFallBackOrchestrator(tiers []ITierAnnouncer) (Orchestrator, error) {
 }
 
 func (o *FallbackBackOrchestrator) Start(announce AnnouncingFunction) {
-	startAnnounceTiers := time.After(0 * time.Second)
+	go func(o *FallbackBackOrchestrator) {
+		startAnnounceTiers := time.After(0 * time.Millisecond)
 
-	currentEvent := tracker.Started
+		currentEvent := tracker.Started
 
-	for {
-		select {
-		case <-startAnnounceTiers:
-			startAnnounceTiers = nil
-			event := currentEvent
-			go o.tier.startAnnounceLoop(announce, event)
-		case st := <-o.tier.States():
-			if st == DEAD {
-				o.tier.stopAnnounceLoop()
-				drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
-				o.tier.next()
-				if o.tier.isFirst() { // we have travel through the whole list and get back to the first tier, lets wait before trying to re-announce on the first tier
-					startAnnounceTiers = time.After(DefaultDurationWaitOnError)
-
+		for {
+			select {
+			case <-startAnnounceTiers:
+				startAnnounceTiers = nil
+				event := currentEvent
+				go o.tier.startAnnounceLoop(announce, event)
+			case st := <-o.tier.States():
+				if st == DEAD {
+					o.tier.stopAnnounceLoop()
+					drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
+					o.tier.next()
+					startAnnounceTiers = time.After(0 * time.Millisecond)
+					if o.tier.isFirst() { // we have travel through the whole list and get back to the first tier, lets wait before trying to re-announce on the first tier
+						interval, err := o.tier.LastKnownInterval()
+						if err != nil {
+							interval = DefaultDurationWaitOnError
+						}
+						startAnnounceTiers = time.After(interval)
+					}
+					break
 				}
-				break
-			}
-			currentEvent = tracker.None // as soon an event succeed we can proceed with None all the subsequent time
+				currentEvent = tracker.None // as soon an event succeed we can proceed with None all the subsequent time
 
-			if !o.tier.isFirst() { // A backup tier has successfully announced, lets get back to primary tier
+				if !o.tier.isFirst() { // A backup tier has successfully announced, lets get back to primary tier
+					o.tier.stopAnnounceLoop()
+					drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
+					interval, err := o.tier.LastKnownInterval()
+					if err != nil {
+						interval = DefaultDurationWaitOnError
+					}
+					startAnnounceTiers = time.After(interval)
+					o.tier.rewindToFirst()
+				}
+			case doneStopping := <-o.stopping:
 				o.tier.stopAnnounceLoop()
-				drainStatesChannel(o.tier)                                  // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
-				startAnnounceTiers = time.After(DefaultDurationWaitOnError) // TODO: get the interval here (the state ALIVE should wrap the last successfull announce)
-				o.tier.rewindToFirst()
+				drainStatesChannel(o.tier)
+				doneStopping <- struct{}{}
+				return
 			}
-		case doneStopping := <-o.stopping:
-			o.tier.stopAnnounceLoop() // TODO: stopAnnounceLoop must be non blocking if the tier is not started. This signal can happen when the tier is not started, if a call to stop on a non started tier block the program we are doomed
-			drainStatesChannel(o.tier)
-			doneStopping <- struct{}{}
-			return
 		}
-	}
+	}(o)
 }
 
 func drainStatesChannel(t ITierAnnouncer) {
@@ -110,3 +121,11 @@ func (o *FallbackBackOrchestrator) Stop(ctx context.Context) {
 
 	// TODO: announceStop once (and fallback to next till is succeed, but return if all fails once)
 }
+
+type tierState = byte
+type trackerState = tierState
+
+const (
+	ALIVE tierState = iota
+	DEAD            = 0x01
+)
