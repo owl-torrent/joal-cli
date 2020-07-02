@@ -8,6 +8,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/google/uuid"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -32,12 +33,14 @@ type ITierAnnouncer interface {
 
 type Orchestrator interface {
 	Start(announce AnnouncingFunction)
-	Stop(context context.Context)
+	Stop(announce AnnouncingFunction, context context.Context)
 }
 
 type FallbackBackOrchestrator struct {
-	tier     *linkedTierList
-	stopping chan chan struct{}
+	tier           *linkedTierList
+	stopping       chan chan struct{}
+	loopInProgress bool
+	lock           *sync.RWMutex
 }
 
 func NewFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
@@ -49,12 +52,21 @@ func NewFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
 		return nil, err
 	}
 	return &FallbackBackOrchestrator{
-		tier:     list,
-		stopping: make(chan chan struct{}),
+		tier:           list,
+		stopping:       make(chan chan struct{}),
+		loopInProgress: false,
+		lock:           &sync.RWMutex{},
 	}, nil
 }
 
 func (o *FallbackBackOrchestrator) Start(announce AnnouncingFunction) {
+	o.lock.Lock()
+	if o.loopInProgress {
+		o.lock.Unlock()
+		return
+	}
+	o.loopInProgress = true
+	o.lock.Unlock()
 	go func(o *FallbackBackOrchestrator) {
 		startAnnounceTiers := time.After(0 * time.Millisecond)
 
@@ -114,7 +126,14 @@ func drainStatesChannel(t ITierAnnouncer) {
 	}
 }
 
-func (o *FallbackBackOrchestrator) Stop(ctx context.Context) {
+func (o *FallbackBackOrchestrator) Stop(annFunc AnnouncingFunction, ctx context.Context) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	if !o.loopInProgress {
+		return
+	}
+	o.loopInProgress = false
+
 	done := make(chan struct{})
 	o.stopping <- done
 	<-done

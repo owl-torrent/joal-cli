@@ -346,7 +346,7 @@ func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledBut
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
 	latch := congo.NewCountDownLatch(1)
-	go func () {
+	go func() {
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
@@ -360,12 +360,6 @@ func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledBut
 		t.Fatal("Should not have blocked")
 	}
 }
-
-
-
-
-
-
 
 func Test_FallbackTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testing.T) {
 	t.Fatal("Not implemented")
@@ -412,6 +406,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedButOtherNotAnswered(t *testing.T) {
+	t.Fatal("not implemented")
 	/*var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 30; i++ {
@@ -444,6 +439,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFa
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t *testing.T) {
+	t.Fatal("not implemented")
 	/*var trackers []ITrackerAnnouncer
 
 	for i := 0; i < 30; i++ {
