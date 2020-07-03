@@ -3,16 +3,18 @@ package torrent
 import (
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/google/uuid"
 	"sync"
 	"time"
 )
 
+type trackerAwareAnnounceResult struct {
+	trackerAnnounceResult
+	tracker ITrackerAnnouncer
+}
+
 type AllTrackersTierAnnouncer struct {
-	uuid              uuid.UUID
 	trackers          []ITrackerAnnouncer
 	state             chan tierState
-	stoppingLoops     chan chan struct{}
 	stoppingTier      chan chan struct{}
 	loopInProgress    bool
 	lock              *sync.RWMutex
@@ -31,10 +33,8 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 		return nil, errors.New("a tier can not have an empty tracker list")
 	}
 	t := &AllTrackersTierAnnouncer{
-		uuid:              uuid.New(),
 		trackers:          trackers,
 		state:             make(chan tierState),
-		stoppingLoops:     make(chan chan struct{}),
 		stoppingTier:      make(chan chan struct{}),
 		loopInProgress:    false,
 		lock:              &sync.RWMutex{},
@@ -44,14 +44,10 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 	return t, nil
 }
 
-func (t AllTrackersTierAnnouncer) Uuid() uuid.UUID {
-	return t.uuid
-}
-
 func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
 	wg := sync.WaitGroup{}
 
-	states := make(map[uuid.UUID]tierState)
+	states := make(map[ITrackerAnnouncer]tierState)
 
 	for _, tr := range t.trackers {
 		wg.Add(1)
@@ -59,9 +55,9 @@ func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, even
 			defer wg.Done()
 			resp := tr.announceOnce(announce, event)
 			if resp.Err != nil {
-				states[resp.trackerUuid] = DEAD
+				states[tr] = DEAD
 			}
-			states[resp.trackerUuid] = ALIVE
+			states[tr] = ALIVE
 		}(tr)
 	}
 
@@ -93,26 +89,27 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 	}
 
 	responseReceived := make(chan trackerAwareAnnounceResult, len(t.trackers))
+	stoppingLoops := make(chan chan struct{}, len(t.trackers))
 
 	for _, tr := range t.trackers {
-		go func(ti *AllTrackersTierAnnouncer, tr ITrackerAnnouncer) {
+		go func(tr ITrackerAnnouncer) {
 			for {
 				select {
 				case resp := <-tr.Responses():
-					responseReceived <- resp
-				case doneStopping := <-ti.stoppingLoops:
+					responseReceived <- trackerAwareAnnounceResult{trackerAnnounceResult: resp, tracker: tr}
+				case doneStopping := <-stoppingLoops:
 					tr.stopAnnounceLoop()
 					doneStopping <- struct{}{}
 					return
 				}
 			}
-		}(t, tr)
+		}(tr)
 	}
 
-	trackersStates := make(map[uuid.UUID]tierState, len(t.trackers))
+	trackersStates := make(map[ITrackerAnnouncer]tierState, len(t.trackers))
 	// All trackers starts alive
 	for _, tr := range t.trackers {
-		trackersStates[tr.Uuid()] = ALIVE
+		trackersStates[tr] = ALIVE
 	}
 	currentTierState := ALIVE
 
@@ -128,7 +125,7 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 				ts = ALIVE
 				t.lastKnownInterval = resp.Interval
 			}
-			trackersStates[resp.trackerUuid] = ts
+			trackersStates[resp.tracker] = ts
 			if !firstStateReported && ts == ALIVE {
 				currentTierState = ALIVE
 				stateUpdated = t.state
@@ -157,7 +154,28 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 			firstStateReported = true
 			stateUpdated = nil
 		case doneStopping := <-t.stoppingTier:
+			wg := sync.WaitGroup{}
+
+			for range t.trackers {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					done := make(chan struct{})
+					stoppingLoops <- done
+					for {
+						select {
+						case <-done:
+							return
+						case <-time.After(25 * time.Millisecond):
+							drainTierResponseChannel(responseReceived) // drain channel ensuring no goroutine are blocked writting to it
+						}
+					}
+
+				}()
+			}
+			wg.Wait()
 			doneStopping <- struct{}{}
+
 			return
 		}
 	}
@@ -171,22 +189,18 @@ func (t *AllTrackersTierAnnouncer) stopAnnounceLoop() {
 	}
 	t.loopInProgress = false
 
-	wg := sync.WaitGroup{}
-
-	for range t.trackers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			done := make(chan struct{})
-			t.stoppingLoops <- done
-			<-done
-		}()
-	}
-
-	wg.Wait()
-
-	// Stop the tier last. If a tracker routine write to the 'responseReceived' chan and the tier dont read it the routine will block and never goes into the stop case
 	done := make(chan struct{})
 	t.stoppingTier <- done
 	<-done
+}
+
+func drainTierResponseChannel(t <-chan trackerAwareAnnounceResult) {
+	for {
+		select {
+		case <-t:
+			continue
+		default:
+			return
+		}
+	}
 }

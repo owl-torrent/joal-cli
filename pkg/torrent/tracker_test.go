@@ -108,7 +108,7 @@ func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
 	}
 
 	tra := newTracker(url.URL{})
-	var resps []trackerAwareAnnounceResult
+	var resps []trackerAnnounceResult
 
 	go tra.startAnnounceLoop(annFunc, tracker.None)
 	defer tra.stopAnnounceLoop()
@@ -125,16 +125,14 @@ func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
 	assert.Len(t, resps, 10)
 }
 
-
 func Test_TrackerAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTrackerWasNotStarted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-
 	tr := newTracker(*testutils.MustParseUrl("http://localhost"))
 
 	latch := congo.NewCountDownLatch(1)
-	go func () {
+	go func() {
 		tr.stopAnnounceLoop()
 		tr.stopAnnounceLoop()
 		tr.stopAnnounceLoop()

@@ -3,7 +3,6 @@ package torrent
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/google/uuid"
 	"net/url"
 	"sync"
 	"time"
@@ -14,9 +13,8 @@ var (
 )
 
 type trackerAnnouncer struct {
-	uuid           uuid.UUID
 	url            url.URL
-	responses      chan trackerAwareAnnounceResult
+	responses      chan trackerAnnounceResult
 	stoppingLoop   chan chan struct{}
 	loopInProgress bool
 	lock           *sync.RWMutex
@@ -24,29 +22,21 @@ type trackerAnnouncer struct {
 
 func newTracker(url url.URL) *trackerAnnouncer {
 	return &trackerAnnouncer{
-		uuid:           uuid.New(),
 		url:            url,
-		responses:      make(chan trackerAwareAnnounceResult),
+		responses:      make(chan trackerAnnounceResult),
 		stoppingLoop:   make(chan chan struct{}),
 		loopInProgress: false,
 		lock:           &sync.RWMutex{},
 	}
 }
 
-func (t trackerAnnouncer) Uuid() uuid.UUID {
-	return t.uuid
-}
-
-func (t trackerAnnouncer) Responses() <-chan trackerAwareAnnounceResult {
+func (t trackerAnnouncer) Responses() <-chan trackerAnnounceResult {
 	return t.responses
 }
 
-func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAwareAnnounceResult {
+func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
 	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
-	return trackerAwareAnnounceResult{
-		trackerAnnounceResult: announce(t.url, event, ctx),
-		trackerUuid:           t.uuid,
-	}
+	return announce(t.url, event, ctx)
 }
 
 func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
@@ -59,12 +49,12 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	t.lock.Unlock()
 
 	var next time.Time
-	var lastAnnounce trackerAwareAnnounceResult
+	var lastAnnounce trackerAnnounceResult
 	event := firstEvent
 
-	var announceDone chan trackerAwareAnnounceResult
+	var announceDone chan trackerAnnounceResult
 	var cancelRunningAnnounce context.CancelFunc
-	var pending []trackerAwareAnnounceResult
+	var pendingResponses []trackerAnnounceResult
 
 	for {
 		var announceDelay time.Duration
@@ -79,24 +69,21 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 		}
 
 		// Build some kind of a queue system to ensure the response handling in <- announceDone wont be stuck trying to write to the t.response chan with no one to listen on the other side
-		var first trackerAwareAnnounceResult
-		var responses chan trackerAwareAnnounceResult
-		if len(pending) > 0 {
-			first = pending[0]
+		var firstPendingResponse trackerAnnounceResult
+		var responses chan trackerAnnounceResult
+		if len(pendingResponses) > 0 {
+			firstPendingResponse = pendingResponses[0]
 			responses = t.responses
 		}
 
 		select {
 		case <-announceTime:
-			announceDone = make(chan trackerAwareAnnounceResult, 1)
+			announceDone = make(chan trackerAnnounceResult, 1)
 			go func(t trackerAnnouncer) {
 				var ctx context.Context
 				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())
 				response := announce(t.url, event, ctx)
-				announceDone <- trackerAwareAnnounceResult{
-					trackerAnnounceResult: response,
-					trackerUuid:           t.uuid,
-				}
+				announceDone <- response
 			}(*t)
 		case response := <-announceDone:
 			cancelRunningAnnounce = nil
@@ -113,15 +100,15 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 			}
 			next = time.Now().Add(nextAnnounceInterval)
 
-			pending = append(pending, response) // enqueue event here and the select will distribute the response as soon as someone is able to read
+			pendingResponses = append(pendingResponses, response) // enqueue event here and the select will distribute the response as soon as someone is able to read
 		case stopDone := <-t.stoppingLoop:
 			if cancelRunningAnnounce != nil {
 				cancelRunningAnnounce()
 			}
 			stopDone <- struct{}{}
 			return
-		case responses <- first:
-			pending = pending[1:]
+		case responses <- firstPendingResponse:
+			pendingResponses = pendingResponses[1:]
 		}
 	}
 }
@@ -137,9 +124,4 @@ func (t *trackerAnnouncer) stopAnnounceLoop() {
 	done := make(chan struct{})
 	t.stoppingLoop <- done
 	<-done
-}
-
-type trackerAwareAnnounceResult struct {
-	trackerAnnounceResult
-	trackerUuid uuid.UUID
 }

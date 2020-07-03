@@ -7,7 +7,6 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
 	"github.com/nvn1729/congo"
 	"net/url"
 	"strings"
@@ -44,8 +43,7 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 			Times(1)
 		t.EXPECT().stopAnnounceLoop().Times(1)
 
-		t.EXPECT().Uuid().Return(uuid.New()).AnyTimes()
-		t.EXPECT().Responses().Return(make(chan trackerAwareAnnounceResult)).AnyTimes()
+		t.EXPECT().Responses().Return(make(chan trackerAnnounceResult)).AnyTimes()
 
 		trackers = append(trackers, t)
 	}
