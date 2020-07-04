@@ -107,7 +107,7 @@ func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 						interval = DefaultDurationWaitOnError
 					}
 					startAnnounceTiers = time.After(interval)
-					o.tier.rewindToFirst()
+					o.tier.backToFirst()
 				}
 			case doneStopping := <-o.stopping:
 				o.tier.stopAnnounceLoop()

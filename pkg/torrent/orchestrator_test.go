@@ -515,7 +515,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
 			c <- tierState(DEAD)
 			latch.CountDown()
-		}).AnyTimes()
+		}).MinTimes(1)
 		tier.EXPECT().LastKnownInterval().Return(1*time.Millisecond, nil).AnyTimes()
 
 		tiers = append(tiers, tier)

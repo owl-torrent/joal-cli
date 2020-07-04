@@ -194,6 +194,63 @@ func (t *AllTrackersTierAnnouncer) stopAnnounceLoop() {
 	<-done
 }
 
+type FallbackTrackersTierAnnouncer struct {
+	trackers          []ITrackerAnnouncer
+	state             chan tierState
+	stoppingTier      chan chan struct{}
+	loopInProgress    bool
+	lock              *sync.RWMutex
+	lastKnownInterval time.Duration
+}
+
+func newFallbackTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer, error) {
+	if len(trackers) == 0 {
+		return nil, errors.New("a tier can not have an empty tracker list")
+	}
+	t := &FallbackTrackersTierAnnouncer{
+		trackers:          trackers,
+		state:             make(chan tierState),
+		stoppingTier:      make(chan chan struct{}),
+		loopInProgress:    false,
+		lock:              &sync.RWMutex{},
+		lastKnownInterval: 0 * time.Nanosecond,
+	}
+
+	return t, nil
+}
+
+func (t FallbackTrackersTierAnnouncer) LastKnownInterval() (time.Duration, error) {
+	if t.lastKnownInterval == 0 {
+		return 0 * time.Nanosecond, errors.New("no interval received from trackers yet")
+	}
+	return t.lastKnownInterval, nil
+}
+
+func (t FallbackTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+	panic("not implemented")
+}
+
+func (t FallbackTrackersTierAnnouncer) States() <-chan tierState {
+	return t.state
+}
+
+func (t *FallbackTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
+	panic("not implemented")
+}
+
+func (t *FallbackTrackersTierAnnouncer) stopAnnounceLoop() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if !t.loopInProgress {
+		return
+	}
+	t.loopInProgress = false
+
+	done := make(chan struct{})
+	t.stoppingTier <- done
+	<-done
+}
+
 func drainTierResponseChannel(t <-chan trackerAwareAnnounceResult) {
 	for {
 		select {
