@@ -1,3 +1,6 @@
+# TODO before v3.0
+- [ ] 
+
 # V3
 - [x] add multi tracker support (that mimic real clients)
 - [x] add multi tier support (that mimic real clients)

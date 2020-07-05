@@ -91,7 +91,11 @@ func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 		d.totalWeight -= previousClaimerWeight
 	}
 
-	d.claimers[claimer] = calculateWeight(claimer.GetSwarm())
+	swarm := claimer.GetSwarm()
+	if swarm == nil {
+		return
+	}
+	d.claimers[claimer] = calculateWeight(swarm)
 	d.totalWeight += d.claimers[claimer]
 }
 

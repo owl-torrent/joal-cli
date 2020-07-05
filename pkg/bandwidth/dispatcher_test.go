@@ -314,3 +314,16 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 	assert.Zero(t, claimer1.uploaded)
 	assert.Greater(t, claimer2.uploaded, int64(0))
 }
+
+func TestDispatcher_shouldNotRegisterIfSwarmIsNil(t *testing.T) {
+	dispatcher := &dispatcher{
+		claimers: make(map[IBandwidthClaimable]Weight),
+		lock:     &sync.RWMutex{},
+	}
+	claimer1 := &DumbBandwidthClaimable{
+		swarm: nil,
+	}
+	dispatcher.ClaimOrUpdate(claimer1)
+
+	assert.Empty(t, dispatcher.claimers)
+}
