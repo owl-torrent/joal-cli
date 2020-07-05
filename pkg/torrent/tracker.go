@@ -35,7 +35,7 @@ func (t trackerAnnouncer) Responses() <-chan trackerAnnounceResult {
 }
 
 func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	return announce(t.url, event, ctx)
 }
 

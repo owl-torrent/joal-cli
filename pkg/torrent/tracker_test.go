@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"context"
+	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/golang/mock/gomock"
@@ -144,5 +145,24 @@ func Test_TrackerAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTrack
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("Should not have blocked")
+	}
+}
+
+func Test_TrackerAnnouncer_ShouldAnnounceOnce(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tr := newTracker(*testutils.MustParseUrl("http://localhost"))
+
+	latch := congo.NewCountDownLatch(1)
+
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
+		defer latch.CountDown()
+		return trackerAnnounceResult{Err: errors.New("nop")}
+	}
+	go tr.announceOnce(annFunc, tracker.Started)
+
+	if !latch.WaitTimeout(50 * time.Millisecond) {
+		t.Fatal("timed out")
 	}
 }
