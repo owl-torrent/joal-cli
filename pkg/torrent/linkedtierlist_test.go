@@ -49,16 +49,16 @@ func Test_linkedTierList_ShouldGoToNextAndFinalyGetBackToFirst(t *testing.T) {
 	list, _ := newLinkedTierList(ts)
 
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 	for i := 1; i < len(ts); i++ {
 		list.next()
-		assert.Equal(t, list.ITierAnnouncer, ts[i])
 		assert.Equal(t, list.currentIndex, uint(i))
+		assert.Same(t, list.ITierAnnouncer, ts[i])
 	}
 
 	list.next()
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 }
 
 func Test_linkedTierList_ShouldForwardToFirst(t *testing.T) {
@@ -74,16 +74,16 @@ func Test_linkedTierList_ShouldForwardToFirst(t *testing.T) {
 	list.backToFirst()
 
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 	for i := 1; i < len(ts)/2; i++ {
 		list.next()
-		assert.Equal(t, list.ITierAnnouncer, ts[i])
 		assert.Equal(t, list.currentIndex, uint(i))
+		assert.Same(t, list.ITierAnnouncer, ts[i])
 	}
 	list.backToFirst()
 
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 }
 
 func Test_linkedTierList_ShouldWorkWithOnlyOneEntry(t *testing.T) {
@@ -95,13 +95,13 @@ func Test_linkedTierList_ShouldWorkWithOnlyOneEntry(t *testing.T) {
 	list, _ := newLinkedTierList(ts)
 
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 
 	list.next()
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 
 	list.backToFirst()
 	assert.Equal(t, list.currentIndex, uint(0))
-	assert.Equal(t, list.ITierAnnouncer, ts[0])
+	assert.Same(t, list.ITierAnnouncer, ts[0])
 }
