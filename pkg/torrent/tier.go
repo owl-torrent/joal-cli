@@ -44,10 +44,10 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 	return t, nil
 }
 
-//TODO: add tests for announceOnce
 func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
 	wg := sync.WaitGroup{}
 
+	lock := &sync.Mutex{}
 	states := make(map[ITrackerAnnouncer]tierState)
 
 	for _, tr := range t.trackers {
@@ -55,10 +55,13 @@ func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, even
 		go func(tr ITrackerAnnouncer) {
 			defer wg.Done()
 			resp := tr.announceOnce(announce, event)
+			lock.Lock()
+			st := ALIVE
 			if resp.Err != nil {
-				states[tr] = DEAD
+				st = DEAD
 			}
-			states[tr] = ALIVE
+			states[tr] = st
+			lock.Unlock()
 		}(tr)
 	}
 
@@ -231,7 +234,6 @@ func (t FallbackTrackersTierAnnouncer) LastKnownInterval() (time.Duration, error
 	return t.lastKnownInterval, nil
 }
 
-//TODO: add tests for announceOnce
 func (t *FallbackTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
 	res := t.tracker.announceOnce(announce, event)
 	if res.Err == nil {
