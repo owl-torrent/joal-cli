@@ -26,9 +26,11 @@ func (l *linkedTrackerList) PromoteCurrent() {
 		return
 	}
 
-	for i := l.currentIndex; i > 0; i-- {
+	selected := l.list[l.currentIndex]
+	for i := l.currentIndex; i > 0; i-- { // offset by +1 all the element before the current
 		l.list[i] = l.list[i-1]
 	}
+	l.list[0] = selected
 
 	l.currentIndex = 0
 	l.ITrackerAnnouncer = l.list[l.currentIndex]
@@ -38,6 +40,13 @@ func (l *linkedTrackerList) PromoteCurrent() {
 func (l *linkedTrackerList) isFirst() bool {
 	l.lock.RLock()
 	r := l.currentIndex == 0
+	l.lock.RUnlock()
+	return r
+}
+
+func (l *linkedTrackerList) isLast() bool {
+	l.lock.RLock()
+	r := l.currentIndex == uint(len(l.list)-1)
 	l.lock.RUnlock()
 	return r
 }
