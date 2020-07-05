@@ -1,6 +1,6 @@
 # V3
-- [ ] add multi tracker support (that mimic real clients)
-- [ ] add multi tier support (that mimic real clients)
+- [x] add multi tracker support (that mimic real clients)
+- [x] add multi tier support (that mimic real clients)
 - [ ] iso rewrite
 - [ ] make listening port customizable
 - [ ] allow for proxy integration
