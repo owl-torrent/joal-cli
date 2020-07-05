@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"net/url"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -422,6 +421,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 	}
 	tier.stopAnnounceLoop()
 
+	latch = congo.NewCountDownLatch(1)
 	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -595,6 +595,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 	latch := congo.NewCountDownLatch(10000)
 	var trackers []ITrackerAnnouncer
 
+	DefaultDurationWaitOnError = 0 * time.Millisecond
 	for i := 0; i < 3000; i++ {
 		t := NewMockITrackerAnnouncer(ctrl)
 		c := make(chan trackerAnnounceResult)
@@ -602,8 +603,8 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 		t.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
 		t.EXPECT().stopAnnounceLoop().AnyTimes()
 		t.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			time.Sleep(50 * time.Hour)
+			defer latch.CountDown()
+			c <- trackerAnnounceResult{Err: errors.New("nop")}
 		}).MinTimes(1)
 
 		trackers = append(trackers, t)
@@ -612,7 +613,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
 
-	if !latch.WaitTimeout(50 * time.Millisecond) {
+	if !latch.WaitTimeout(5000 * time.Millisecond) {
 		t.Fatal("latch has not released")
 	}
 	tier.stopAnnounceLoop()
@@ -620,7 +621,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 
 func Test_FallbackTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *testing.T) {
 	_, err := newFallbackTrackersTierAnnouncer()
-	if err != nil {
+	if err == nil {
 		t.Fatal("Should have failed to build")
 	}
 }
@@ -630,13 +631,12 @@ func Test_FallbackTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCall
 	defer ctrl.Finish()
 
 	tier, _ := newFallbackTrackersTierAnnouncer(NewMockITrackerAnnouncer(ctrl))
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
-
-	runtime.Gosched()
-	time.Sleep(10 * time.Millisecond)
 
 	c := make(chan struct{})
 	go func() {
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
+		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
 		close(c)
 	}()
@@ -808,9 +808,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 		}).Times(1),
 		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
 			c2 <- trackerAnnounceResult{Interval: 1 * time.Millisecond, Completed: time.Now()}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- trackerAnnounceResult{Err: errors.New("nop")}
+			c2 <- trackerAnnounceResult{Err: errors.New("nop")} // send a success then send an error
 		}).Times(1),
 		// t2 has succeed, the order should now be t2, t1, t3. When t2 fails it should go to t1
 		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
