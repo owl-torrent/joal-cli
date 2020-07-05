@@ -71,15 +71,15 @@ func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 	}
 	o.loopInProgress = true
 	o.lock.Unlock()
-	go func(o *FallbackOrchestrator) {
-		startAnnounceTiers := time.After(0 * time.Millisecond)
+	go func(o *FallbackOrchestrator) { // TODO: remove async go, start should be blocking
+		pauseBeforeLoop := time.After(0 * time.Millisecond)
 
 		currentEvent := tracker.Started
 
 		for {
 			select {
-			case <-startAnnounceTiers:
-				startAnnounceTiers = nil
+			case <-pauseBeforeLoop:
+				pauseBeforeLoop = nil
 				event := currentEvent
 				go o.tier.startAnnounceLoop(announce, event)
 			case st := <-o.tier.States():
@@ -87,13 +87,13 @@ func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 					o.tier.stopAnnounceLoop()
 					drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
 					o.tier.next()
-					startAnnounceTiers = time.After(0 * time.Millisecond)
+					pauseBeforeLoop = time.After(0 * time.Millisecond)
 					if o.tier.isFirst() { // we have travel through the whole list and get back to the first tier, lets wait before trying to re-announce on the first tier
 						interval, err := o.tier.LastKnownInterval()
 						if err != nil {
 							interval = DefaultDurationWaitOnError
 						}
-						startAnnounceTiers = time.After(interval)
+						pauseBeforeLoop = time.After(interval)
 					}
 					break
 				}
@@ -106,7 +106,7 @@ func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 					if err != nil {
 						interval = DefaultDurationWaitOnError
 					}
-					startAnnounceTiers = time.After(interval)
+					pauseBeforeLoop = time.After(interval)
 					o.tier.backToFirst()
 				}
 			case doneStopping := <-o.stopping:
@@ -221,7 +221,7 @@ func (o *AllOrchestrator) Start(announce AnnouncingFunction) {
 		}(t)
 	}
 
-	go func(o *AllOrchestrator) {
+	go func(o *AllOrchestrator) { // TODO: remove async go, Start should be blocking
 		for {
 			select {
 			case <-stateReceived:
