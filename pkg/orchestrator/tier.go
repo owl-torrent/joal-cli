@@ -1,14 +1,15 @@
-package torrent
+package orchestrator
 
 import (
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"sync"
 	"time"
 )
 
 type trackerAwareAnnounceResult struct {
-	trackerAnnounceResult
+	seed.trackerAnnounceResult
 	tracker ITrackerAnnouncer
 }
 

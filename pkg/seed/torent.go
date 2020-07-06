@@ -1,18 +1,26 @@
-package torrent
+package seed
 
 import (
 	"context"
-	"github.com/anacrolix/missinggo/v2"
+	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"net/url"
 	"time"
 )
 
+type ITorrent interface {
+	InfoHash() torrent.InfoHash
+	AddUploaded(bytes int64)
+	// May return nil
+	GetSwarm() ISwarm
+	StartSeeding()
+	StopSeeding()
+}
+
 type Torrent struct {
 	metaInfo metainfo.MetaInfo
 	info     metainfo.Info
-	closed   missinggo.SynchronizedEvent
 }
 
 type trackerAnnounceResult struct {

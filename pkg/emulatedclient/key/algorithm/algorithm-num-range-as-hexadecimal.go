@@ -1,8 +1,8 @@
 package algorithm
 
 import (
+	"github.com/anthonyraymond/joal-cli/internal/randutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key"
-	"github.com/anthonyraymond/joal-cli/pkg/randutils"
 )
 
 type NumRangeAsHexAlgorithm struct {

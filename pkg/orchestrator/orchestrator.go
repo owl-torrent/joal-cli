@@ -1,17 +1,18 @@
-package torrent
+package orchestrator
 
-//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/torrent -package=torrent github.com/anthonyraymond/joal-cli/pkg/torrent Orchestrator,ITrackerAnnouncer,ITierAnnouncer
+//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator Orchestrator,ITrackerAnnouncer,ITierAnnouncer
 
 import (
 	"context"
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"net/url"
 	"sync"
 	"time"
 )
 
-type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult
+type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult
 type tierState = byte
 type trackerState = tierState
 
@@ -21,9 +22,9 @@ const (
 )
 
 type ITrackerAnnouncer interface {
-	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
+	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.trackerAnnounceResult
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
-	Responses() <-chan trackerAnnounceResult
+	Responses() <-chan seed.trackerAnnounceResult
 	stopAnnounceLoop()
 }
 

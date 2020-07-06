@@ -1,5 +1,10 @@
 package seed
 
+type ISwarm interface {
+	GetSeeders() int32
+	GetLeechers() int32
+}
+
 type swarm struct {
 	seeders  int32
 	leechers int32

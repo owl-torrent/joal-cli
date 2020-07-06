@@ -1,4 +1,4 @@
-package torrent
+package orchestrator
 
 import (
 	"github.com/golang/mock/gomock"

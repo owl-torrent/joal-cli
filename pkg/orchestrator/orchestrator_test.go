@@ -1,8 +1,9 @@
-package torrent
+package orchestrator
 
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"net/url"
@@ -12,8 +13,8 @@ import (
 )
 
 //noinspection GoVarAndConstTypeMayBeOmitted
-var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) trackerAnnounceResult {
-	return trackerAnnounceResult{
+var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
+	return seed.trackerAnnounceResult{
 		Err:       nil,
 		Interval:  0,
 		Completed: time.Now(),

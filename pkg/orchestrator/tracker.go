@@ -1,8 +1,9 @@
-package torrent
+package orchestrator
 
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"net/url"
 	"sync"
 	"time"
@@ -14,7 +15,7 @@ var (
 
 type trackerAnnouncer struct {
 	url            url.URL
-	responses      chan trackerAnnounceResult
+	responses      chan seed.trackerAnnounceResult
 	stoppingLoop   chan chan struct{}
 	loopInProgress bool
 	lock           *sync.RWMutex
@@ -23,18 +24,18 @@ type trackerAnnouncer struct {
 func newTracker(url url.URL) *trackerAnnouncer {
 	return &trackerAnnouncer{
 		url:            url,
-		responses:      make(chan trackerAnnounceResult),
+		responses:      make(chan seed.trackerAnnounceResult),
 		stoppingLoop:   make(chan chan struct{}),
 		loopInProgress: false,
 		lock:           &sync.RWMutex{},
 	}
 }
 
-func (t trackerAnnouncer) Responses() <-chan trackerAnnounceResult {
+func (t trackerAnnouncer) Responses() <-chan seed.trackerAnnounceResult {
 	return t.responses
 }
 
-func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
+func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.trackerAnnounceResult {
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	return announce(t.url, event, ctx)
 }
@@ -49,12 +50,12 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	t.lock.Unlock()
 
 	var next time.Time
-	var lastAnnounce trackerAnnounceResult
+	var lastAnnounce seed.trackerAnnounceResult
 	event := firstEvent
 
-	var announceDone chan trackerAnnounceResult
+	var announceDone chan seed.trackerAnnounceResult
 	var cancelRunningAnnounce context.CancelFunc
-	var pendingResponses []trackerAnnounceResult
+	var pendingResponses []seed.trackerAnnounceResult
 
 	for {
 		var announceDelay time.Duration
@@ -69,8 +70,8 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 		}
 
 		// Build some kind of a queue system to ensure the response handling in <- announceDone wont be stuck trying to write to the t.response chan with no one to listen on the other side
-		var firstPendingResponse trackerAnnounceResult
-		var responses chan trackerAnnounceResult
+		var firstPendingResponse seed.trackerAnnounceResult
+		var responses chan seed.trackerAnnounceResult
 		if len(pendingResponses) > 0 {
 			firstPendingResponse = pendingResponses[0]
 			responses = t.responses
@@ -78,7 +79,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 
 		select {
 		case <-announceTime:
-			announceDone = make(chan trackerAnnounceResult, 1)
+			announceDone = make(chan seed.trackerAnnounceResult, 1)
 			go func(t trackerAnnouncer) {
 				var ctx context.Context
 				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())
