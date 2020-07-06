@@ -4,7 +4,7 @@ package bandwidth
 
 import (
 	"github.com/anacrolix/torrent"
-	"github.com/anthonyraymond/joal-cli/pkg/utils"
+	"github.com/anthonyraymond/joal-cli/internal/utils"
 	"sync"
 	"time"
 )
@@ -14,7 +14,7 @@ type ISwarm interface {
 	GetLeechers() int32
 }
 type IBandwidthClaimable interface {
-	InfoHash() *torrent.InfoHash
+	InfoHash() torrent.InfoHash
 	AddUploaded(bytes int64)
 	// May return nil
 	GetSwarm() ISwarm
