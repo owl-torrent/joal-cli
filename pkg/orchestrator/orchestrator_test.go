@@ -13,8 +13,8 @@ import (
 )
 
 //noinspection GoVarAndConstTypeMayBeOmitted
-var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
-	return seed.trackerAnnounceResult{
+var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
+	return seed.TrackerAnnounceResult{
 		Err:       nil,
 		Interval:  0,
 		Completed: time.Now(),

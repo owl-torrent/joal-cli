@@ -18,18 +18,18 @@ type ITorrent interface {
 	StopSeeding()
 }
 
-type Torrent struct {
-	metaInfo metainfo.MetaInfo
-	info     metainfo.Info
-}
-
-type trackerAnnounceResult struct {
+type TrackerAnnounceResult struct {
 	Err       error
 	Interval  time.Duration
 	Completed time.Time
 }
 
-func (t *Torrent) announce(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (ret trackerAnnounceResult) {
+type Torrent struct {
+	metaInfo metainfo.MetaInfo
+	info     metainfo.Info
+}
+
+func (t *Torrent) announce(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (ret TrackerAnnounceResult) {
 	defer func() {
 		ret.Completed = time.Now()
 	}()

@@ -20,7 +20,7 @@ import (
 
 type ISeed interface {
 	FilePath() string
-	InfoHash() *torrent.InfoHash
+	InfoHash() torrent.InfoHash
 	TorrentName() string
 	GetSwarm() bandwidth.ISwarm
 	Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher)
@@ -29,7 +29,7 @@ type ISeed interface {
 type seed struct {
 	path              string
 	torrentSpecs      *torrent.TorrentSpec
-	infoHash          *torrent.InfoHash
+	infoHash          torrent.InfoHash
 	announceList      metainfo.AnnounceList
 	seeding           bool
 	nextAnnounce      tracker.AnnounceEvent
@@ -47,7 +47,7 @@ func (s *seed) FilePath() string {
 	return s.path
 }
 
-func (s *seed) InfoHash() *torrent.InfoHash {
+func (s *seed) InfoHash() torrent.InfoHash {
 	return s.infoHash
 }
 func (s *seed) TorrentName() string {
@@ -80,7 +80,7 @@ func LoadFromFile(file string) (ISeed, error) {
 	return &seed{
 		path:              file,
 		torrentSpecs:      torrent.TorrentSpecFromMetaInfo(info),
-		infoHash:          &infoHash,
+		infoHash:          infoHash,
 		announceList:      announceList,
 		seeding:           false,
 		nextAnnounce:      tracker.Started,
@@ -124,7 +124,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 		select {
 		case <-announceAfter.C:
 			currentAnnounceType := s.nextAnnounce
-			response, err := bitTorrentClient.Announce(&s.announceList, *s.infoHash, s.seedingStats.Uploaded, s.seedingStats.Downloaded, s.seedingStats.Left, currentAnnounceType, context.Background())
+			response, err := bitTorrentClient.Announce(&s.announceList, s.infoHash, s.seedingStats.Uploaded, s.seedingStats.Downloaded, s.seedingStats.Left, currentAnnounceType, context.Background())
 			if err != nil {
 				s.consecutiveErrors = s.consecutiveErrors + 1
 				if currentAnnounceType == tracker.None {

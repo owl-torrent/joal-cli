@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult
+type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult
 type tierState = byte
 type trackerState = tierState
 
@@ -22,9 +22,9 @@ const (
 )
 
 type ITrackerAnnouncer interface {
-	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.trackerAnnounceResult
+	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.TrackerAnnounceResult
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
-	Responses() <-chan seed.trackerAnnounceResult
+	Responses() <-chan seed.TrackerAnnounceResult
 	stopAnnounceLoop()
 }
 

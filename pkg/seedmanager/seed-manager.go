@@ -161,12 +161,12 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if _, contains := s.seeds[*torrentSeed.InfoHash()]; !contains {
-		s.seeds[*torrentSeed.InfoHash()] = torrentSeed
+	if _, contains := s.seeds[torrentSeed.InfoHash()]; !contains {
+		s.seeds[torrentSeed.InfoHash()] = torrentSeed
 		go func() {
 			defer func() {
 				s.lock.Lock()
-				delete(s.seeds, *torrentSeed.InfoHash())
+				delete(s.seeds, torrentSeed.InfoHash())
 				s.lock.Unlock()
 			}()
 			torrentSeed.Seed(s.client, s.bandwidthDispatcher)

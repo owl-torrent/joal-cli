@@ -15,7 +15,7 @@ var (
 
 type trackerAnnouncer struct {
 	url            url.URL
-	responses      chan seed.trackerAnnounceResult
+	responses      chan seed.TrackerAnnounceResult
 	stoppingLoop   chan chan struct{}
 	loopInProgress bool
 	lock           *sync.RWMutex
@@ -24,18 +24,18 @@ type trackerAnnouncer struct {
 func newTracker(url url.URL) *trackerAnnouncer {
 	return &trackerAnnouncer{
 		url:            url,
-		responses:      make(chan seed.trackerAnnounceResult),
+		responses:      make(chan seed.TrackerAnnounceResult),
 		stoppingLoop:   make(chan chan struct{}),
 		loopInProgress: false,
 		lock:           &sync.RWMutex{},
 	}
 }
 
-func (t trackerAnnouncer) Responses() <-chan seed.trackerAnnounceResult {
+func (t trackerAnnouncer) Responses() <-chan seed.TrackerAnnounceResult {
 	return t.responses
 }
 
-func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.trackerAnnounceResult {
+func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.TrackerAnnounceResult {
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	return announce(t.url, event, ctx)
 }
@@ -50,12 +50,12 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	t.lock.Unlock()
 
 	var next time.Time
-	var lastAnnounce seed.trackerAnnounceResult
+	var lastAnnounce seed.TrackerAnnounceResult
 	event := firstEvent
 
-	var announceDone chan seed.trackerAnnounceResult
+	var announceDone chan seed.TrackerAnnounceResult
 	var cancelRunningAnnounce context.CancelFunc
-	var pendingResponses []seed.trackerAnnounceResult
+	var pendingResponses []seed.TrackerAnnounceResult
 
 	for {
 		var announceDelay time.Duration
@@ -70,8 +70,8 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 		}
 
 		// Build some kind of a queue system to ensure the response handling in <- announceDone wont be stuck trying to write to the t.response chan with no one to listen on the other side
-		var firstPendingResponse seed.trackerAnnounceResult
-		var responses chan seed.trackerAnnounceResult
+		var firstPendingResponse seed.TrackerAnnounceResult
+		var responses chan seed.TrackerAnnounceResult
 		if len(pendingResponses) > 0 {
 			firstPendingResponse = pendingResponses[0]
 			responses = t.responses
@@ -79,7 +79,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 
 		select {
 		case <-announceTime:
-			announceDone = make(chan seed.trackerAnnounceResult, 1)
+			announceDone = make(chan seed.TrackerAnnounceResult, 1)
 			go func(t trackerAnnouncer) {
 				var ctx context.Context
 				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())

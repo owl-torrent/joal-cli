@@ -17,10 +17,10 @@ import (
 func Test_TrackerAnnouncer_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	latch := congo.NewCountDownLatch(2)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
 		defer func() { _ = latch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return seed.trackerAnnounceResult{
+		return seed.TrackerAnnounceResult{
 			Err:       nil,
 			Interval:  1 * time.Millisecond,
 			Completed: time.Now(),
@@ -43,10 +43,10 @@ func Test_TrackerAnnouncer_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) 
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
 	endedLatch := congo.NewCountDownLatch(1)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return seed.trackerAnnounceResult{
+		return seed.TrackerAnnounceResult{
 			Err:       nil,
 			Interval:  1 * time.Millisecond,
 			Completed: time.Now(),
@@ -74,10 +74,10 @@ func Test_TrackerAnnouncer_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) 
 func Test_TrackerAnnouncer_ShouldBeReusableAfterStopLoop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return seed.trackerAnnounceResult{
+		return seed.TrackerAnnounceResult{
 			Err:       nil,
 			Interval:  1 * time.Millisecond,
 			Completed: time.Now(),
@@ -105,12 +105,12 @@ func Test_TrackerAnnouncer_ShouldBeReusableAfterStopLoop(t *testing.T) {
 }
 
 func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
-	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
-		return seed.trackerAnnounceResult{Err: nil, Interval: 1 * time.Millisecond, Completed: time.Now()}
+	var annFunc = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
+		return seed.TrackerAnnounceResult{Err: nil, Interval: 1 * time.Millisecond, Completed: time.Now()}
 	}
 
 	tra := newTracker(url.URL{})
-	var resps []seed.trackerAnnounceResult
+	var resps []seed.TrackerAnnounceResult
 
 	go tra.startAnnounceLoop(annFunc, tracker.None)
 	defer tra.stopAnnounceLoop()
@@ -157,9 +157,9 @@ func Test_TrackerAnnouncer_ShouldAnnounceOnce(t *testing.T) {
 
 	latch := congo.NewCountDownLatch(1)
 
-	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.trackerAnnounceResult {
+	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
 		defer latch.CountDown()
-		return seed.trackerAnnounceResult{Err: errors.New("nop")}
+		return seed.TrackerAnnounceResult{Err: errors.New("nop")}
 	}
 	go tr.announceOnce(annFunc, tracker.Started)
 
