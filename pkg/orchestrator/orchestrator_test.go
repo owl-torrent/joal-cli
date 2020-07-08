@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"net/url"
@@ -13,12 +12,13 @@ import (
 )
 
 //noinspection GoVarAndConstTypeMayBeOmitted
-var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult {
-	return seed.TrackerAnnounceResult{
-		Err:       nil,
-		Interval:  0,
-		Completed: time.Now(),
-	}
+var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	return tracker.AnnounceResponse{
+		Interval: 1800,
+		Leechers: 1,
+		Seeders:  1,
+		Peers:    []tracker.Peer{},
+	}, nil
 }
 
 func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {

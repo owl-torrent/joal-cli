@@ -3,13 +3,12 @@ package orchestrator
 import (
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"sync"
 	"time"
 )
 
 type trackerAwareAnnounceResult struct {
-	seed.TrackerAnnounceResult
+	trackerAnnounceResult
 	tracker ITrackerAnnouncer
 }
 
@@ -101,7 +100,7 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 			for {
 				select {
 				case resp := <-tr.Responses():
-					responseReceived <- trackerAwareAnnounceResult{TrackerAnnounceResult: resp, tracker: tr}
+					responseReceived <- trackerAwareAnnounceResult{trackerAnnounceResult: resp, tracker: tr}
 				case doneStopping := <-stoppingLoops:
 					tr.stopAnnounceLoop()
 					doneStopping <- struct{}{}
@@ -278,7 +277,7 @@ func (t *FallbackTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFun
 			select {
 			case res := <-t.tracker.Responses():
 				pauseBeforeLoop = nil
-				responseReceived <- trackerAwareAnnounceResult{TrackerAnnounceResult: res, tracker: t.tracker.ITrackerAnnouncer}
+				responseReceived <- trackerAwareAnnounceResult{trackerAnnounceResult: res, tracker: t.tracker.ITrackerAnnouncer}
 				if res.Err == nil {
 					t.lastKnownInterval = res.Interval
 					currentEvent = tracker.None

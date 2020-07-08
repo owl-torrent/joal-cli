@@ -6,13 +6,12 @@ import (
 	"context"
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"net/url"
 	"sync"
 	"time"
 )
 
-type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) seed.TrackerAnnounceResult
+type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error)
 type tierState = byte
 type trackerState = tierState
 
@@ -21,10 +20,16 @@ const (
 	DEAD            = 0x01
 )
 
+type trackerAnnounceResult struct {
+	Err       error
+	Interval  time.Duration
+	Completed time.Time
+}
+
 type ITrackerAnnouncer interface {
-	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.TrackerAnnounceResult
+	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
-	Responses() <-chan seed.TrackerAnnounceResult
+	Responses() <-chan trackerAnnounceResult
 	stopAnnounceLoop()
 }
 

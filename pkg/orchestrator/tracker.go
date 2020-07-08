@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"net/url"
 	"sync"
 	"time"
@@ -15,7 +14,7 @@ var (
 
 type trackerAnnouncer struct {
 	url            url.URL
-	responses      chan seed.TrackerAnnounceResult
+	responses      chan trackerAnnounceResult
 	stoppingLoop   chan chan struct{}
 	loopInProgress bool
 	lock           *sync.RWMutex
@@ -24,20 +23,32 @@ type trackerAnnouncer struct {
 func newTracker(url url.URL) *trackerAnnouncer {
 	return &trackerAnnouncer{
 		url:            url,
-		responses:      make(chan seed.TrackerAnnounceResult),
+		responses:      make(chan trackerAnnounceResult),
 		stoppingLoop:   make(chan chan struct{}),
 		loopInProgress: false,
 		lock:           &sync.RWMutex{},
 	}
 }
 
-func (t trackerAnnouncer) Responses() <-chan seed.TrackerAnnounceResult {
+func (t trackerAnnouncer) Responses() <-chan trackerAnnounceResult {
 	return t.responses
 }
 
-func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) seed.TrackerAnnounceResult {
+func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	return announce(t.url, event, ctx)
+	res, err := announce(t.url, event, ctx)
+	if err != nil {
+		return trackerAnnounceResult{
+			Err:       err,
+			Interval:  0,
+			Completed: time.Now(),
+		}
+	}
+	return trackerAnnounceResult{
+		Err:       nil,
+		Interval:  time.Duration(res.Interval) * time.Second,
+		Completed: time.Now(),
+	}
 }
 
 func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
@@ -50,12 +61,12 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	t.lock.Unlock()
 
 	var next time.Time
-	var lastAnnounce seed.TrackerAnnounceResult
+	var lastAnnounce trackerAnnounceResult
 	event := firstEvent
 
-	var announceDone chan seed.TrackerAnnounceResult
+	var announceDone chan trackerAnnounceResult
 	var cancelRunningAnnounce context.CancelFunc
-	var pendingResponses []seed.TrackerAnnounceResult
+	var pendingResponses []trackerAnnounceResult
 
 	for {
 		var announceDelay time.Duration
@@ -70,8 +81,8 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 		}
 
 		// Build some kind of a queue system to ensure the response handling in <- announceDone wont be stuck trying to write to the t.response chan with no one to listen on the other side
-		var firstPendingResponse seed.TrackerAnnounceResult
-		var responses chan seed.TrackerAnnounceResult
+		var firstPendingResponse trackerAnnounceResult
+		var responses chan trackerAnnounceResult
 		if len(pendingResponses) > 0 {
 			firstPendingResponse = pendingResponses[0]
 			responses = t.responses
@@ -79,12 +90,25 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 
 		select {
 		case <-announceTime:
-			announceDone = make(chan seed.TrackerAnnounceResult, 1)
+			announceDone = make(chan trackerAnnounceResult, 1)
 			go func(t trackerAnnouncer) {
 				var ctx context.Context
 				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())
-				response := announce(t.url, event, ctx)
-				announceDone <- response
+
+				res, err := announce(t.url, event, ctx)
+				if err != nil {
+					announceDone <- trackerAnnounceResult{
+						Err:       err,
+						Interval:  0,
+						Completed: time.Now(),
+					}
+					return
+				}
+				announceDone <- trackerAnnounceResult{
+					Err:       nil,
+					Interval:  time.Duration(res.Interval) * time.Second,
+					Completed: time.Now(),
+				}
 			}(*t)
 		case response := <-announceDone:
 			cancelRunningAnnounce = nil
