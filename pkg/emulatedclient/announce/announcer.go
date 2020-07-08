@@ -3,7 +3,6 @@ package announce
 import (
 	"context"
 	"fmt"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -12,6 +11,7 @@ import (
 	"strings"
 )
 
+// tracker.AnnounceRequest uses a uint32 for the IPAddress, create our own struct that use proper net.IP type. UDP will net to convert this one to a tracker.AnnounceRequest
 type AnnounceRequest struct {
 	InfoHash   [20]byte
 	PeerId     [20]byte
@@ -65,47 +65,31 @@ func (a *Announcer) AfterPropertiesSet() error {
 // Announce to the announceURLs in order until one answer properly.
 // The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
 // If none of the trackers respond the methods returns an error.
-func (a *Announcer) Announce(announceUrlList *metainfo.AnnounceList, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
-	var announceErrors = make([]error, 0)
-
-	for iTier, tier := range *announceUrlList {
-		for iUrl, uri := range tier {
-			announceUrl, err := url.Parse(uri)
-			if err != nil {
-				announceErrors = append(announceErrors, errors.New(fmt.Sprintf("failed to parse announce url '%s': %v", uri, err)))
-				continue
-			}
-			var currentAnnouncer interface {
-				Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
-			}
-			if strings.HasPrefix(announceUrl.Scheme, "http") {
-				currentAnnouncer = a.Http
-			} else if strings.HasPrefix(announceUrl.Scheme, "udp") {
-				currentAnnouncer = a.Udp
-			}
-
-			if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
-				announceErrors = append(announceErrors, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported", announceUrl.String(), announceUrl.Scheme)))
-				continue
-			}
-
-			logrus.
-				WithField("event", announceRequest.Event).
-				WithField("infohash", announceRequest.InfoHash).
-				WithField("uploaded", announceRequest.Uploaded).
-				Info("announcing to tracker")
-
-			ret, err := currentAnnouncer.Announce(*announceUrl, announceRequest, ctx)
-			if err == nil {
-				promoteUrlInTier(announceUrlList, iTier, iUrl)
-				promoteTier(announceUrlList, iTier)
-				return ret, nil
-			}
-
-			announceErrors = append(announceErrors, err)
-		}
+func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
+	var currentAnnouncer interface {
+		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
+	}
+	if strings.HasPrefix(u.Scheme, "http") {
+		currentAnnouncer = a.Http
+	} else if strings.HasPrefix(u.Scheme, "udp") {
+		currentAnnouncer = a.Udp
 	}
 
-	err := errors.New(fmt.Sprintf("failed to announce on every announce url: %+v", announceErrors))
-	return tracker.AnnounceResponse{}, err
+	if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
+		return tracker.AnnounceResponse{}, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme))
+	}
+
+	logrus.
+		WithField("event", announceRequest.Event).
+		WithField("infohash", announceRequest.InfoHash).
+		WithField("uploaded", announceRequest.Uploaded).
+		WithField("tracker", u.Host).
+		Info("announcing to tracker")
+
+	ret, err := currentAnnouncer.Announce(u, announceRequest, ctx)
+	if err != nil {
+		return tracker.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
+	}
+
+	return ret, nil
 }
