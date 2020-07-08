@@ -7,20 +7,20 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
+	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"math/rand"
 	"net/url"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
 type ITorrent interface {
 	InfoHash() torrent.InfoHash
 	AddUploaded(bytes int64)
 	// May return nil
-	GetSwarm() ISwarm
+	GetSwarm() bandwidth.ISwarm
 	StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher)
 	StopSeeding(ctx context.Context)
 }
@@ -47,23 +47,16 @@ type slimInfo struct {
 	Files       []metainfo.FileInfo
 }
 
-type TrackerAnnounceResult struct {
-	Err       error
-	Interval  time.Duration
-	Completed time.Time
-}
-
 type seedingTorrent struct {
 	seedStats
-	path          string
-	metaInfo      *slimMetaInfo
-	info          *slimInfo
-	infoHash      torrent.InfoHash
-	uploadedBytes int64
-	swarm         ISwarm
-	isRunning     bool
-	stopping      chan chan struct{}
-	lock          *sync.Mutex
+	path      string
+	metaInfo  *slimMetaInfo
+	info      *slimInfo
+	infoHash  torrent.InfoHash
+	swarm     bandwidth.ISwarm
+	isRunning bool
+	stopping  chan chan struct{}
+	lock      *sync.Mutex
 }
 
 func FromReader(filePath string) (ITorrent, error) {
@@ -125,7 +118,7 @@ func (t seedingTorrent) InfoHash() torrent.InfoHash {
 	return t.infoHash
 }
 
-func (t seedingTorrent) GetSwarm() ISwarm {
+func (t seedingTorrent) GetSwarm() bandwidth.ISwarm {
 	return t.swarm
 }
 
@@ -133,31 +126,26 @@ func (t *seedingTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dis
 	// TODO: create orchestrator & everything needed here and close with defer since this has to be a blocking function.
 	panic("not implemented")
 }
+
 func (t *seedingTorrent) StopSeeding(ctx context.Context) {
 	panic("not implemented")
+	// TODO: Announce stop to all and wait for them to return before reseting to 0 (otherwise an announce may be sent with a 0 uploaded
 	// TODO: reset swarm to 0
 	// TODO: reset seed stats
 }
 
-func (t *seedingTorrent) announce(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (ret TrackerAnnounceResult) {
-	defer func() {
-		ret.Completed = time.Now()
-	}()
+func createAnnounceFunction(t *seedingTorrent, client emulatedclient.EmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
+	return func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
 
-	ret.Interval = 5 * time.Minute
+		resp, err := client.Announce(u, t.infoHash, t.Uploaded, t.Downloaded, t.Left, event, ctx)
+		if err != nil {
+			return tracker.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
+		}
+		//TODO: publish res & error (most likely create our own struct and publish to chan)
 
-	//*
-	var res tracker.AnnounceResponse
-	/*/
-	TODO: client announce (with a lock??)
-	if err != nil {
-		ret.Err = fmt.Errorf("error announcing: %s", err)
-		return
+		// TODO: a tricky think to do will be to evaluate the real number of peer for a torrent since multiple tracker may return different peer count. url may be used to differentiate trackers response and maintain an average or max-peer count for each
+		// TODO: this has to be called after the torrent has updated his seeders/leechers, but not to many times to prevent overhead calculations dispatcher.ClaimOrUpdate(t)
+
+		return resp, nil
 	}
-	//*/
-
-	// TODO: a tricky think to do will be to evaluate the real number of peer for a torrent since multiple tracker may return different peer count. url may be used to differentiate trackers response and maintain an average or max-peer count for each
-
-	ret.Interval = time.Duration(res.Interval) * time.Second
-	return
 }
