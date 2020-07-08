@@ -2,7 +2,6 @@ package announce
 
 import (
 	"context"
-	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/go-playground/validator/v10"
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"net/url"
-	"strings"
 	"testing"
 )
 
@@ -100,30 +98,4 @@ func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp4://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp6://localhost.fr"), AnnounceRequest{}, context.Background())
-}
-
-type DumbHttpAnnouncer struct {
-	counter int
-}
-
-func (a *DumbHttpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbHttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
-	a.counter++
-	if strings.Contains(url.String(), "fail") {
-		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")
-	}
-	return tracker.AnnounceResponse{}, nil
-}
-
-type DumbUdpAnnouncer struct {
-	counter int
-}
-
-func (a *DumbUdpAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *DumbUdpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
-	a.counter++
-	if strings.Contains(url.String(), "fail") {
-		return tracker.AnnounceResponse{}, errors.New("asked to fail because url contains 'fail'")
-	}
-	return tracker.AnnounceResponse{}, nil
 }
