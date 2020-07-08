@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/validationutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
@@ -15,11 +14,12 @@ import (
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v2"
 	"io"
+	"net/url"
 	"os"
 )
 
 type IEmulatedClient interface {
-	Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error)
+	Announce(u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
 }
@@ -88,7 +88,7 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 	return nil
 }
 
-func (c *EmulatedClient) Announce(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+func (c *EmulatedClient) Announce(u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
 		panic(errors.New("EmulatedClient listener is not started"))
 	}
@@ -108,7 +108,7 @@ func (c *EmulatedClient) Announce(announceList *metainfo.AnnounceList, infoHash 
 		announceRequest.NumWant = c.NumWantOnStop
 	}
 
-	return c.Announcer.Announce(announceList, announceRequest, ctx)
+	return c.Announcer.Announce(u, announceRequest, ctx)
 }
 
 func (c *EmulatedClient) StartListener() error {
