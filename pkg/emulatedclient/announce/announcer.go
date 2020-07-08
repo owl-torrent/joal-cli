@@ -1,5 +1,7 @@
 package announce
 
+//go:generate mockgen -destination=./announcer_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce -package=announce github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce IHttpAnnouncer,IUdpAnnouncer
+
 import (
 	"context"
 	"fmt"

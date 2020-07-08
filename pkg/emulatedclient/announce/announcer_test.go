@@ -3,10 +3,10 @@ package announce
 import (
 	"context"
 	"errors"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/go-playground/validator/v10"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"net/url"
@@ -77,59 +77,29 @@ func TestAnnouncer_ShouldValidate(t *testing.T) {
 }
 
 func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	httpAnn := NewMockIHttpAnnouncer(ctrl)
+	udpAnn := NewMockIUdpAnnouncer(ctrl)
 	announcer := Announcer{
-		Http: &DumbHttpAnnouncer{},
-		Udp:  &DumbUdpAnnouncer{},
+		Http: httpAnn,
+		Udp:  udpAnn,
 	}
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"http://localhost.fr"}}, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
+	gomock.InOrder(
+		httpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("http://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
+		httpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("https://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
+		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
+		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp4://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
+		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp6://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
+	)
 
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"https://localhost.fr"}}, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 2, announcer.Http.(*DumbHttpAnnouncer).counter)
-
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp://localhost.fr"}}, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 1, announcer.Udp.(*DumbUdpAnnouncer).counter)
-
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp4://localhost.fr"}}, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 2, announcer.Udp.(*DumbUdpAnnouncer).counter)
-
-	_, _ = announcer.Announce(&metainfo.AnnounceList{{"udp6://localhost.fr"}}, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 3, announcer.Udp.(*DumbUdpAnnouncer).counter)
-}
-
-func TestAnnouncer_Announce_ShouldNotDemoteIfSucceed(t *testing.T) {
-	announcer := Announcer{
-		Http: &DumbHttpAnnouncer{},
-		Udp:  &DumbUdpAnnouncer{},
-	}
-
-	urls := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
-	expected := metainfo.AnnounceList{{"http://localhost.fr", "udp://localhost.fr"}}
-	_, _ = announcer.Announce(&urls, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 1, announcer.Http.(*DumbHttpAnnouncer).counter)
-	assert.Equal(t, expected, urls)
-	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
-}
-
-func TestAnnouncer_Announce_ShouldPromoteTierAndUrlInTierIfSucceed(t *testing.T) {
-	announcer := Announcer{
-		Http: &DumbHttpAnnouncer{},
-		Udp:  &DumbUdpAnnouncer{},
-	}
-
-	urls := metainfo.AnnounceList{
-		{"http://localhost.fr/fail", "http://localhost.fr/x/fail", "http://localhost.fr/y/fail"},
-		{"http://localhost.fr/t2/fail", "http://localhost.fr/t2/x/fail", "http://localhost.fr/t2/y"},
-	}
-	expected := metainfo.AnnounceList{
-		{"http://localhost.fr/t2/y", "http://localhost.fr/t2/fail", "http://localhost.fr/t2/x/fail"},
-		{"http://localhost.fr/fail", "http://localhost.fr/x/fail", "http://localhost.fr/y/fail"},
-	}
-	_, _ = announcer.Announce(&urls, AnnounceRequest{}, context.Background())
-	assert.Equal(t, 6, announcer.Http.(*DumbHttpAnnouncer).counter)
-	assert.Equal(t, expected, urls)
-	assert.Equal(t, 0, announcer.Udp.(*DumbUdpAnnouncer).counter)
+	_, _ = announcer.Announce(*testutils.MustParseUrl("http://localhost.fr"), AnnounceRequest{}, context.Background())
+	_, _ = announcer.Announce(*testutils.MustParseUrl("https://localhost.fr"), AnnounceRequest{}, context.Background())
+	_, _ = announcer.Announce(*testutils.MustParseUrl("udp://localhost.fr"), AnnounceRequest{}, context.Background())
+	_, _ = announcer.Announce(*testutils.MustParseUrl("udp4://localhost.fr"), AnnounceRequest{}, context.Background())
+	_, _ = announcer.Announce(*testutils.MustParseUrl("udp6://localhost.fr"), AnnounceRequest{}, context.Background())
 }
 
 type DumbHttpAnnouncer struct {
