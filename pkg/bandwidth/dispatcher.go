@@ -57,6 +57,7 @@ func (d *dispatcher) Start() {
 		speedProviderChan := utils.Every(d.speedProviderUpdateInterval, func() { d.randomSpeedProvider.Refresh() })
 		defer close(speedProviderChan)
 		ticker := time.NewTicker(d.dispatcherUpdateInterval)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
