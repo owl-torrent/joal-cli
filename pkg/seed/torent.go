@@ -53,7 +53,6 @@ type seedingTorrent struct {
 	metaInfo  *slimMetaInfo
 	info      *slimInfo
 	infoHash  torrent.InfoHash
-	swarm     bandwidth.ISwarm
 	isRunning bool
 	stopping  chan chan struct{}
 	lock      *sync.Mutex
@@ -107,7 +106,6 @@ func FromReader(filePath string) (ITorrent, error) {
 			Files:       info.Files,
 		},
 		infoHash:  infoHash,
-		swarm:     nil,
 		isRunning: false,
 		stopping:  make(chan chan struct{}),
 		lock:      &sync.Mutex{},

@@ -12,7 +12,6 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"math"
 	"path/filepath"
 	"sync"
 	"time"
@@ -96,7 +95,7 @@ func LoadFromFile(file string) (ISeed, error) {
 }
 
 func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-	s.lock.Lock()
+	/*s.lock.Lock()
 	if s.seeding {
 		// TODO: log already running
 		s.lock.Unlock()
@@ -168,7 +167,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 
 			continue
 		}
-	}
+	}*/
 }
 
 func (s *seed) StopSeeding(ctx context.Context) {
