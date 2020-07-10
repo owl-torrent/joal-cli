@@ -153,29 +153,29 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	} else {
 		_ = f.Close()
 	}
+	/*
+		torrentSeed, err := seed.LoadFromFile(filePath)
+		if err != nil {
+			return errors.Wrap(err, "failed to create torrent from file")
+		}
 
-	torrentSeed, err := seed.LoadFromFile(filePath)
-	if err != nil {
-		return errors.Wrap(err, "failed to create torrent from file")
-	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if _, contains := s.seeds[torrentSeed.InfoHash()]; !contains {
-		s.seeds[torrentSeed.InfoHash()] = torrentSeed
-		go func() {
-			defer func() {
-				s.lock.Lock()
-				delete(s.seeds, torrentSeed.InfoHash())
-				s.lock.Unlock()
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		if _, contains := s.seeds[torrentSeed.InfoHash()]; !contains {
+			s.seeds[torrentSeed.InfoHash()] = torrentSeed
+			go func() {
+				defer func() {
+					s.lock.Lock()
+					delete(s.seeds, torrentSeed.InfoHash())
+					s.lock.Unlock()
+				}()
+				torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 			}()
-			torrentSeed.Seed(s.client, s.bandwidthDispatcher)
-		}()
-	} else {
-		logrus.WithFields(logrus.Fields{
-			"file": filepath.Base(filePath),
-		}).Warn("Seed was not not started, seed map already contains this infohash.")
-	}
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"file": filepath.Base(filePath),
+			}).Warn("Seed was not not started, seed map already contains this infohash.")
+		}*/
 
 	return nil
 }

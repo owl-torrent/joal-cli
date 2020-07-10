@@ -4,17 +4,9 @@ package seed
 
 import (
 	"context"
-	"fmt"
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"path/filepath"
-	"sync"
-	"time"
 )
 
 type ISeed interface {
@@ -25,6 +17,8 @@ type ISeed interface {
 	Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher)
 	StopSeeding(ctx context.Context)
 }
+
+/*
 type seed struct {
 	path              string
 	torrentSpecs      *torrent.TorrentSpec
@@ -95,7 +89,7 @@ func LoadFromFile(file string) (ISeed, error) {
 }
 
 func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-	/*s.lock.Lock()
+	s.lock.Lock()
 	if s.seeding {
 		// TODO: log already running
 		s.lock.Unlock()
@@ -167,7 +161,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 
 			continue
 		}
-	}*/
+	}
 }
 
 func (s *seed) StopSeeding(ctx context.Context) {
@@ -194,3 +188,4 @@ func (s *seed) StopSeeding(ctx context.Context) {
 		}).Info("Seed stopped gracefully")
 	}
 }
+*/
