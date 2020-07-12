@@ -4,9 +4,12 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -53,7 +56,99 @@ type FallbackOrchestrator struct {
 	lock           *sync.RWMutex
 }
 
-func NewFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
+type IConfig interface {
+	SupportAnnounceList() bool
+	AnnounceToAllTiers() bool
+	AnnounceToAllTrackersInTier() bool
+}
+
+func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error) {
+	if conf == nil {
+		return nil, errors.New("nil orchestrator config")
+	}
+
+	if !conf.SupportAnnounceList() {
+		logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
+		var announceList = [][]string{{meta.Announce}}
+		return createOrchestratorForAnnounceList(announceList, true, true)
+	}
+
+	if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
+		logrus.WithField("url", meta.Announce).Info("build orchestrator with 'announce' because 'announce-list' is empty")
+		var announceList = [][]string{{meta.Announce}}
+		return createOrchestratorForAnnounceList(announceList, true, true)
+	}
+
+	// dont trust your inputs: some url (or even tiers) may be empty, filter them
+	var announceList [][]string
+	for _, tier := range meta.AnnounceList {
+		tiers := make([]string, 0)
+		for _, u := range tier {
+			if strings.TrimSpace(u) != "" {
+				tier = append(tier, u)
+			}
+		}
+		if len(tiers) > 0 {
+			announceList = append(announceList, tiers)
+		}
+	}
+
+	if len(announceList) == 0 {
+		return nil, errors.New("announce-list is empty")
+	}
+
+	if !conf.SupportAnnounceList() {
+		logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
+		var announceList = [][]string{{meta.Announce}}
+		return createOrchestratorForAnnounceList(announceList, true, true)
+	}
+
+	logrus.WithField("announce-list", announceList).Info("build orchestrator with 'announce-list'")
+	return createOrchestratorForAnnounceList(announceList, conf.AnnounceToAllTiers(), conf.AnnounceToAllTrackersInTier())
+}
+
+func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (Orchestrator, error) {
+	var tiers []ITierAnnouncer
+
+	for _, tier := range announceList {
+		var trackers []ITrackerAnnouncer
+		for _, trackerUrl := range tier {
+			u, err := url.Parse(trackerUrl)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse torrent Announce uri '%s'", trackerUrl)
+			}
+			t := newTracker(*u)
+			trackers = append(trackers, t)
+		}
+
+		var tier ITierAnnouncer
+		var err error
+		if announceToAllTrackersInTier {
+			tier, err = newAllTrackersTierAnnouncer(trackers...)
+		} else {
+			tier, err = newFallbackTrackersTierAnnouncer(trackers...)
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create tier")
+		}
+		tiers = append(tiers, tier)
+	}
+
+	var o Orchestrator
+	var err error
+	if announceToAllTiers {
+		o, err = newAllOrchestrator(tiers...)
+	} else {
+		o, err = newFallBackOrchestrator(tiers...)
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create orchestrator")
+	}
+
+	return o, nil
+}
+
+func newFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, errors.New("tiers list can not be empty")
 	}
@@ -178,7 +273,7 @@ type AllOrchestrator struct {
 	lock           *sync.RWMutex
 }
 
-func NewAllOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
+func newAllOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, errors.New("tiers list can not be empty")
 	}

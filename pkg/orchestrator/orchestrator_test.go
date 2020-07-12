@@ -41,7 +41,7 @@ func buildErrAnnouncingFunc(callbacks ...func(u url.URL)) AnnouncingFunction {
 }
 
 func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {
-	_, err := NewFallBackOrchestrator()
+	_, err := newFallBackOrchestrator()
 	if err == nil {
 		t.Fatal("should have failed to build")
 	}
@@ -77,7 +77,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceOnlyOnFirstTierIfItSucceed(t *testi
 		}).Times(1),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -134,7 +134,7 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceed(t *testing.
 		t3.EXPECT().LastKnownInterval().Return(1800*time.Second, nil).Times(1),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -192,7 +192,7 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceedUpToLast(t *
 		t4.EXPECT().LastKnownInterval().Return(1800*time.Second, nil).Times(1),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -251,7 +251,7 @@ func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *t
 		shouldNotRelease.CountDown()
 	}).Times(0)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -299,7 +299,7 @@ func Test_FallbackOrchestrator_ShouldReAnnounceOnFirstTrackerAfterABackupTierHas
 		}).Times(1),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -347,7 +347,7 @@ func Test_FallbackOrchestrator_ShouldKeepAnnouncingToFirstTrackerIfItSucceed(t *
 		shouldNotRelease.CountDown()
 	}).Times(0)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -397,7 +397,7 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingToNext(t *testing
 
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -444,7 +444,7 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingBackToPrimaryAfte
 
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -485,7 +485,7 @@ func Test_FallbackOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 		}).Times(1),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -500,7 +500,7 @@ func Test_FallbackOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *tes
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	o, _ := NewFallBackOrchestrator(NewMockITierAnnouncer(ctrl))
+	o, _ := newFallBackOrchestrator(NewMockITierAnnouncer(ctrl))
 
 	latch := congo.NewCountDownLatch(1)
 	go func() {
@@ -541,7 +541,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 		tiers = append(tiers, tier)
 	}
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -569,7 +569,7 @@ func Test_FallbackOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 		latch.CountDown()
 	}).Times(1)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -618,7 +618,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 		}),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -656,7 +656,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *te
 		}),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -695,7 +695,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *t
 		}),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -741,7 +741,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t
 		}),
 	)
 
-	o, _ := NewFallBackOrchestrator(tiers...)
+	o, _ := newFallBackOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -764,7 +764,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t
 }
 
 func Test_AllOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {
-	_, err := NewAllOrchestrator()
+	_, err := newAllOrchestrator()
 	if err == nil {
 		t.Fatal("should have failed to build")
 	}
@@ -793,7 +793,7 @@ func Test_AllOrchestrator_ShouldAnnounceOnAllTiers(t *testing.T) {
 		latchs = append(latchs, latch)
 	}
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -836,7 +836,7 @@ func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfOneTierFails(t *testing.
 	t1.EXPECT().stopAnnounceLoop().Times(0)
 	t2.EXPECT().stopAnnounceLoop().Times(0)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 
 	runtime.Gosched()
@@ -890,7 +890,7 @@ func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfAllTierFails(t *testing.
 	t2.EXPECT().stopAnnounceLoop().Times(0)
 	t3.EXPECT().stopAnnounceLoop().Times(0)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -940,7 +940,7 @@ func Test_AllOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 	}).Times(1)
 	t3.EXPECT().stopAnnounceLoop().Times(1)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -953,7 +953,7 @@ func Test_AllOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	o, _ := NewAllOrchestrator(NewMockITierAnnouncer(ctrl))
+	o, _ := newAllOrchestrator(NewMockITierAnnouncer(ctrl))
 
 	latch := congo.NewCountDownLatch(1)
 	go func() {
@@ -994,7 +994,7 @@ func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testin
 		tiers = append(tiers, tier)
 	}
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
@@ -1022,7 +1022,7 @@ func Test_AllOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 		latch.CountDown()
 	}).Times(1)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 	go o.Start(nil)
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -1083,7 +1083,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 		}),
 	)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -1132,7 +1132,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testin
 		return tierState(DEAD)
 	})
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -1166,7 +1166,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *tes
 		}),
 	)
 
-	o, _ := NewAllOrchestrator(tiers...)
+	o, _ := newAllOrchestrator(tiers...)
 
 	go o.Start(nil)
 	if !latch.WaitTimeout(500 * time.Millisecond) {
