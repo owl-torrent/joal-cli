@@ -128,7 +128,7 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	// TODO: send stop signal to main loop
 }
 
-func createAnnounceClosure(t *joalTorrent, client emulatedclient.EmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
+func createAnnounceClosure(t *joalTorrent, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
 
 		resp, err := client.Announce(ctx, u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event)
