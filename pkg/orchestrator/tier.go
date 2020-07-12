@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"context"
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"sync"
@@ -44,7 +45,12 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 	return t, nil
 }
 
-func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+func (t AllTrackersTierAnnouncer) announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+	select {
+	case <-ctx.Done():
+		return DEAD
+	default:
+	}
 	wg := sync.WaitGroup{}
 
 	lock := &sync.Mutex{}
@@ -54,7 +60,7 @@ func (t AllTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, even
 		wg.Add(1)
 		go func(tr ITrackerAnnouncer) {
 			defer wg.Done()
-			resp := tr.announceOnce(announce, event)
+			resp := tr.announceOnce(ctx, announce, event)
 			lock.Lock()
 			st := ALIVE
 			if resp.Err != nil {
@@ -234,16 +240,27 @@ func (t FallbackTrackersTierAnnouncer) LastKnownInterval() (time.Duration, error
 	return t.lastKnownInterval, nil
 }
 
-func (t *FallbackTrackersTierAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
-	res := t.tracker.announceOnce(announce, event)
+func (t *FallbackTrackersTierAnnouncer) announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+	select {
+	case <-ctx.Done():
+		return DEAD
+	default:
+	}
+	res := t.tracker.announceOnce(ctx, announce, event)
 	if res.Err == nil {
 		t.tracker.PromoteCurrent()
 		return ALIVE
 	}
 
+	select {
+	case <-ctx.Done():
+		return DEAD
+	default:
+	}
+
 	for !t.tracker.isLast() {
 		t.tracker.next()
-		res := t.tracker.announceOnce(announce, event)
+		res := t.tracker.announceOnce(ctx, announce, event)
 		if res.Err == nil {
 			t.tracker.PromoteCurrent()
 			return ALIVE

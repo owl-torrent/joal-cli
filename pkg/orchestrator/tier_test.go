@@ -370,11 +370,11 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveA
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != ALIVE {
 		t.Fatal("should have returned tier alive")
 	}
@@ -408,11 +408,11 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != ALIVE {
 		t.Fatal("should have returned tier alive")
 	}
@@ -446,11 +446,11 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != ALIVE {
 		t.Fatal("should have returned tier alive")
 	}
@@ -484,11 +484,11 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportDeadIf
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != DEAD {
 		t.Fatal("should have returned tier dead")
 	}
@@ -502,7 +502,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldLoopTrackersAndStopLoop(t *testing
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	trackers = append(trackers, t1)
 
 	latch := congo.NewCountDownLatch(1)
@@ -533,7 +533,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
@@ -573,14 +573,14 @@ func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
@@ -616,7 +616,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsW
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
@@ -648,14 +648,14 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTracke
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
@@ -703,7 +703,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingFo
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
@@ -736,7 +736,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 		t := NewMockITrackerAnnouncer(ctrl)
 		c := make(chan trackerAnnounceResult)
 		t.EXPECT().Responses().Return(c).AnyTimes()
-		t.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+		t.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		t.EXPECT().stopAnnounceLoop().AnyTimes()
 		t.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
 			defer latch.CountDown()
@@ -792,14 +792,14 @@ func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceed(
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
@@ -831,21 +831,21 @@ func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceedU
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
 	t3 := NewMockITrackerAnnouncer(ctrl)
 	c3 := make(chan trackerAnnounceResult)
 	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t3)
 
@@ -880,13 +880,13 @@ func Test_FallbackTrackersTierAnnouncer_ShouldStopTrackerBeforeMovingToNext(t *t
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
@@ -919,21 +919,21 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
 	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
 	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
 	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t2)
 
 	t3 := NewMockITrackerAnnouncer(ctrl)
 	c3 := make(chan trackerAnnounceResult)
 	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t3)
 
@@ -1054,11 +1054,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceToFirstTrackerAndRetur
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Times(0)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Times(0)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != ALIVE {
 		t.Fatal("should have returned tier alive")
 	}
@@ -1092,11 +1092,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceByFallingBackUntilOnce
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != ALIVE {
 		t.Fatal("should have returned tier alive")
 	}
@@ -1130,11 +1130,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceByFallingBackAndReturn
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
 
-	state := tier.announceOnce(nil, tracker.Started)
+	state := tier.announceOnce(context.Background(), nil, tracker.Started)
 	if state != DEAD {
 		t.Fatal("should have returned tier dead")
 	}

@@ -27,14 +27,14 @@ type trackerAnnounceResult struct {
 }
 
 type ITrackerAnnouncer interface {
-	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
+	announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
 	Responses() <-chan trackerAnnounceResult
 	stopAnnounceLoop()
 }
 
 type ITierAnnouncer interface {
-	announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) tierState
+	announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
 	States() <-chan tierState
 	LastKnownInterval() (time.Duration, error)
@@ -157,7 +157,7 @@ func (o *FallbackOrchestrator) Stop(annFunc AnnouncingFunction, ctx context.Cont
 		wg.Add(1)
 		go func(tier ITierAnnouncer) {
 			defer wg.Done()
-			tier.announceOnce(annFunc, tracker.Stopped)
+			tier.announceOnce(ctx, annFunc, tracker.Stopped)
 		}(o.tier)
 
 		wg.Wait()
@@ -273,7 +273,7 @@ func (o *AllOrchestrator) Stop(annFunc AnnouncingFunction, ctx context.Context) 
 			wg.Add(1)
 			go func(tier ITierAnnouncer) {
 				defer wg.Done()
-				tier.announceOnce(annFunc, tracker.Stopped)
+				tier.announceOnce(ctx, annFunc, tracker.Stopped)
 			}(tier)
 		}
 

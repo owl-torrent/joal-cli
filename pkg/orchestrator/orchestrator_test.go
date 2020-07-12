@@ -14,7 +14,6 @@ import (
 
 //noinspection GoVarAndConstTypeMayBeOmitted
 var ThirtyMinutesIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(30 * time.Minute)
-var OneMillisecondIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(1 * time.Millisecond)
 var ZeroIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(0 * time.Millisecond)
 var ErrorAnnouncingFunc AnnouncingFunction = buildErrAnnouncingFunc()
 
@@ -58,7 +57,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceOnlyOnFirstTierIfItSucceed(t *testi
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
@@ -100,28 +99,28 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceed(t *testing.
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	t4 := NewMockITierAnnouncer(ctrl)
 	c4 := make(chan tierState)
 	t4.EXPECT().States().Return(c4).AnyTimes()
 	t4.EXPECT().stopAnnounceLoop().AnyTimes()
-	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t4)
 
 	latch := congo.NewCountDownLatch(1)
@@ -157,28 +156,28 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceedUpToLast(t *
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	t4 := NewMockITierAnnouncer(ctrl)
 	c4 := make(chan tierState)
 	t4.EXPECT().States().Return(c4).AnyTimes()
 	t4.EXPECT().stopAnnounceLoop().AnyTimes()
-	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t4)
 
 	latch := congo.NewCountDownLatch(1)
@@ -215,21 +214,21 @@ func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *t
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	// After all tiers has failed, primary tier will be asked for the last known interval, this test will verify that the tier does wait for the interval and does not re-announce immediatly
@@ -272,21 +271,21 @@ func Test_FallbackOrchestrator_ShouldReAnnounceOnFirstTrackerAfterABackupTierHas
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	latch := congo.NewCountDownLatch(1)
@@ -319,21 +318,21 @@ func Test_FallbackOrchestrator_ShouldKeepAnnouncingToFirstTrackerIfItSucceed(t *
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
 	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
 	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	gomock.InOrder(
@@ -367,19 +366,19 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingToNext(t *testing
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	t1.EXPECT().LastKnownInterval().Return(1800*time.Millisecond, nil).Times(1)
@@ -416,19 +415,19 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingBackToPrimaryAfte
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	t2.EXPECT().LastKnownInterval().Return(1800*time.Millisecond, nil).Times(1)
@@ -463,19 +462,19 @@ func Test_FallbackOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	latch := congo.NewCountDownLatch(1)
@@ -532,7 +531,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 		c := make(chan tierState)
 		tier.EXPECT().States().Return(c).AnyTimes()
 		tier.EXPECT().stopAnnounceLoop().AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
 			c <- tierState(DEAD)
 			latch.CountDown()
@@ -561,7 +560,7 @@ func Test_FallbackOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	latch := congo.NewCountDownLatch(1)
@@ -614,7 +613,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -652,7 +651,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *te
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return tierState(DEAD)
 		}),
 	)
@@ -690,9 +689,9 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *t
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
-			return tierState(ALIVE)
+			return ALIVE
 		}),
 	)
 
@@ -736,7 +735,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
 			return ALIVE
 		}),
@@ -783,7 +782,7 @@ func Test_AllOrchestrator_ShouldAnnounceOnAllTiers(t *testing.T) {
 		tier := NewMockITierAnnouncer(ctrl)
 		c := make(chan tierState)
 		tier.EXPECT().States().Return(c).AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		tier.EXPECT().stopAnnounceLoop().AnyTimes()
 		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
 			c <- ALIVE
@@ -814,13 +813,13 @@ func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfOneTierFails(t *testing.
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	latch := congo.NewCountDownLatch(2)
@@ -857,19 +856,19 @@ func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfAllTierFails(t *testing.
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	latch := congo.NewCountDownLatch(3)
@@ -908,19 +907,19 @@ func Test_AllOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t1)
 
 	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
 	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t2)
 
 	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
 	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	tiers = append(tiers, t3)
 
 	latch := congo.NewCountDownLatch(3)
@@ -985,7 +984,7 @@ func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testin
 		c := make(chan tierState)
 		tier.EXPECT().States().Return(c).AnyTimes()
 		tier.EXPECT().stopAnnounceLoop().AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
 			c <- ALIVE
 			latch.CountDown()
@@ -1013,7 +1012,7 @@ func Test_AllOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
 	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any()).AnyTimes()
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	tiers = append(tiers, t1)
 
@@ -1069,7 +1068,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -1079,7 +1078,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c2 <- ALIVE
 		}).Times(1),
 		t2.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -1126,10 +1125,10 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testin
 		t2.EXPECT().stopAnnounceLoop().Times(1),
 	)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 		return tierState(DEAD)
 	})
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 		return tierState(DEAD)
 	})
 
@@ -1161,7 +1160,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *tes
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
 			return ALIVE
 		}),

@@ -151,7 +151,7 @@ func Test_TrackerAnnouncer_ShouldAnnounceOnce(t *testing.T) {
 	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
 		latch.CountDown()
 	})
-	go tr.announceOnce(annFunc, tracker.Started)
+	go tr.announceOnce(context.Background(), annFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("timed out")
