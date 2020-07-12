@@ -51,6 +51,7 @@ func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {
 }
 
 func (d *dispatcher) Start() {
+	// TODO: rewrite properly with channels instead of timeutils.every
 	d.quit = make(chan int)
 	go func() {
 		d.randomSpeedProvider.Refresh()
