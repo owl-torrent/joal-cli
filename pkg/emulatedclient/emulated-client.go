@@ -19,7 +19,7 @@ import (
 )
 
 type IEmulatedClient interface {
-	Announce(u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error)
+	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
 }
@@ -88,7 +88,7 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 	return nil
 }
 
-func (c *EmulatedClient) Announce(u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
 		panic(errors.New("EmulatedClient listener is not started"))
 	}

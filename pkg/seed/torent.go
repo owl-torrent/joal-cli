@@ -131,7 +131,7 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 func createAnnounceClosure(t *joalTorrent, client emulatedclient.EmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
 
-		resp, err := client.Announce(u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event, ctx)
+		resp, err := client.Announce(ctx, u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event)
 		if err != nil {
 			if event != tracker.Stopped {
 				t.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
