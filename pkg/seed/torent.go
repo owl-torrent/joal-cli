@@ -45,13 +45,16 @@ type slimInfo struct {
 }
 
 type joalTorrent struct {
-	path      string
-	metaInfo  *slimMetaInfo
-	info      *slimInfo
-	infoHash  torrent.InfoHash
-	isRunning bool
-	stopping  chan chan struct{}
-	lock      *sync.Mutex
+	ISeedSession
+	path         string
+	metaInfo     *slimMetaInfo
+	info         *slimInfo
+	infoHash     torrent.InfoHash
+	isRunning    bool
+	stopping     chan chan struct{}
+	lock         *sync.Mutex
+	orchestrator orchestrator.Orchestrator
+	swarm        *swarmElector
 }
 
 func FromReader(filePath string) (ITorrent, error) {
@@ -77,6 +80,9 @@ func FromReader(filePath string) (ITorrent, error) {
 	}
 
 	return &joalTorrent{
+		//TODO: init IseedSession
+		//  swarm
+		//  orchestrator
 		path: filePath,
 		metaInfo: &slimMetaInfo{
 			Announce:     meta.Announce,
@@ -107,39 +113,41 @@ func (t joalTorrent) InfoHash() torrent.InfoHash {
 	return t.infoHash
 }
 
+func (t joalTorrent) GetSwarm() bandwidth.ISwarm {
+	return t.swarm
+}
+
 func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-	// TODO: create orchestrator, swarm & everything needed here and close with defer since this has to be a blocking function.
-	//  doing this will prevent weird state and concurrent access to struct attributes.
-	//  Swarm, orchestrator and so on will only exists in the scope of this function, no need to reset swarm, and so on.
+	// TODO: start orchestrator, swarm & everything needed here
+
 	panic("not implemented")
 }
 
 func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	panic("not implemented")
-	// TODO: Announce stop to all and wait for them to return before reseting to 0 (otherwise an announce may be sent with a 0 uploaded
-	// TODO: reset seed stats
+	// TODO: send stop signal to main loop
 }
 
-func createAnnounceClosure(client emulatedclient.EmulatedClient, dispatcher bandwidth.IDispatcher, seedSession *mutableSeedSession) orchestrator.AnnouncingFunction {
+func createAnnounceClosure(t *joalTorrent, client emulatedclient.EmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
 	return func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
 
-		resp, err := client.Announce(u, seedSession.InfoHash(), seedSession.Uploaded(), seedSession.Downloaded(), seedSession.Left(), event, ctx)
+		resp, err := client.Announce(u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event, ctx)
 		if err != nil {
 			if event != tracker.Stopped {
-				seedSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
-				if seedSession.swarm.HasChanged() {
-					seedSession.swarm.ResetChanged()
-					dispatcher.ClaimOrUpdate(seedSession)
+				t.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
+				if t.swarm.HasChanged() {
+					t.swarm.ResetChanged()
+					dispatcher.ClaimOrUpdate(t)
 				}
 			}
 			return tracker.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
 
 		if event != tracker.Stopped {
-			seedSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
-			if seedSession.swarm.HasChanged() {
-				seedSession.swarm.ResetChanged()
-				dispatcher.ClaimOrUpdate(seedSession)
+			t.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
+			if t.swarm.HasChanged() {
+				t.swarm.ResetChanged()
+				dispatcher.ClaimOrUpdate(t)
 			}
 		}
 
@@ -150,27 +158,18 @@ func createAnnounceClosure(client emulatedclient.EmulatedClient, dispatcher band
 }
 
 type ISeedSession interface {
-	InfoHash() torrent.InfoHash
-	GetSwarm() bandwidth.ISwarm
-	Uploaded() int32
-	Downloaded() int32
-	Left() int32
+	Uploaded() int64
+	Downloaded() int64
+	Left() int64
+	AddUploaded(bytes int64)
 }
 
 type mutableSeedSession struct {
-	infoHash   torrent.InfoHash
-	swarm      *swarmElector
 	uploaded   int64
 	downloaded int64
 	left       int64
 }
 
-func (m mutableSeedSession) InfoHash() torrent.InfoHash {
-	return m.infoHash
-}
-func (m mutableSeedSession) GetSwarm() bandwidth.ISwarm {
-	return m.swarm.CurrentSwarm()
-}
 func (m mutableSeedSession) Uploaded() int64 {
 	return m.uploaded
 }
