@@ -3,9 +3,9 @@ package generator
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/algorithm"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
@@ -34,7 +34,7 @@ type validAbleKeyGenerator struct {
 	Field string `validate:"required"`
 }
 
-func (a *validAbleKeyGenerator) get(algorithm algorithm.IPeerIdAlgorithm, infoHash torrent.InfoHash, event tracker.AnnounceEvent) peerid.PeerId {
+func (a *validAbleKeyGenerator) get(algorithm.IPeerIdAlgorithm, torrent.InfoHash, tracker.AnnounceEvent) peerid.PeerId {
 	return [20]byte{}
 }
 func (a *validAbleKeyGenerator) afterPropertiesSet() error { return nil }

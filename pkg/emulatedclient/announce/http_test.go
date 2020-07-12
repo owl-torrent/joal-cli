@@ -6,9 +6,9 @@ import (
 	"context"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/casing"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/urlencoder"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
@@ -136,11 +136,11 @@ func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 		Peers:    tracker.Peers{tracker.Peer{IP: net.IPv4(10, 10, 10, 10), Port: 2501, ID: []byte{1}}},
 	}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bytes, err := bencode.Marshal(expectedResponse)
+		b, err := bencode.Marshal(expectedResponse)
 		if err != nil {
 			t.Errorf("failed to encode http announce response")
 		}
-		_, _ = w.Write(bytes)
+		_, _ = w.Write(b)
 	}))
 	defer s.Close()
 

@@ -1,4 +1,4 @@
-package utils
+package timeutils
 
 import (
 	"github.com/nvn1729/congo"

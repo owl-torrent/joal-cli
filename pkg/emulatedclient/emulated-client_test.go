@@ -1,7 +1,6 @@
 package emulatedclient
 
 import (
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/casing"
 	keyAlgorithm "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/algorithm"
@@ -9,6 +8,7 @@ import (
 	peerIdAlgorithm "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/algorithm"
 	peerIdGenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/generator"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/urlencoder"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"

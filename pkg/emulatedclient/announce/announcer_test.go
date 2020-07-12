@@ -3,7 +3,7 @@ package announce
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ type validAbleAnnouncer struct {
 }
 
 func (a *validAbleAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *validAbleAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
+func (a *validAbleAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (tracker.AnnounceResponse, error) {
 	return tracker.AnnounceResponse{}, nil
 }
 

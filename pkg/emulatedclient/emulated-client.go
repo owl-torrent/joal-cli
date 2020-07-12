@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/validationutils"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/generator"
 	peeridgenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/generator"
@@ -51,7 +50,7 @@ func FromReader(reader io.Reader) (IEmulatedClient, error) {
 	}
 
 	validate := validator.New()
-	validate.RegisterTagNameFunc(validationutils.TagNameFunction)
+	validate.RegisterTagNameFunc(TagNameFunction) // add json capability
 	err = validate.Struct(client)
 	if err != nil {
 		return nil, err

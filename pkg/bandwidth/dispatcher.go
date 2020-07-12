@@ -4,7 +4,7 @@ package bandwidth
 
 import (
 	"github.com/anacrolix/torrent"
-	"github.com/anthonyraymond/joal-cli/internal/utils"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/timeutils"
 	"sync"
 	"time"
 )
@@ -54,7 +54,7 @@ func (d *dispatcher) Start() {
 	d.quit = make(chan int)
 	go func() {
 		d.randomSpeedProvider.Refresh()
-		speedProviderChan := utils.Every(d.speedProviderUpdateInterval, func() { d.randomSpeedProvider.Refresh() })
+		speedProviderChan := timeutils.Every(d.speedProviderUpdateInterval, func() { d.randomSpeedProvider.Refresh() })
 		defer close(speedProviderChan)
 		ticker := time.NewTicker(d.dispatcherUpdateInterval)
 		defer ticker.Stop()

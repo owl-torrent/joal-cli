@@ -3,7 +3,7 @@ package bandwidth
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anthonyraymond/joal-cli/internal/gomockutils"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/gomockutils"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"

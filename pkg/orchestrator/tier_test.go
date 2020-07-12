@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/testutils"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"net/url"

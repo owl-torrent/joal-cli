@@ -1,4 +1,4 @@
-package validationutils
+package emulatedclient
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -22,6 +22,7 @@ func Test_TagNameFunction_ShouldMatchName(t *testing.T) {
 	assert.Equal(t, "", TagNameFunction(mustFieldByName(reflect.TypeOf(s).FieldByName("Empty"))))
 }
 
+//noinspection GoUnusedParameter
 func mustFieldByName(st reflect.StructField, b bool) reflect.StructField {
 	return st
 }
