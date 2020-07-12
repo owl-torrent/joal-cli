@@ -43,7 +43,7 @@ type ITierAnnouncer interface {
 
 type Orchestrator interface {
 	Start(announce AnnouncingFunction)
-	Stop(announce AnnouncingFunction, context context.Context)
+	Stop(context context.Context, announce AnnouncingFunction)
 }
 
 type FallbackOrchestrator struct {
@@ -135,7 +135,7 @@ func drainStatesChannel(t ITierAnnouncer) {
 	}
 }
 
-func (o *FallbackOrchestrator) Stop(annFunc AnnouncingFunction, ctx context.Context) {
+func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	if !o.loopInProgress {
@@ -250,7 +250,7 @@ func (o *AllOrchestrator) Start(announce AnnouncingFunction) {
 	}
 }
 
-func (o *AllOrchestrator) Stop(annFunc AnnouncingFunction, ctx context.Context) {
+func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 	if !o.loopInProgress {
