@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error)
+type AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
 type tierState = byte
 type trackerState = tierState
 

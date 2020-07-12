@@ -35,8 +35,8 @@ func (t trackerAnnouncer) Responses() <-chan trackerAnnounceResult {
 }
 
 func (t trackerAnnouncer) announceOnce(announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	res, err := announce(t.url, event, ctx)
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second) // TODO: take this context from param
+	res, err := announce(ctx, t.url, event)
 	if err != nil {
 		return trackerAnnounceResult{
 			Err:       err,
@@ -95,7 +95,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 				var ctx context.Context
 				ctx, cancelRunningAnnounce = context.WithCancel(context.Background())
 
-				res, err := announce(t.url, event, ctx)
+				res, err := announce(ctx, t.url, event)
 				if err != nil {
 					announceDone <- trackerAnnounceResult{
 						Err:       err,

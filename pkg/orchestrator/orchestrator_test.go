@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
@@ -12,13 +13,32 @@ import (
 )
 
 //noinspection GoVarAndConstTypeMayBeOmitted
-var noOpAnnouncingFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
-	return tracker.AnnounceResponse{
-		Interval: 1800,
-		Leechers: 1,
-		Seeders:  1,
-		Peers:    []tracker.Peer{},
-	}, nil
+var ThirtyMinutesIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(30 * time.Minute)
+var OneMillisecondIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(1 * time.Millisecond)
+var ZeroIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(0 * time.Millisecond)
+var ErrorAnnouncingFunc AnnouncingFunction = buildErrAnnouncingFunc()
+
+func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) AnnouncingFunction {
+	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+		for _, c := range callbacks {
+			c(u)
+		}
+		return tracker.AnnounceResponse{
+			Interval: int32(interval.Seconds()),
+			Leechers: 0,
+			Seeders:  0,
+			Peers:    []tracker.Peer{},
+		}, nil
+	}
+}
+
+func buildErrAnnouncingFunc(callbacks ...func(u url.URL)) AnnouncingFunction {
+	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+		for _, c := range callbacks {
+			c(u)
+		}
+		return tracker.AnnounceResponse{}, errors.New("nop")
+	}
 }
 
 func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {
@@ -60,7 +80,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceOnlyOnFirstTierIfItSucceed(t *testi
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -117,7 +137,7 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceed(t *testing.
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -175,7 +195,7 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceedUpToLast(t *
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -234,7 +254,7 @@ func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *t
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	runtime.Gosched()
 	if shouldNotRelease.WaitTimeout(100 * time.Millisecond) {
@@ -282,7 +302,7 @@ func Test_FallbackOrchestrator_ShouldReAnnounceOnFirstTrackerAfterABackupTierHas
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -330,7 +350,7 @@ func Test_FallbackOrchestrator_ShouldKeepAnnouncingToFirstTrackerIfItSucceed(t *
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	runtime.Gosched()
 	if shouldNotRelease.WaitTimeout(100 * time.Millisecond) {
@@ -380,7 +400,7 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingToNext(t *testing
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -427,7 +447,7 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingBackToPrimaryAfte
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -468,7 +488,7 @@ func Test_FallbackOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	t1.EXPECT().stopAnnounceLoop().Times(1)
 
@@ -485,12 +505,12 @@ func Test_FallbackOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *tes
 
 	latch := congo.NewCountDownLatch(1)
 	go func() {
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 		latch.CountDown()
 	}()
 
@@ -524,7 +544,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 
 	o, _ := NewFallBackOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -556,7 +576,7 @@ func Test_FallbackOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
 	}
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	latch = congo.NewCountDownLatch(1)
 	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
@@ -568,7 +588,7 @@ func Test_FallbackOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
 	}
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
@@ -606,7 +626,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 		t.Fatal("latch has not been released")
 	}
 
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *testing.T) {
@@ -644,7 +664,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *te
 		t.Fatal("latch has not been released")
 	}
 
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testing.T) {
@@ -687,7 +707,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *t
 
 	doneChan := make(chan struct{})
 	go func() {
-		o.Stop(noOpAnnouncingFunc, ctx)
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, ctx)
 		doneChan <- struct{}{}
 	}()
 	select {
@@ -733,7 +753,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t
 
 	doneChan := make(chan struct{})
 	go func() {
-		o.Stop(noOpAnnouncingFunc, ctx)
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, ctx)
 		doneChan <- struct{}{}
 	}()
 	select {
@@ -776,7 +796,7 @@ func Test_AllOrchestrator_ShouldAnnounceOnAllTiers(t *testing.T) {
 
 	o, _ := NewAllOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	for i, latch := range latchs {
 		if !latch.WaitTimeout(500 * time.Millisecond) {
@@ -923,7 +943,7 @@ func Test_AllOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
 
 	o, _ := NewAllOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -938,12 +958,12 @@ func Test_AllOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.
 
 	latch := congo.NewCountDownLatch(1)
 	go func() {
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
-		o.Stop(noOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 		latch.CountDown()
 	}()
 
@@ -977,7 +997,7 @@ func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testin
 
 	o, _ := NewAllOrchestrator(tiers...)
 	go o.Start(nil)
-	defer o.Stop(noOpAnnouncingFunc, context.Background())
+	defer o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
@@ -1010,7 +1030,7 @@ func Test_AllOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 		t.Fatal("latch has not been released")
 	}
 
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 
 	latch = congo.NewCountDownLatch(1)
 	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
@@ -1023,7 +1043,7 @@ func Test_AllOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
 	if !latch.WaitTimeout(500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
 	}
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
@@ -1071,7 +1091,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 		t.Fatal("latch has not been released")
 	}
 
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testing.T) {
@@ -1120,7 +1140,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testin
 		t.Fatal("latch has not been released")
 	}
 
-	o.Stop(noOpAnnouncingFunc, context.Background())
+	o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, context.Background())
 }
 
 func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *testing.T) {
@@ -1158,7 +1178,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *tes
 
 	doneChan := make(chan struct{})
 	go func() {
-		o.Stop(noOpAnnouncingFunc, ctx)
+		o.Stop(ThirtyMinutesIntervalNoOpAnnouncingFunc, ctx)
 		doneChan <- struct{}{}
 	}()
 	select {

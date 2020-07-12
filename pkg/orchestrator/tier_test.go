@@ -15,22 +15,6 @@ import (
 	"time"
 )
 
-func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) AnnouncingFunction {
-	return func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
-		for _, c := range callbacks {
-			c(u)
-		}
-		return tracker.AnnounceResponse{
-			Interval: int32(interval.Seconds()),
-			Leechers: 0,
-			Seeders:  0,
-			Peers:    []tracker.Peer{},
-		}, nil
-	}
-}
-
-var OneMinuteIntervalAnnouncingFUnc = buildAnnouncingFunc(1 * time.Minute)
-
 func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -54,7 +38,7 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(OneMinuteIntervalAnnouncingFUnc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	if testutils.WaitOrFailAfterTimeout(&wg, 50*time.Millisecond) != nil {
@@ -72,7 +56,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc AnnouncingFunction = buildAnnouncingFunc(1*time.Minute, func(u url.URL) { wg.Done() })
+	var annFunc = buildAnnouncingFunc(1*time.Minute, func(u url.URL) { wg.Done() })
 
 	wg.Add(len(trackers))
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
@@ -98,11 +82,8 @@ func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *te
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var failAnnFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
-		return tracker.AnnounceResponse{}, errors.New("failed")
-	}
 
-	go tier.startAnnounceLoop(failAnnFunc, tracker.Started)
+	go tier.startAnnounceLoop(ErrorAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	timeout := time.Now().Add(1 * time.Second)
@@ -133,11 +114,10 @@ func Test_AllTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedB
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 	lock := &sync.Mutex{}
 	latch := congo.NewCountDownLatch(1)
-	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	var annFunc = buildErrAnnouncingFunc(func(u url.URL) {
 		lock.Lock() // first call lock the mutex to prevent any other announce to run
 		defer latch.CountDown()
-		return tracker.AnnounceResponse{}, errors.New("nop")
-	}
+	})
 
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
@@ -165,11 +145,10 @@ func Test_AllTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 	lock := &sync.Mutex{}
 	latch := congo.NewCountDownLatch(1)
-	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
 		lock.Lock() // first call lock the mutex to prevent any other announce to run
 		defer latch.CountDown()
-		return tracker.AnnounceResponse{Interval: 1800}, nil
-	}
+	})
 
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
@@ -197,11 +176,8 @@ func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSi
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var failAnnFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
-		return tracker.AnnounceResponse{}, errors.New("failed")
-	}
 
-	go tier.startAnnounceLoop(failAnnFunc, tracker.Started)
+	go tier.startAnnounceLoop(ErrorAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	timeout := time.Now().Add(1 * time.Second)
@@ -231,9 +207,10 @@ func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucc
 
 	DefaultDurationWaitOnError = 1 * time.Millisecond
 	announceResponse := &tracker.AnnounceResponse{}
-	var errResponse error = errors.New("nop")
+	var errResponse = errors.New("nop")
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var failAnnFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	//noinspection GoVarAndConstTypeMayBeOmitted
+	var failAnnFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
 		return *announceResponse, errResponse
 	}
 
@@ -286,7 +263,7 @@ func Test_AllTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForever
 	latch := congo.NewCountDownLatch(uint(len(trackers)))
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc AnnouncingFunction = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) {
+	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) {
 		latch.CountDown()
 		time.Sleep(500 * time.Minute)
 	})
@@ -321,7 +298,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTracke
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc AnnouncingFunction = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
+	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
 
 	latch = congo.NewCountDownLatch(uint(5 * len(trackers)))
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
@@ -539,7 +516,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldLoopTrackersAndStopLoop(t *testing
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -574,14 +551,14 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
 	}
 	tier.stopAnnounceLoop()
 
 	latch = congo.NewCountDownLatch(1)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
 	}
@@ -618,7 +595,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	select {
@@ -650,7 +627,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsW
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	select {
@@ -696,7 +673,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTracke
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
 	select {
@@ -739,7 +716,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingFo
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -770,7 +747,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 	}
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(5000 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -838,7 +815,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceed(
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -887,7 +864,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceedU
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -926,7 +903,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldStopTrackerBeforeMovingToNext(t *t
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -977,7 +954,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 	)
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(noOpAnnouncingFunc, tracker.Started)
+	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
 	if !latch.WaitTimeout(50 * time.Millisecond) {
 		t.Fatal("latch has not released")
@@ -996,11 +973,10 @@ func Test_FallbackTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFa
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 	lock := &sync.Mutex{}
 	latch := congo.NewCountDownLatch(1)
-	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	var annFunc = buildErrAnnouncingFunc(func(u url.URL) {
 		lock.Lock() // first call lock the mutex to prevent any other announce to run
 		defer latch.CountDown()
-		return tracker.AnnounceResponse{}, errors.New("nop")
-	}
+	})
 
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
@@ -1028,11 +1004,10 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSucce
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 	lock := &sync.Mutex{}
 	latch := congo.NewCountDownLatch(1)
-	var annFunc AnnouncingFunction = func(u url.URL, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
 		lock.Lock() // first call lock the mutex to prevent any other announce to run
 		defer latch.CountDown()
-		return tracker.AnnounceResponse{Interval: 1800}, nil
-	}
+	})
 
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
