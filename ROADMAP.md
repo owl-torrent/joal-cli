@@ -1,6 +1,6 @@
 # ROADMAP to v3.0
 - [ ] implement the new torrent struct
-- [ ] shuffle tier (or tracker i don't remember which) list when reading torrent file
+- [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
 - [ ] link torrent with orchestrator
 - [ ] link torrent with dispatcher
 - [ ] link torrent with emulatedClient
