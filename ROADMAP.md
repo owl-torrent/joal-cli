@@ -1,13 +1,14 @@
 # ROADMAP to v3.0
 - [ ] implement the new torrent struct
-- [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
 - [ ] link torrent with orchestrator
 - [ ] link torrent with dispatcher
 - [ ] link torrent with emulatedClient
+- [ ] change logging library from logrus to [uber-go/zap](https://github.com/uber-go/zap)
+- [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
 - [ ] implement a replacement for seedmanager.seed-manager
 - [ ] make listening port customizable
 - [ ] Udp support
-- [ ] allow for proxy integration (via http client)
+- [ ] allow proxy integration (via http client)
 - [ ] run some real life tests on public trackers
 - [ ] add a fake tracker for integration tests
 - [ ] write some integrations tests

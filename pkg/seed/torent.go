@@ -73,6 +73,7 @@ func FromReader(filePath string) (ITorrent, error) {
 		"infohash": infoHash,
 	}).Info("torrent parsed")
 
+	//TODO: move the tracker shuffling in orchestrator, it shouldn't be here
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
