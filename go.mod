@@ -1,22 +1,17 @@
 module github.com/anthonyraymond/joal-cli
 
-go 1.13
+go 1.15
 
 require (
-	github.com/anacrolix/dht/v2 v2.5.1 // indirect
-	github.com/anacrolix/missinggo/v2 v2.4.1-0.20200227072623-f02f6484f997
+	github.com/anacrolix/missinggo/v2 v2.4.1-0.20200227072623-f02f6484f997 // indirect
 	github.com/anacrolix/torrent v1.14.0
 	github.com/anthonyraymond/watcher v1.0.8-0.20200326230057-d944578ac457
-	github.com/go-playground/assert/v2 v2.0.1
 	github.com/go-playground/validator/v10 v10.0.1
 	github.com/golang/mock v1.4.3
-	github.com/google/uuid v1.1.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/lucasjones/reggen v0.0.0-20180717132126-cdb49ff09d77
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/nvn1729/congo v0.0.0-20180622025223-f8763bd071bc
-	github.com/onsi/ginkgo v1.7.0
-	github.com/petergtz/pegomock v2.7.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.5.0
 	github.com/stretchr/testify v1.5.1

@@ -21,7 +21,7 @@ func init() {
 
 func main() {
 
-	conf, err := config.ConfigManagerNew("C:/Users/raymo/Desktop/joal3/config.json")
+	conf, err := config.ConfigManagerNew("/home/yossefaz/Documents/joal/config2Go.json")
 	if err != nil {
 		panic(err)
 	}

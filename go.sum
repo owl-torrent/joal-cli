@@ -19,9 +19,8 @@ github.com/anacrolix/dht v0.0.0-20180412060941-24cbf25b72a4/go.mod h1:hQfX2BrtuQ
 github.com/anacrolix/dht/v2 v2.0.1/go.mod h1:GbTT8BaEtfqab/LPd5tY41f3GvYeii3mmDUK300Ycyo=
 github.com/anacrolix/dht/v2 v2.2.1-0.20191103020011-1dba080fb358/go.mod h1:d7ARx3WpELh9uOEEr0+8wvQeVTOkPse4UU6dKpv4q0E=
 github.com/anacrolix/dht/v2 v2.3.2-0.20200103043204-8dce00767ebd/go.mod h1:cgjKyErDnKS6Mej5D1fEqBKg3KwFF2kpFZJp3L6/fGI=
+github.com/anacrolix/dht/v2 v2.5.0 h1:AYoGu41z2fellHU9zdFZOQFr8E3epyAGWk6RfOz5UVE=
 github.com/anacrolix/dht/v2 v2.5.0/go.mod h1:7RLvyOjm+ZPA7vgFRP+1eRjFzrh27p/nF0VCk5LcjoU=
-github.com/anacrolix/dht/v2 v2.5.1 h1:e2CLLVsmD57I27sZgBjOMcYgufeVi/Ff9+JfWKGrjGg=
-github.com/anacrolix/dht/v2 v2.5.1/go.mod h1:7RLvyOjm+ZPA7vgFRP+1eRjFzrh27p/nF0VCk5LcjoU=
 github.com/anacrolix/envpprof v0.0.0-20180404065416-323002cec2fa/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.0/go.mod h1:KgHhUaQMc8cC0+cEflSgCFNFbKwi5h54gqtVn8yhP7c=
 github.com/anacrolix/envpprof v1.0.1/go.mod h1:My7T5oSqVfEn4MD4Meczkw/f5lSIndGAKu/0SM/rkf4=
@@ -147,8 +146,6 @@ github.com/google/btree v0.0.0-20180124185431-e89373fe6b4a/go.mod h1:lNA+9X1NB3Z
 github.com/google/btree v1.0.0 h1:0udJVsspx3VBr5FwtLhQQtuAsVc79tTq0ocGIPAU6qo=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
-github.com/google/uuid v1.1.1 h1:Gkbcsh/GbpXz7lPftLA3P6TYMwjCLYm83jiFQZF/3gY=
-github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gopherjs/gopherjs v0.0.0-20190309154008-847fc94819f9/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
@@ -209,8 +206,6 @@ github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+W
 github.com/onsi/gomega v1.4.3 h1:RE1xgDvH7imwFD45h+u2SgIfERHlS2yNG4DObb5BSKU=
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/openzipkin/zipkin-go v0.1.6/go.mod h1:QgAqvLzwWbR/WpD4A3cGpPtJrZXNIiJc5AZX7/PBEpw=
-github.com/petergtz/pegomock v2.7.0+incompatible h1:42rJ5wIOBAg9OGdkLaPW9PlF/RtqDc5aGl6PcTCXl3o=
-github.com/petergtz/pegomock v2.7.0+incompatible/go.mod h1:nuBLWZpVyv/fLo56qTwt/AUau7jgouO1h7bEvZCq82o=
 github.com/philhofer/fwd v1.0.0 h1:UbZqGr5Y38ApvM/V/jEljVxwocdweyH+vmYvRPBnbqQ=
 github.com/philhofer/fwd v1.0.0/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/pierrec/lz4 v2.0.5+incompatible/go.mod h1:pdkljMzZIN41W+lC3N2tnIh5sFi+IEE17M5jbnwPHcY=
