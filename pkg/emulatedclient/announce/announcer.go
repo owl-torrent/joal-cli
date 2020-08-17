@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// tracker.AnnounceRequest uses a uint32 for the IPAddress, create our own struct that use proper net.IP type. UDP will net to convert this one to a tracker.AnnounceRequest
+// tracker.AnnounceRequest uses a uint32 for the IPAddress, create our own struct that use proper net.IP type. UDP will need to convert this one to a tracker.AnnounceRequest
 type AnnounceRequest struct {
 	InfoHash   [20]byte
 	PeerId     [20]byte
@@ -64,9 +64,6 @@ func (a *Announcer) AfterPropertiesSet() error {
 	return nil
 }
 
-// Announce to the announceURLs in order until one answer properly.
-// The announceURLs array is modified in this method, a non answering tracker will be demoted to last position in the list.
-// If none of the trackers respond the methods returns an error.
 func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
 	var currentAnnouncer interface {
 		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)

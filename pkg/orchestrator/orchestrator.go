@@ -1,6 +1,6 @@
 package orchestrator
 
-//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator Orchestrator,ITrackerAnnouncer,ITierAnnouncer
+//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator IOrchestrator,ITrackerAnnouncer,ITierAnnouncer
 
 import (
 	"context"
@@ -45,7 +45,7 @@ type ITierAnnouncer interface {
 	stopAnnounceLoop()
 }
 
-type Orchestrator interface {
+type IOrchestrator interface {
 	Start(announce AnnouncingFunction)
 	Stop(context context.Context, announce AnnouncingFunction)
 }
@@ -58,10 +58,11 @@ type FallbackOrchestrator struct {
 }
 
 type IConfig interface {
-	SupportAnnounceList() bool
-	AnnounceToAllTiers() bool
-	AnnounceToAllTrackersInTier() bool
+	DoesSupportAnnounceList() bool
+	ShouldAnnounceToAllTiers() bool
+	ShouldAnnounceToAllTrackersInTier() bool
 }
+
 
 func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error) {
 	log := logs.GetLogger()
@@ -69,9 +70,12 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error)
 	if conf == nil {
 		return nil, errors.New("nil orchestrator config")
 	}
-
+  
 	if !conf.SupportAnnounceList() {
 		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
+
+	if !conf.DoesSupportAnnounceList() {
+		logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}
@@ -100,6 +104,7 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error)
 		return nil, errors.New("announce-list is empty")
 	}
 
+
 	if !conf.SupportAnnounceList() {
 		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
@@ -109,7 +114,7 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error)
 	return createOrchestratorForAnnounceList(announceList, conf.AnnounceToAllTiers(), conf.AnnounceToAllTrackersInTier())
 }
 
-func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (Orchestrator, error) {
+func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (IOrchestrator, error) {
 	var tiers []ITierAnnouncer
 
 	for _, tier := range announceList {
@@ -136,7 +141,7 @@ func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTie
 		tiers = append(tiers, tier)
 	}
 
-	var o Orchestrator
+	var o IOrchestrator
 	var err error
 	if announceToAllTiers {
 		o, err = newAllOrchestrator(tiers...)
@@ -150,7 +155,7 @@ func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTie
 	return o, nil
 }
 
-func newFallBackOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
+func newFallBackOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, errors.New("tiers list can not be empty")
 	}
@@ -275,7 +280,7 @@ type AllOrchestrator struct {
 	lock           *sync.RWMutex
 }
 
-func newAllOrchestrator(tiers ...ITierAnnouncer) (Orchestrator, error) {
+func newAllOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, errors.New("tiers list can not be empty")
 	}

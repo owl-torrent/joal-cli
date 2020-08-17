@@ -14,6 +14,10 @@ peerIdGenerator:
   type: NEVER_REFRESH
 numwant: 200
 numwantOnStop: 0
+announceOrchestrator:
+  supportAnnounceList: true
+  announceToAllTiers: true
+  announceToAllTrackersInTier: true
 announcer:
   http:
     urlEncoder:
