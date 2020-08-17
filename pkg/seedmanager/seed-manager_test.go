@@ -2,20 +2,13 @@ package seedmanager
 
 import (
 	"bytes"
-	"context"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
-	"github.com/golang/mock/gomock"
-	"github.com/nvn1729/congo"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 )
@@ -338,7 +331,7 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 		t.Fatal("latch timed out")
 	}
 }*/
-
+/*
 func TestSeedManager_StartAndStop(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -418,4 +411,4 @@ func TestSeedManager_StartAndStop(t *testing.T) {
 	if !dispatcherLatch.WaitTimeout(5 * time.Second) {
 		t.Fatal("latch timed out")
 	}
-}
+}*/
