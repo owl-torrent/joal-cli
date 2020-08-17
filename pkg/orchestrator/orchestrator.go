@@ -64,18 +64,20 @@ type IConfig interface {
 }
 
 func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error) {
+	log := logs.GetLogger()
+	defer log.Sync()
 	if conf == nil {
 		return nil, errors.New("nil orchestrator config")
 	}
 
 	if !conf.SupportAnnounceList() {
-		logs.Log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
+		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}
 
 	if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
-		logs.Log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
+		log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}
@@ -99,11 +101,11 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error)
 	}
 
 	if !conf.SupportAnnounceList() {
-		logs.Log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
+		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}
-	logs.Log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
+	log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
 	return createOrchestratorForAnnounceList(announceList, conf.AnnounceToAllTiers(), conf.AnnounceToAllTrackersInTier())
 }
 

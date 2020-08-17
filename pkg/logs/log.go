@@ -4,18 +4,19 @@ import (
 	"encoding/json"
 	"go.uber.org/zap"
 	"io/ioutil"
+	"os"
 )
-var Log *zap.Logger
 
-func init() {
-	rawJSON, _ := ioutil.ReadFile("./config.json")
+func GetLogger() *zap.Logger {
+	pwd, _ := os.Getwd()
+	rawJSON, _ := ioutil.ReadFile(pwd + "/pkg/logs/config.json")
 	var cfg zap.Config
 	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
 		panic(err)
 	}
-	Log, err := cfg.Build()
+	log, err := cfg.Build()
 	if err != nil {
 		panic(err)
 	}
-	defer Log.Sync()
+	return log
 }
