@@ -15,7 +15,7 @@ require (
 	github.com/nvn1729/congo v0.0.0-20180622025223-f8763bd071bc
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.5.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	github.com/tinylib/msgp v1.1.2 // indirect
 	go.etcd.io/bbolt v1.3.4 // indirect
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b // indirect
