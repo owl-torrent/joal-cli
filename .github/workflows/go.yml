@@ -29,6 +29,7 @@ jobs:
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep ensure
         fi
+        GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
 
     - name: Build
       run: go generate ./... && go build -v .
