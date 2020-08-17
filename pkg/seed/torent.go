@@ -53,11 +53,11 @@ type joalTorrent struct {
 	isRunning    bool
 	stopping     chan chan struct{}
 	lock         *sync.Mutex
-	orchestrator orchestrator.Orchestrator
+	orchestrator orchestrator.IOrchestrator
 	swarm        *swarmElector
 }
 
-func FromReader(filePath string) (ITorrent, error) {
+func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorrent, error) {
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
@@ -80,11 +80,16 @@ func FromReader(filePath string) (ITorrent, error) {
 		})
 	}
 
+	o, err := client.CreateOrchestratorForTorrent(*meta)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create orchestrator for torrent '%s'", filePath)
+	}
+
 	return &joalTorrent{
 		//TODO: init IseedSession
 		//  swarm
-		//  orchestrator
-		path: filePath,
+		orchestrator: o,
+		path:         filePath,
 		metaInfo: &slimMetaInfo{
 			Announce:     meta.Announce,
 			AnnounceList: meta.AnnounceList,
