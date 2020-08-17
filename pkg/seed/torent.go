@@ -124,11 +124,22 @@ func (t joalTorrent) GetSwarm() bandwidth.ISwarm {
 }
 
 func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-	// TODO: check not already started
+	t.lock.Lock()
+	if t.isRunning {
+		t.lock.Unlock()
+		return
+	}
+	t.isRunning = true
+	t.lock.Unlock()
 
 	t.swarm = newSwarmElector()
+	t.ISeedSession = newSeedSession()
 
-	// TODO: start orchestrator, swarm & everything needed here
+	//announceClosure := createAnnounceClosure(t, client, dispatcher)
+
+	// TODO: start orchestrator, swarm & everything needed here and create a goroutine
+
+	// TODO: on stop, nil t.swarm & t.ISeedSession
 
 	panic("not implemented")
 }
@@ -179,6 +190,14 @@ type mutableSeedSession struct {
 	uploaded   int64
 	downloaded int64
 	left       int64
+}
+
+func newSeedSession() *mutableSeedSession {
+	return &mutableSeedSession{
+		uploaded:   0,
+		downloaded: 0,
+		left:       0,
+	}
 }
 
 func (m mutableSeedSession) Uploaded() int64 {
