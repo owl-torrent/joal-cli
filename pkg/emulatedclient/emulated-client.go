@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/generator"
 	peeridgenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/generator"
+	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v2"
 	"io"
@@ -21,17 +23,19 @@ type IEmulatedClient interface {
 	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
+	CreateOrchestratorForTorrent(info metainfo.MetaInfo) (orchestrator.IOrchestrator, error)
 }
 
 type EmulatedClient struct {
-	Name            string                           `yaml:"name" validate:"required"`
-	Version         string                           `yaml:"version" validate:"required"`
-	KeyGenerator    *keygenerator.KeyGenerator       `yaml:"keyGenerator" validate:"required"`
-	PeerIdGenerator *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
-	NumWant         int32                            `yaml:"numwant" validate:"min=1"`
-	NumWantOnStop   int32                            `yaml:"numwantOnStop"`
-	Announcer       *announce.Announcer              `yaml:"announcer" validate:"required"`
-	Listener        *Listener                        `yaml:"listener" validate:"required"`
+	Name                string                           `yaml:"name" validate:"required"`
+	Version             string                           `yaml:"version" validate:"required"`
+	KeyGenerator        *keygenerator.KeyGenerator       `yaml:"keyGenerator" validate:"required"`
+	PeerIdGenerator     *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
+	NumWant             int32                            `yaml:"numwant" validate:"min=1"`
+	NumWantOnStop       int32                            `yaml:"numwantOnStop"`
+	OrchestratorFactory *orchestratorFactory             `yaml:"announceOrchestrator" validate:"required"`
+	Announcer           *announce.Announcer              `yaml:"announcer" validate:"required"`
+	Listener            *Listener                        `yaml:"listener" validate:"required"`
 }
 
 func FromClientFile(path string) (IEmulatedClient, error) {
@@ -116,4 +120,8 @@ func (c *EmulatedClient) StartListener() error {
 
 func (c *EmulatedClient) StopListener(ctx context.Context) {
 	c.Listener.Stop(ctx)
+}
+
+func (c *EmulatedClient) CreateOrchestratorForTorrent(info metainfo.MetaInfo) (orchestrator.IOrchestrator, error) {
+	return c.OrchestratorFactory.createOrchestrator(info)
 }
