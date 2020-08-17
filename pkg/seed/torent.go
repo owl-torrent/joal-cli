@@ -87,7 +87,7 @@ func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorren
 
 	return &joalTorrent{
 		//TODO: init IseedSession
-		//  swarm
+		swarm:        nil,
 		orchestrator: o,
 		path:         filePath,
 		metaInfo: &slimMetaInfo{
@@ -124,6 +124,10 @@ func (t joalTorrent) GetSwarm() bandwidth.ISwarm {
 }
 
 func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
+	// TODO: check not already started
+
+	t.swarm = newSwarmElector()
+
 	// TODO: start orchestrator, swarm & everything needed here
 
 	panic("not implemented")
@@ -131,6 +135,7 @@ func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispat
 
 func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	panic("not implemented")
+
 	// TODO: send stop signal to main loop
 }
 
