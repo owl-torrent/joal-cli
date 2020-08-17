@@ -545,7 +545,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
+	if !latch.WaitTimeout(1500 * time.Millisecond) {
 		t.Fatal("latch has not been released")
 	}
 }
