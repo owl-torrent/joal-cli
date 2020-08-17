@@ -613,7 +613,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -651,7 +651,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *te
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return tierState(DEAD)
 		}),
 	)
@@ -689,7 +689,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *t
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
 			return ALIVE
 		}),
@@ -735,7 +735,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
 			return ALIVE
 		}),
@@ -1068,7 +1068,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -1078,7 +1078,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 			c2 <- ALIVE
 		}).Times(1),
 		t2.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			return ALIVE
 		}),
 	)
@@ -1125,10 +1125,10 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testin
 		t2.EXPECT().stopAnnounceLoop().Times(1),
 	)
 
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 		return tierState(DEAD)
 	})
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 		return tierState(DEAD)
 	})
 
@@ -1160,7 +1160,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *tes
 			c1 <- ALIVE
 		}).Times(1),
 		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
 			time.Sleep(5 * time.Hour)
 			return ALIVE
 		}),

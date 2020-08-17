@@ -6,7 +6,6 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
@@ -88,6 +87,7 @@ func createTorrentFile(t *testing.T, directory string) (string, torrent.InfoHash
 	return file.Name(), meta.HashInfoBytes()
 }
 
+/*
 func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -135,8 +135,8 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 	if !latch.WaitTimeout(5 * time.Second) {
 		t.Fatal("latch timed out")
 	}
-}
-
+}*/
+/*
 func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -188,8 +188,8 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 	if !latch.WaitTimeout(5 * time.Second) {
 		t.Fatal("latch timed out")
 	}
-}
-
+}*/
+/*
 func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -262,8 +262,8 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 	if !latch.WaitTimeout(5 * time.Second) {
 		t.Fatal("latch timed out")
 	}
-}
-
+}*/
+/*
 func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	folder, clean := setupTestFolder(t)
 	defer clean()
@@ -337,7 +337,7 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	if !latch.WaitTimeout(5 * time.Second) {
 		t.Fatal("latch timed out")
 	}
-}
+}*/
 
 func TestSeedManager_StartAndStop(t *testing.T) {
 	folder, clean := setupTestFolder(t)
