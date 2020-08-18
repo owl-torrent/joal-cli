@@ -21,11 +21,11 @@ func init() {
 }
 
 func main() {
-	conf, err := config.ConfigManagerNew("/home/yossefaz/Documents/joal/3.0/config.json")
+	conf, err := config.ConfigManagerNew(os.Args[1])
 	if err != nil {
 		panic(err)
 	}
-	joal, err := seedmanager.JoalNew("/home/yossefaz/Documents/joal/3.0/", conf)
+	joal, err := seedmanager.JoalNew(os.Args[2], conf)
 	if err != nil {
 		panic(err)
 	}
