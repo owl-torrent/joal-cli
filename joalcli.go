@@ -18,11 +18,12 @@ func init() {
 	logrus.SetOutput(os.Stdout)
 	logrus.Info("init log to prevent race exception in logrus")
 	logrus.Info("")
-	defer logs.GetLogger().Sync()
+
 
 }
 
 func main() {
+	defer logs.GetLogger().Sync()
 	conf, err := config.ConfigManagerNew(os.Args[1])
 	if err != nil {
 		panic(err)
