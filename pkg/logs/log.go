@@ -7,16 +7,21 @@ import (
 	"os"
 )
 
-func GetLogger() *zap.Logger {
+var (
+	Log *zap.Logger
+	logerr error
+)
+
+func init(){
 	pwd, _ := os.Getwd()
 	rawJSON, _ := ioutil.ReadFile(pwd + "/pkg/logs/config.json")
 	var cfg zap.Config
 	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
 		panic(err)
 	}
-	log, err := cfg.Build()
-	if err != nil {
-		panic(err)
+	Log, logerr = cfg.Build()
+	if logerr != nil {
+		panic(logerr)
 	}
-	return log
+
 }

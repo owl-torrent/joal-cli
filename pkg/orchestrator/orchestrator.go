@@ -66,7 +66,7 @@ type IConfig interface {
 
 
 func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error) {
-	log := logs.GetLogger()
+	log := logs.Log
 	defer log.Sync()
 	if conf == nil {
 		return nil, errors.New("nil orchestrator config")

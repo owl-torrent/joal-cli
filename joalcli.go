@@ -5,6 +5,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/sirupsen/logrus"
+
 	"os"
 	"time"
 )
@@ -20,7 +21,6 @@ func init() {
 }
 
 func main() {
-
 	conf, err := config.ConfigManagerNew("/home/yossefaz/Documents/joal/3.0/config.json")
 	if err != nil {
 		panic(err)
