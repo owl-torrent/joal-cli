@@ -53,11 +53,11 @@ type joalTorrent struct {
 	isRunning    bool
 	stopping     chan chan struct{}
 	lock         *sync.Mutex
-	orchestrator orchestrator.Orchestrator
+	orchestrator orchestrator.IOrchestrator
 	swarm        *swarmElector
 }
 
-func FromReader(filePath string) (ITorrent, error) {
+func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorrent, error) {
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
@@ -73,17 +73,23 @@ func FromReader(filePath string) (ITorrent, error) {
 		"infohash": infoHash,
 	}).Info("torrent parsed")
 
+	//TODO: move the tracker shuffling in orchestrator, it shouldn't be here
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
 		})
 	}
 
+	o, err := client.CreateOrchestratorForTorrent(*meta)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create orchestrator for torrent '%s'", filePath)
+	}
+
 	return &joalTorrent{
 		//TODO: init IseedSession
-		//  swarm
-		//  orchestrator
-		path: filePath,
+		swarm:        nil,
+		orchestrator: o,
+		path:         filePath,
 		metaInfo: &slimMetaInfo{
 			Announce:     meta.Announce,
 			AnnounceList: meta.AnnounceList,
@@ -118,13 +124,29 @@ func (t joalTorrent) GetSwarm() bandwidth.ISwarm {
 }
 
 func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
-	// TODO: start orchestrator, swarm & everything needed here
+	t.lock.Lock()
+	if t.isRunning {
+		t.lock.Unlock()
+		return
+	}
+	t.isRunning = true
+	t.lock.Unlock()
+
+	t.swarm = newSwarmElector()
+	t.ISeedSession = newSeedSession()
+
+	//announceClosure := createAnnounceClosure(t, client, dispatcher)
+
+	// TODO: start orchestrator, swarm & everything needed here and create a goroutine
+
+	// TODO: on stop, nil t.swarm & t.ISeedSession
 
 	panic("not implemented")
 }
 
 func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	panic("not implemented")
+
 	// TODO: send stop signal to main loop
 }
 
@@ -168,6 +190,14 @@ type mutableSeedSession struct {
 	uploaded   int64
 	downloaded int64
 	left       int64
+}
+
+func newSeedSession() *mutableSeedSession {
+	return &mutableSeedSession{
+		uploaded:   0,
+		downloaded: 0,
+		left:       0,
+	}
 }
 
 func (m mutableSeedSession) Uploaded() int64 {

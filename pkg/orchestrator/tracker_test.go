@@ -113,8 +113,8 @@ func Test_TrackerAnnouncer_ShouldFeedChannelWithResponse(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("timedout")
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
 	}
 }
 
