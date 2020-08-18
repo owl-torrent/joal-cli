@@ -8,6 +8,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"net/url"
 	"strings"
@@ -64,55 +65,55 @@ type IConfig interface {
 }
 
 
-func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (Orchestrator, error) {
+func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error) {
 	log := logs.GetLogger()
 	defer log.Sync()
 	if conf == nil {
 		return nil, errors.New("nil orchestrator config")
 	}
-  
-	if !conf.SupportAnnounceList() {
-		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
 
-	if !conf.DoesSupportAnnounceList() {
-		logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
-	}
 
-	if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
-		log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
-	}
 
-	// dont trust your inputs: some url (or even tiers) may be empty, filter them
-	var announceList [][]string
-	for _, tier := range meta.AnnounceList {
-		tiers := make([]string, 0)
-		for _, u := range tier {
-			if strings.TrimSpace(u) != "" {
-				tier = append(tier, u)
+		if !conf.DoesSupportAnnounceList() {
+			logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
+			var announceList = [][]string{{meta.Announce}}
+			return createOrchestratorForAnnounceList(announceList, true, true)
+		}
+
+		if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
+			log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
+			var announceList = [][]string{{meta.Announce}}
+			return createOrchestratorForAnnounceList(announceList, true, true)
+		}
+
+		// dont trust your inputs: some url (or even tiers) may be empty, filter them
+		var announceList [][]string
+		for _, tier := range meta.AnnounceList {
+			tiers := make([]string, 0)
+			for _, u := range tier {
+				if strings.TrimSpace(u) != "" {
+					tier = append(tier, u)
+				}
+			}
+			if len(tiers) > 0 {
+				announceList = append(announceList, tiers)
 			}
 		}
-		if len(tiers) > 0 {
-			announceList = append(announceList, tiers)
+
+		if len(announceList) == 0 {
+			return nil, errors.New("announce-list is empty")
 		}
+
+		if !conf.DoesSupportAnnounceList() {
+			log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
+			var announceList = [][]string{{meta.Announce}}
+			return createOrchestratorForAnnounceList(announceList, true, true)
+		}
+		log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
+		return createOrchestratorForAnnounceList(announceList, conf.ShouldAnnounceToAllTiers(), conf.ShouldAnnounceToAllTrackersInTier())
 	}
 
-	if len(announceList) == 0 {
-		return nil, errors.New("announce-list is empty")
-	}
 
-
-	if !conf.SupportAnnounceList() {
-		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
-	}
-	log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
-	return createOrchestratorForAnnounceList(announceList, conf.AnnounceToAllTiers(), conf.AnnounceToAllTrackersInTier())
-}
 
 func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (IOrchestrator, error) {
 	var tiers []ITierAnnouncer
