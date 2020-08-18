@@ -64,7 +64,6 @@ type IConfig interface {
 	ShouldAnnounceToAllTrackersInTier() bool
 }
 
-
 func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error) {
 	log := logs.GetLogger()
 	if conf == nil {
@@ -86,31 +85,29 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 	// dont trust your inputs: some url (or even tiers) may be empty, filter them
 	var announceList [][]string
 	for _, tier := range meta.AnnounceList {
-			tiers := make([]string, 0)
-			for _, u := range tier {
-				if strings.TrimSpace(u) != "" {
-					tier = append(tier, u)
-				}
-			}
-			if len(tiers) > 0 {
-				announceList = append(announceList, tiers)
+		tiers := make([]string, 0)
+		for _, u := range tier {
+			if strings.TrimSpace(u) != "" {
+				tier = append(tier, u)
 			}
 		}
-
-		if len(announceList) == 0 {
-			return nil, errors.New("announce-list is empty")
+		if len(tiers) > 0 {
+			announceList = append(announceList, tiers)
 		}
+	}
 
-		if !conf.DoesSupportAnnounceList() {
-			log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
-			var announceList = [][]string{{meta.Announce}}
-			return createOrchestratorForAnnounceList(announceList, true, true)
-		}
-		log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
-		return createOrchestratorForAnnounceList(announceList, conf.ShouldAnnounceToAllTiers(), conf.ShouldAnnounceToAllTrackersInTier())
+	if len(announceList) == 0 {
+		return nil, errors.New("announce-list is empty")
+	}
+
+	if !conf.DoesSupportAnnounceList() {
+		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
+		var announceList = [][]string{{meta.Announce}}
+		return createOrchestratorForAnnounceList(announceList, true, true)
+	}
+	log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
+	return createOrchestratorForAnnounceList(announceList, conf.ShouldAnnounceToAllTiers(), conf.ShouldAnnounceToAllTrackersInTier())
 }
-
-
 
 func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTiers bool, announceToAllTrackersInTier bool) (IOrchestrator, error) {
 	var tiers []ITierAnnouncer
