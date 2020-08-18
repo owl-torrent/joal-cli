@@ -7,13 +7,13 @@ import (
 
 var log *zap.Logger
 
-func init(){
+func init() {
 	var cfg zap.Config
 	rawJSON := []byte(`{
 		"level": "info",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stderr"],
-		"encoding": "json",
+		"encoding": "console",
 		"encoderConfig": {
 			"messageKey": "message",
 			"levelKey": "level",
@@ -27,6 +27,6 @@ func init(){
 	defer log.Sync()
 }
 
-func GetLogger() *zap.Logger{
+func GetLogger() *zap.Logger {
 	return log
 }
