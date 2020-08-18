@@ -55,7 +55,7 @@ func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager,
 }
 
 func (s *SeedManager) Start() error {
-	log := logs.Log
+	log := logs.GetLogger()
 	defer log.Sync()
 	s.lock.Lock()
 	defer s.lock.Unlock()
