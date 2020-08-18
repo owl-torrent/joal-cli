@@ -86,20 +86,20 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 	// dont trust your inputs: some url (or even tiers) may be empty, filter them
 	var announceList [][]string
 	for _, tier := range meta.AnnounceList {
-		tiers := make([]string, 0)
-		for _, u := range tier {
-			if strings.TrimSpace(u) != "" {
-				tier = append(tier, u)
+			tiers := make([]string, 0)
+			for _, u := range tier {
+				if strings.TrimSpace(u) != "" {
+					tier = append(tier, u)
+				}
+			}
+			if len(tiers) > 0 {
+				announceList = append(announceList, tiers)
 			}
 		}
-		if len(tiers) > 0 {
-			announceList = append(announceList, tiers)
-		}
-	}
 
-	if len(announceList) == 0 {
-		return nil, errors.New("announce-list is empty")
-	}
+		if len(announceList) == 0 {
+			return nil, errors.New("announce-list is empty")
+		}
 
 		if !conf.DoesSupportAnnounceList() {
 			log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
@@ -108,7 +108,7 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 		}
 		log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
 		return createOrchestratorForAnnounceList(announceList, conf.ShouldAnnounceToAllTiers(), conf.ShouldAnnounceToAllTrackersInTier())
-	}
+}
 
 
 
