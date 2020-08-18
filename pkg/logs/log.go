@@ -24,7 +24,6 @@ func init() {
 		panic(err)
 	}
 	log, _ = cfg.Build()
-	defer log.Sync()
 }
 
 func GetLogger() *zap.Logger {
