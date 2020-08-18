@@ -1,6 +1,6 @@
 # Created by https://www.gitignore.io/api/go,jetbrains
 # Edit at https://www.gitignore.io/?templates=go,jetbrains
-
+go_build_joal_cli_main_go
 ### Go ###
 # Binaries for programs and plugins
 *.exe
