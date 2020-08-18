@@ -1,22 +1,30 @@
 package logs
 
 import (
+	"encoding/json"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var log *zap.Logger
 
 func init(){
-	log, _ = zap.Config{
-		Encoding:    "json",
-		Level:       zap.NewAtomicLevelAt(zapcore.DebugLevel),
-		OutputPaths: []string{"stdout"},
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey: "message",
-			LevelKey: "Level",
-		},
-	}.Build()
+	var cfg zap.Config
+	rawJSON := []byte(`{
+		"level": "info",
+		"outputPaths": ["stdout"],
+		"errorOutputPaths": ["stderr"],
+		"encoding": "json",
+		"encoderConfig": {
+			"messageKey": "message",
+			"levelKey": "level",
+			"levelEncoder": "lowercase"
+		}
+	}`)
+	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+		panic(err)
+	}
+	log, _ = cfg.Build()
+	defer log.Sync()
 }
 
 func GetLogger() *zap.Logger{

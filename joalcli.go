@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"os"
 	"time"
@@ -18,9 +20,12 @@ func init() {
 	logrus.SetOutput(os.Stdout)
 	logrus.Info("init log to prevent race exception in logrus")
 	logrus.Info("")
+
 }
 
 func main() {
+	log := logs.GetLogger()
+	log.Info("TEST", zap.String("test", "test"))
 	conf, err := config.ConfigManagerNew(os.Args[1])
 	if err != nil {
 		panic(err)
