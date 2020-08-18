@@ -84,8 +84,6 @@ func (s *SeedManager) Start() error {
 	go func() {
 		log.Debug("Starting file watcher")
 		if err := s.torrentFileWatcher.Start(s.fileWatcherPoll); err != nil {
-			//TODO Check for Zap implementation
-			//logrus.WithError(err).Error("File watcher has stopped with an error")
 			log.Error("Starting file watcher", zap.Error(err))
 		}
 	}()
@@ -101,16 +99,11 @@ func (s *SeedManager) Start() error {
 					log.Info(event.String())
 					e := s.onTorrentFileCreate(event.Path)
 					if e != nil {
-						//TODO Check for zap implementation
 						log.Error("Error in file creation callback",
 							zap.String("file", filepath.Base(event.Path)),
 							zap.Any("event", event.Op),
 							zap.Error(err),
 						)
-						//logrus.WithFields(logrus.Fields{
-						//	"file":  filepath.Base(event.Path),
-						//	"event": event.Op,
-						//}).WithError(err).Error("Error in file creation callback")
 						continue
 					}
 				case watcher.Rename:
