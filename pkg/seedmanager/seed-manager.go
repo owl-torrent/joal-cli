@@ -5,10 +5,12 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"os"
 	"path"
 	"path/filepath"
@@ -53,9 +55,9 @@ func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager,
 }
 
 func (s *SeedManager) Start() error {
+	log := logs.GetLogger()
 	s.lock.Lock()
 	defer s.lock.Unlock()
-
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter())
 	err := torrentFileWatcher.Add(s.joalPaths.torrentFolder)
@@ -73,72 +75,63 @@ func (s *SeedManager) Start() error {
 	// Trigger create events after watcher started
 	go func() {
 		s.torrentFileWatcher.Wait()
-		logrus.Debug("File watcher started, dispatching event for already present torrent files")
+		log.Debug("File watcher started, dispatching event for already present torrent files")
 		for fullPath, info := range s.torrentFileWatcher.WatchedFiles() {
 			s.torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
 	}()
 
 	go func() {
-		logrus.Debug("Starting file watcher")
+		log.Debug("Starting file watcher")
 		if err := s.torrentFileWatcher.Start(s.fileWatcherPoll); err != nil {
-			logrus.WithError(err).Error("File watcher has stopped with an error")
+			log.Error("Starting file watcher", zap.Error(err))
 		}
 	}()
 	go func() {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			defer logrus.Debug("Exiting file watcher loop")
+		if log.Core().Enabled(zap.DebugLevel) {
+			defer log.Debug("Exiting file watcher loop")
 		}
 		for {
 			select {
 			case event := <-s.torrentFileWatcher.Event:
 				switch event.Op {
 				case watcher.Create:
-					logrus.Info(event)
+					log.Info(event.String())
 					e := s.onTorrentFileCreate(event.Path)
 					if e != nil {
-						logrus.WithFields(logrus.Fields{
-							"file":  filepath.Base(event.Path),
-							"event": event.Op,
-						}).WithError(err).Error("Error in file creation callback")
+						log.Error("Error in file creation callback",
+							zap.String("file", filepath.Base(event.Path)),
+							zap.Any("event", event.Op),
+							zap.Error(err),
+						)
 						continue
 					}
 				case watcher.Rename:
-					logrus.Info(event)
+					log.Info(event.String())
 					e := s.onTorrentFileRenamed(event.OldPath, event.Path)
 					if e != nil {
-						logrus.WithFields(logrus.Fields{
-							"file":  filepath.Base(event.Path),
-							"event": event.Op,
-						}).WithError(err).Error("Error in file rename callback")
+						log.Error("Error in file rename callback", zap.String("file", filepath.Base(event.Path)), zap.String("event", event.Op.String()))
 						continue
 					}
 				case watcher.Remove:
-					logrus.Info(event)
+					log.Info(event.String())
 					e := s.onTorrentFileRemoved(event.Path)
 					if e != nil {
-						logrus.WithFields(logrus.Fields{
-							"file":  filepath.Base(event.Path),
-							"event": event.Op,
-						}).WithError(err).Error("Error in file remove callback")
+						log.Error("Error in file remove callback", zap.String("file", filepath.Base(event.Path)), zap.String("event", event.Op.String()))
 						continue
 					}
 				default:
 					// does not handle WRITE since the write may occur while the file is being written before CREATE
-					logrus.WithFields(logrus.Fields{
-						"file":  filepath.Base(event.Path),
-						"event": event.Op,
-					}).Info("Event is ignored")
+					log.Info("Event is ignored", zap.String("file", filepath.Base(event.Path)), zap.String("event", event.Op.String()))
 				}
 			case err := <-s.torrentFileWatcher.Error:
-				logrus.WithError(err).Error("File watcher has reported an error")
+				log.Error("File watcher has reported an error", zap.Error(err))
 			case <-s.torrentFileWatcher.Closed:
-				logrus.Info("File watcher stopped")
+				log.Info("File watcher stopped")
 				return
 			}
 		}
 	}()
-
 	return nil
 }
 
