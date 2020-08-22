@@ -6,8 +6,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"net"
 	"net/url"
 	"strings"
@@ -65,6 +66,7 @@ func (a *Announcer) AfterPropertiesSet() error {
 }
 
 func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
+	log := logs.GetLogger()
 	var currentAnnouncer interface {
 		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
 	}
@@ -77,13 +79,12 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 	if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
 		return tracker.AnnounceResponse{}, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme))
 	}
-
-	logrus.
-		WithField("event", announceRequest.Event).
-		WithField("infohash", announceRequest.InfoHash).
-		WithField("uploaded", announceRequest.Uploaded).
-		WithField("tracker", u.Host).
-		Info("announcing to tracker")
+	log.Info("announcing to tracker",
+		zap.String("event", announceRequest.Event.String()),
+		zap.ByteString("infohash", []byte(string(announceRequest.InfoHash[:]))),
+		zap.Int64("uploaded", announceRequest.Uploaded),
+		zap.String("tracker", u.Host),
+	)
 
 	ret, err := currentAnnouncer.Announce(u, announceRequest, ctx)
 	if err != nil {

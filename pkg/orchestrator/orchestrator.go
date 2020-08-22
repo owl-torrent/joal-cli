@@ -8,7 +8,6 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"net/url"
 	"strings"
@@ -71,13 +70,13 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 	}
 
 	if !conf.DoesSupportAnnounceList() {
-		logrus.WithField("url", meta.Announce).Info("build orchestrator without support for announce-list")
+		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}
 
 	if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
-		logrus.WithField("url", meta.Announce).Info("build orchestrator with 'announce' because 'announce-list' is empty")
+		log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
 		var announceList = [][]string{{meta.Announce}}
 		return createOrchestratorForAnnounceList(announceList, true, true)
 	}

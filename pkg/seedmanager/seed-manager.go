@@ -2,22 +2,21 @@ package seedmanager
 
 import (
 	"context"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
+	"github.com/anthonyraymond/watcher"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"os"
 	"path"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/anthonyraymond/watcher"
 )
 
 type SeedManager struct {
@@ -58,6 +57,7 @@ func (s *SeedManager) Start() error {
 	log := logs.GetLogger()
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter())
 	err := torrentFileWatcher.Add(s.joalPaths.torrentFolder)
@@ -132,16 +132,16 @@ func (s *SeedManager) Start() error {
 			}
 		}
 	}()
+
 	return nil
 }
 
 func (s *SeedManager) onTorrentFileCreate(filePath string) error {
+	log := logs.GetLogger()
 	f, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
 		sleep := 5 * time.Second
-		logrus.WithFields(logrus.Fields{
-			"file": filePath,
-		}).Warnf("File is already in use, wait %s before proceed", sleep)
+		log.Warn(fmt.Sprintf("File is already in use, wait %s before proceed", sleep), zap.String("file", filePath))
 		time.Sleep(sleep) // File was most likely created but not written yet, let's wait just a bit
 	} else {
 		_ = f.Close()
@@ -165,10 +165,7 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 				torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 			}()
 		} else {
-			logrus.WithFields(logrus.Fields{
-				"file": filepath.Base(filePath),
-			}).Warn("Seed was not not started, seed map already contains this infohash.")
-		}*/
+		log.Warn("Seed was not not started, seed map already contains this infohash.", zap.String("file", filepath.Base(filePath)))*/
 
 	return nil
 }
@@ -211,13 +208,11 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 }
 
 func (s *SeedManager) Stop(ctx context.Context) {
-	logrus.Info("Stopping seedmanager gracefully")
+	log := logs.GetLogger()
+	log.Info("Stopping seedmanager gracefully")
 	s.lock.Lock()
 	defer s.lock.Unlock()
-
-	logrus.WithFields(logrus.Fields{
-		"seedCount": len(s.seeds),
-	}).Info("Trigger seeds shutdown")
+	log.Info("Trigger seeds shutdown", zap.Int("seedCount", len(s.seeds)))
 
 	wg := sync.WaitGroup{}
 	for _, v := range s.seeds {
