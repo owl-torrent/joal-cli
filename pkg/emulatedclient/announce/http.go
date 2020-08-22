@@ -7,8 +7,9 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/urlencoder"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -41,6 +42,7 @@ func (a *HttpAnnouncer) AfterPropertiesSet() error {
 }
 
 func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (ret tracker.AnnounceResponse, err error) {
+	log := logs.GetLogger()
 	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
 	if err != nil {
@@ -59,14 +61,13 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 	for _, v := range a.RequestHeaders {
 		req.Header.Add(v.Name, v.Value)
 	}
-
-	logrus.
-		WithField("infohash", announceRequest.InfoHash).
-		WithField("protocol", req.Proto).
-		WithField("method", req.Method).
-		WithField("url", req.URL.String()).
-		WithField("headers", req.Header).
-		Debug("announce details")
+	log.Debug("announce details",
+		zap.ByteString("infohash", []byte(string(announceRequest.InfoHash[:]))),
+		zap.String("protocol", req.Proto),
+		zap.String("method", req.Method),
+		zap.String("url", req.URL.String()),
+		zap.Reflect("headers", req.Header),
+	)
 
 	resp, err := (&http.Client{
 		Timeout: time.Second * 15,

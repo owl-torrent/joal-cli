@@ -89,15 +89,14 @@ func LoadFromFile(file string) (ISeed, error) {
 }
 
 func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
+	log := logs.GetLogger()
 	s.lock.Lock()
 	if s.seeding {
 		// TODO: log already running
 		s.lock.Unlock()
 		return
 	}
-	logrus.WithFields(logrus.Fields{
-		"torrent": filepath.Base(s.path),
-	}).Info("Start seed")
+	log.Info("Start seed", zap.String("torrent", filepath.Base(s.path)))
 
 	defer func() {
 		s.seeding = false
@@ -128,7 +127,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 					progressiveDuration := math.Min(1800, float64(10*(s.consecutiveErrors*s.consecutiveErrors)))
 					s.nextAnnounceAt = time.Now().Add(time.Duration(progressiveDuration) * time.Second)
 				}
-				logrus.WithError(err).WithField("infohash", s.infoHash).Warn("failed to announce")
+				log.Warn("failed to announce", zap.Any("infohash", meta.Announce))
 				if s.consecutiveErrors >= 2 && currentAnnounceType != tracker.Started {
 					s.peers = &swarm{seeders: 0, leechers: 0}
 					dispatcher.ClaimOrUpdate(s)
@@ -179,13 +178,9 @@ func (s *seed) StopSeeding(ctx context.Context) {
 	// Wait till context expires or the seed has exited
 	select {
 	case <-ctx.Done():
-		logrus.WithFields(logrus.Fields{
-			"torrent": filepath.Base(s.path),
-		}).Warn("Seed has not stopped gracefully exiting due to context timeout")
+		log.Info("Seed has not stopped gracefully exiting due to context timeout", zap.String("torrent", filepath.Base(s.path)))
 	case <-s.stopped:
-		logrus.WithFields(logrus.Fields{
-			"torrent": filepath.Base(s.path),
-		}).Info("Seed stopped gracefully")
+		log.Info("Seed stopped gracefully", zap.String("torrent", filepath.Base(s.path)))
 	}
 }
 */

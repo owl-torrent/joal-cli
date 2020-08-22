@@ -7,9 +7,10 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"math/rand"
 	"net/url"
 	"path/filepath"
@@ -58,6 +59,7 @@ type joalTorrent struct {
 }
 
 func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorrent, error) {
+	log := logs.GetLogger()
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
@@ -68,11 +70,7 @@ func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorren
 		return nil, errors.Wrapf(err, "failed to load info from file '%s'", filePath)
 	}
 	infoHash := meta.HashInfoBytes()
-	logrus.WithFields(logrus.Fields{
-		"torrent":  filepath.Base(filePath),
-		"infohash": infoHash,
-	}).Info("torrent parsed")
-
+	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.Any("infohash", infoHash))
 	//TODO: move the tracker shuffling in orchestrator, it shouldn't be here
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {

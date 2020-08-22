@@ -5,23 +5,13 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
-	"github.com/sirupsen/logrus"
 	"os"
 	"time"
 )
 
 // torrent base library : https://github.com/anacrolix/torrent
 // especially for bencode and tracker subpackages
-
-func init() {
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.SetOutput(os.Stdout)
-	logrus.Info("init log to prevent race exception in logrus")
-	logrus.Info("")
-
-
-}
-
+//TODO check if init() is needed here, it used to be for log init
 func main() {
 	defer logs.GetLogger().Sync()
 	conf, err := config.ConfigManagerNew(os.Args[1])
