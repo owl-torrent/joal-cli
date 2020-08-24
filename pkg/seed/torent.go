@@ -70,7 +70,7 @@ func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorren
 		return nil, errors.Wrapf(err, "failed to load info from file '%s'", filePath)
 	}
 	infoHash := meta.HashInfoBytes()
-	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.Any("infohash", infoHash))
+	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.ByteString("infohash", infoHash.Bytes()))
 	//TODO: move the tracker shuffling in orchestrator, it shouldn't be here
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {

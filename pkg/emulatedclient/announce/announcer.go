@@ -81,7 +81,7 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 	}
 	log.Info("announcing to tracker",
 		zap.String("event", announceRequest.Event.String()),
-		zap.ByteString("infohash", []byte(string(announceRequest.InfoHash[:]))),
+		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 		zap.Int64("uploaded", announceRequest.Uploaded),
 		zap.String("tracker", u.Host),
 	)
