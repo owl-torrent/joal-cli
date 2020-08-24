@@ -127,7 +127,7 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 					progressiveDuration := math.Min(1800, float64(10*(s.consecutiveErrors*s.consecutiveErrors)))
 					s.nextAnnounceAt = time.Now().Add(time.Duration(progressiveDuration) * time.Second)
 				}
-				log.Warn("failed to announce", zap.Any("infohash", meta.Announce))
+				log.Warn("failed to announce", zap.Error(err), zap.ByteString("infohash", s.infoHash.Bytes()))
 				if s.consecutiveErrors >= 2 && currentAnnounceType != tracker.Started {
 					s.peers = &swarm{seeders: 0, leechers: 0}
 					dispatcher.ClaimOrUpdate(s)

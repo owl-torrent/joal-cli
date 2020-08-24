@@ -141,31 +141,35 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	f, a := os.OpenFile(filePath, os.O_RDONLY|os.O_EXCL, 0)
 	if a != nil {
 		sleep := 5 * time.Second
-		log.Warn(fmt.Sprintf("File is already in use, wait %s before proceed", sleep), zap.String("file", filePath))
+		if log.Core().Enabled(zap.WarnLevel) {
+			log.Warn(fmt.Sprintf("File is already in use, wait %s before proceed", sleep), zap.String("file", filePath))
+		}
 		time.Sleep(sleep) // File was most likely created but not written yet, let's wait just a bit
 	} else {
 		_ = f.Close()
 	}
 	/*
-		torrentSeed, err := seed.LoadFromFile(filePath)
-		if err != nil {
-			return errors.Wrap(err, "failed to create torrent from file")
-		}
+			torrentSeed, err := seed.LoadFromFile(filePath)
+			if err != nil {
+				return errors.Wrap(err, "failed to create torrent from file")
+			}
 
-		s.lock.Lock()
-		defer s.lock.Unlock()
-		if _, contains := s.seeds[torrentSeed.InfoHash()]; !contains {
-			s.seeds[torrentSeed.InfoHash()] = torrentSeed
-			go func() {
-				defer func() {
-					s.lock.Lock()
-					delete(s.seeds, torrentSeed.InfoHash())
-					s.lock.Unlock()
+			s.lock.Lock()
+			defer s.lock.Unlock()
+			if _, contains := s.seeds[torrentSeed.InfoHash()]; !contains {
+				s.seeds[torrentSeed.InfoHash()] = torrentSeed
+				go func() {
+					defer func() {
+						s.lock.Lock()
+						delete(s.seeds, torrentSeed.InfoHash())
+						s.lock.Unlock()
+					}()
+					torrentSeed.Seed(s.client, s.bandwidthDispatcher)
 				}()
-				torrentSeed.Seed(s.client, s.bandwidthDispatcher)
-			}()
-		} else {
-		log.Warn("Seed was not not started, seed map already contains this infohash.", zap.String("file", filepath.Base(filePath)))*/
+			} else {
+			log.Warn("Seed was not not started, seed map already contains this infohash.", zap.String("file", filepath.Base(filePath)))
+		}
+	*/
 
 	return nil
 }
