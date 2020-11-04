@@ -13,7 +13,7 @@ import (
 	peeridgenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/generator"
 	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 	"github.com/go-playground/validator/v10"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"io"
 	"net/url"
 	"os"

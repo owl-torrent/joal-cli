@@ -3,7 +3,7 @@ package urlencoder
 import (
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/casing"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"strings"
 	"testing"
 )
