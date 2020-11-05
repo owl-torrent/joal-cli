@@ -1,7 +1,7 @@
 package emulatedclient
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/casing"
 	keyAlgorithm "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/algorithm"
 	keyGenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/generator"
@@ -84,11 +84,11 @@ func TestEmulatedClient_ShouldValidate(t *testing.T) {
 				AnnounceToAllTiers:          true,
 				AnnounceToAllTrackersInTier: true,
 			},
-			Announcer: &announce.Announcer{
-				Http: &announce.HttpAnnouncer{
+			Announcer: &announcer.Announcer{
+				Http: &announcer.HttpAnnouncer{
 					UrlEncoder:     urlencoder.UrlEncoder{EncodedHexCase: casing.Lower},
 					Query:          "aaa",
-					RequestHeaders: []announce.HttpRequestHeader{},
+					RequestHeaders: []announcer.HttpRequestHeader{},
 				},
 				Udp: nil,
 			},

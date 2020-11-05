@@ -1,4 +1,4 @@
-package announce
+package announcer
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	url2 "net/url"
 	"testing"
 	"text/template"
+	"time"
 )
 
 func TestHttpAnnouncer_ShouldUnmarshal(t *testing.T) {
@@ -129,8 +130,8 @@ func Test_setupQuery(t *testing.T) {
 }
 
 func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
-	expectedResponse := tracker.AnnounceResponse{
-		Interval: 150,
+	expectedResponse := AnnounceResponse{
+		Interval: 150 * time.Second,
 		Leechers: 10,
 		Seeders:  20,
 		Peers:    tracker.Peers{tracker.Peer{IP: net.IPv4(10, 10, 10, 10), Port: 2501, ID: []byte{1}}},
@@ -176,8 +177,8 @@ func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 }
 
 func TestHttpAnnouncer_AnnounceShouldUnderstandAndDecodeGzip(t *testing.T) {
-	expectedResponse := tracker.AnnounceResponse{
-		Interval: 150,
+	expectedResponse := AnnounceResponse{
+		Interval: 150 * time.Second,
 		Leechers: 10,
 		Seeders:  20,
 		Peers:    tracker.Peers{tracker.Peer{IP: net.IPv4(10, 10, 10, 10), Port: 2501, ID: []byte{1}}},

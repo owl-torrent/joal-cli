@@ -1,7 +1,7 @@
 package seed
 
 import (
-	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"net/url"
 	"sync"
@@ -37,7 +37,7 @@ func errorSwarmUpdateRequest(trackerUrl url.URL) swarmUpdateRequest {
 		leechers:   0,
 	}
 }
-func successSwarmUpdateRequest(trackerUrl url.URL, response tracker.AnnounceResponse) swarmUpdateRequest {
+func successSwarmUpdateRequest(trackerUrl url.URL, response announcer.AnnounceResponse) swarmUpdateRequest {
 	return swarmUpdateRequest{
 		trackerUrl: trackerUrl,
 		interval:   time.Duration(response.Interval) * time.Second,

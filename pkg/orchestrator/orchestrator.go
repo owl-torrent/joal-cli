@@ -6,6 +6,7 @@ import (
 	"context"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -15,7 +16,7 @@ import (
 	"time"
 )
 
-type AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
+type AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
 type tierState = byte
 type trackerState = tierState
 

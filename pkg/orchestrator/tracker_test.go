@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
@@ -16,11 +17,11 @@ func Test_TrackerAnnouncer_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted
 	var announceEvents []tracker.AnnounceEvent
 	latch := congo.NewCountDownLatch(2)
 	//noinspection GoVarAndConstTypeMayBeOmitted
-	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		defer func() { _ = latch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return tracker.AnnounceResponse{
-			Interval: 1,
+		return announcer.AnnounceResponse{
+			Interval: 1 * time.Millisecond,
 		}, nil
 	}
 
@@ -41,11 +42,11 @@ func Test_TrackerAnnouncer_AnnounceStartLoopShouldReturnAfterStop(t *testing.T) 
 	announceLatch := congo.NewCountDownLatch(1)
 	endedLatch := congo.NewCountDownLatch(1)
 	//noinspection GoVarAndConstTypeMayBeOmitted
-	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return tracker.AnnounceResponse{
-			Interval: 1,
+		return announcer.AnnounceResponse{
+			Interval: 1 * time.Millisecond,
 		}, nil
 	}
 
@@ -71,11 +72,11 @@ func Test_TrackerAnnouncer_ShouldBeReusableAfterStopLoop(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	announceLatch := congo.NewCountDownLatch(1)
 	//noinspection GoVarAndConstTypeMayBeOmitted
-	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	var annFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		defer func() { _ = announceLatch.CountDown() }()
 		announceEvents = append(announceEvents, event)
-		return tracker.AnnounceResponse{
-			Interval: 1,
+		return announcer.AnnounceResponse{
+			Interval: 1 * time.Millisecond,
 		}, nil
 	}
 

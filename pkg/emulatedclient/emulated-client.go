@@ -8,7 +8,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/generator"
 	peeridgenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/generator"
 	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
@@ -20,7 +20,7 @@ import (
 )
 
 type IEmulatedClient interface {
-	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error)
+	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
 	CreateOrchestratorForTorrent(info metainfo.MetaInfo) (orchestrator.IOrchestrator, error)
@@ -34,7 +34,7 @@ type EmulatedClient struct {
 	NumWant             int32                            `yaml:"numwant" validate:"min=1"`
 	NumWantOnStop       int32                            `yaml:"numwantOnStop"`
 	OrchestratorFactory *orchestratorFactory             `yaml:"announceOrchestrator" validate:"required"`
-	Announcer           *announce.Announcer              `yaml:"announcer" validate:"required"`
+	Announcer           *announcer.Announcer             `yaml:"announcer" validate:"required"`
 	Listener            *Listener                        `yaml:"listener" validate:"required"`
 }
 
@@ -91,11 +91,11 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 	return nil
 }
 
-func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
 		panic(errors.New("EmulatedClient listener is not started"))
 	}
-	announceRequest := announce.AnnounceRequest{
+	announceRequest := announcer.AnnounceRequest{
 		InfoHash:   infoHash,
 		PeerId:     c.PeerIdGenerator.Get(infoHash, event),
 		Downloaded: downloaded,

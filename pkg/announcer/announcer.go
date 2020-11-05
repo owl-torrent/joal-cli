@@ -1,6 +1,6 @@
-package announce
+package announcer
 
-//go:generate mockgen -destination=./announcer_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce -package=announce github.com/anthonyraymond/joal-cli/pkg/emulatedclient/announce IHttpAnnouncer,IUdpAnnouncer
+//go:generate mockgen -destination=./announcer_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/announcer -package=announcer github.com/anthonyraymond/joal-cli/pkg/announcer IHttpAnnouncer,IUdpAnnouncer
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // tracker.AnnounceRequest uses a uint32 for the IPAddress, create our own struct that use proper net.IP type. UDP will need to convert this one to a tracker.AnnounceRequest
@@ -29,6 +30,13 @@ type AnnounceRequest struct {
 	NumWant   int32 // How many peer addresses are desired. -1 for default.
 	Port      uint16
 } // 82 bytes
+
+type AnnounceResponse struct {
+	Interval time.Duration // Minimum seconds the local peer should wait before next announce.
+	Leechers int32
+	Seeders  int32
+	Peers    []tracker.Peer
+}
 
 type Announcer struct {
 	Http IHttpAnnouncer `yaml:"http" validate:"required_without_all=Udp"`
@@ -65,10 +73,10 @@ func (a *Announcer) AfterPropertiesSet() error {
 	return nil
 }
 
-func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error) {
+func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
 	log := logs.GetLogger()
 	var currentAnnouncer interface {
-		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
+		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
 	}
 	if strings.HasPrefix(u.Scheme, "http") {
 		currentAnnouncer = a.Http
@@ -77,7 +85,7 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 	}
 
 	if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
-		return tracker.AnnounceResponse{}, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme))
+		return AnnounceResponse{}, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme))
 	}
 	log.Info("announcing to tracker",
 		zap.String("event", announceRequest.Event.String()),
@@ -88,7 +96,7 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 
 	ret, err := currentAnnouncer.Announce(u, announceRequest, ctx)
 	if err != nil {
-		return tracker.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
+		return AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 	}
 
 	return ret, nil

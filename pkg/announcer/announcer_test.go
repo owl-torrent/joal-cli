@@ -1,8 +1,7 @@
-package announce
+package announcer
 
 import (
 	"context"
-	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang/mock/gomock"
@@ -36,8 +35,8 @@ type validAbleAnnouncer struct {
 }
 
 func (a *validAbleAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *validAbleAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (tracker.AnnounceResponse, error) {
-	return tracker.AnnounceResponse{}, nil
+func (a *validAbleAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (AnnounceResponse, error) {
+	return AnnounceResponse{}, nil
 }
 
 func TestAnnouncer_ShouldValidate(t *testing.T) {

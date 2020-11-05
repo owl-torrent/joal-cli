@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
 	"net/url"
@@ -18,12 +19,12 @@ var ZeroIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(0 * 
 var ErrorAnnouncingFunc AnnouncingFunction = buildErrAnnouncingFunc()
 
 func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) AnnouncingFunction {
-	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		for _, c := range callbacks {
 			c(u)
 		}
-		return tracker.AnnounceResponse{
-			Interval: int32(interval.Seconds()),
+		return announcer.AnnounceResponse{
+			Interval: interval,
 			Leechers: 0,
 			Seeders:  0,
 			Peers:    []tracker.Peer{},
@@ -32,11 +33,11 @@ func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) A
 }
 
 func buildErrAnnouncingFunc(callbacks ...func(u url.URL)) AnnouncingFunction {
-	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		for _, c := range callbacks {
 			c(u)
 		}
-		return tracker.AnnounceResponse{}, errors.New("nop")
+		return announcer.AnnounceResponse{}, errors.New("nop")
 	}
 }
 
@@ -545,7 +546,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
-	if !latch.WaitTimeout(1500 * time.Millisecond) {
+	if !latch.WaitTimeout(10 * time.Second) {
 		t.Fatal("latch has not been released")
 	}
 }
@@ -998,7 +999,7 @@ func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testin
 	go o.Start(nil)
 	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
+	if !latch.WaitTimeout(10 * time.Second) {
 		t.Fatal("latch has not been released")
 	}
 }

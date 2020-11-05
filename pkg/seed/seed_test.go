@@ -39,12 +39,12 @@ func TestSeed_SeedShouldAnnounceInLoopAndUpdateDispatcher(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
 		Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
 		MinTimes(2)
 
 	dispatcher.
@@ -77,23 +77,23 @@ func TestSeed_SeedShouldAnnounceStopOnStopAndReleaseDispatcher(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
-		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (announcer.AnnounceResponse, error) {
 			_ = announceLatch.CountDown()
-			return tracker.AnnounceResponse{Interval: 0, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
+			return announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
 		}).Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (announcer.AnnounceResponse, error) {
 			_ = announceLatch.CountDown()
-			return tracker.AnnounceResponse{Interval: 0, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
+			return announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
 		}).AnyTimes()
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped), gomock.Any()).
-		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (announcer.AnnounceResponse, error) {
 			_ = stopLatch.CountDown()
-			return tracker.AnnounceResponse{Interval: 10, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
+			return announcer.AnnounceResponse{Interval: 10 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil
 		}).Times(1)
 
 	dispatcher.
@@ -131,17 +131,17 @@ func TestSeed_SeedShouldUpdateSeedSwarmWithAnnounceResponse(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 10, Seeders: 501, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 10, Seeders: 501, Peers: []tracker.Peer{}}, nil).
 		Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 0, Seeders: 0, Peers: []tracker.Peer{}}, nil).
 		Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 20, Seeders: 68, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 20, Seeders: 68, Peers: []tracker.Peer{}}, nil).
 		AnyTimes()
 
 	gomock.InOrder(
@@ -175,12 +175,12 @@ func TestSeed_SeedResetSwarmWhenAnnounceErrorMoreThanTwice(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
-		Return(tracker.AnnounceResponse{Interval: 0, Leechers: 10, Seeders: 501, Peers: []tracker.Peer{}}, nil).
+		Return(announcer.AnnounceResponse{Interval: 0 * time.Second, Leechers: 10, Seeders: 501, Peers: []tracker.Peer{}}, nil).
 		Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		Return(tracker.AnnounceResponse{}, errors.New("emulate an error")).
+		Return(announcer.AnnounceResponse{}, errors.New("emulate an error")).
 		MinTimes(2)
 
 	gomock.InOrder(
@@ -212,9 +212,9 @@ func TestSeed_SeedShouldNotFailIfAnnounceStartedIsAnError(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
-		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (announcer.AnnounceResponse, error) {
 			_ = announceLatch.CountDown()
-			return tracker.AnnounceResponse{}, errors.New("emulate an error")
+			return announcer.AnnounceResponse{}, errors.New("emulate an error")
 		}).Times(1)
 
 	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()

@@ -1,4 +1,4 @@
-package announce
+package announcer
 
 import (
 	"bytes"

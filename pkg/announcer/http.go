@@ -1,4 +1,4 @@
-package announce
+package announcer
 
 import (
 	"compress/gzip"
@@ -20,7 +20,7 @@ import (
 )
 
 type IHttpAnnouncer interface {
-	Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (tracker.AnnounceResponse, error)
+	Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
 	AfterPropertiesSet() error
 }
 
@@ -41,7 +41,7 @@ func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	return nil
 }
 
-func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (ret tracker.AnnounceResponse, err error) {
+func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (ret AnnounceResponse, err error) {
 	log := logs.GetLogger()
 	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
@@ -105,7 +105,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		err = fmt.Errorf("tracker gave failure reason: %q", trackerResponse.FailureReason)
 		return
 	}
-	ret.Interval = trackerResponse.Interval
+	ret.Interval = time.Duration(trackerResponse.Interval) * time.Second
 	ret.Leechers = trackerResponse.Incomplete
 	ret.Seeders = trackerResponse.Complete
 	ret.Peers = trackerResponse.Peers

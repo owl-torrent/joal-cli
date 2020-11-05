@@ -108,9 +108,9 @@ func TestSeedManager_Start_ShouldDetectAlreadyPresentFiles(t *testing.T) {
 		client.
 			EXPECT().
 			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started), gomock.Any()).
-			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 				_ = latch.CountDown()
-				return tracker.AnnounceResponse{Interval: 1000}, nil
+				return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 			}).
 			Times(1)
 	}
@@ -169,9 +169,9 @@ func TestSeedManager_Start_ShouldDetectFileAddition(t *testing.T) {
 		client.
 			EXPECT().
 			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started), gomock.Any()).
-			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 				_ = latch.CountDown()
-				return tracker.AnnounceResponse{Interval: 1000}, nil
+				return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 			}).
 			Times(1)
 	}
@@ -212,9 +212,9 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 		client.
 			EXPECT().
 			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started), gomock.Any()).
-			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 				_ = latch.CountDown()
-				return tracker.AnnounceResponse{Interval: 1000}, nil
+				return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 			}).
 			Times(1)
 	}
@@ -245,9 +245,9 @@ func TestSeedManager_Start_ShouldDetectFileDeletion(t *testing.T) {
 		client.
 			EXPECT().
 			Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Stopped), gomock.Any()).
-			DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+			DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 				_ = latch.CountDown()
-				return tracker.AnnounceResponse{Interval: 1000}, nil
+				return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 			}).
 			Times(1)
 	}
@@ -282,9 +282,9 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started), gomock.Any()).
-		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 			_ = latch.CountDown()
-			return tracker.AnnounceResponse{Interval: 1000}, nil
+			return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 		}).
 		Times(1)
 
@@ -313,17 +313,17 @@ func TestSeedManager_Start_ShouldDetectFileRename(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Stopped), gomock.Any()).
-		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 			_ = latch.CountDown()
-			return tracker.AnnounceResponse{Interval: 1000}, nil
+			return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 		}).
 		Times(1)
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Eq(infoHash), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(int64(0)), gomock.Eq(tracker.Started), gomock.Any()).
-		DoAndReturn(func(e ...interface{}) (tracker.AnnounceResponse, error) {
+		DoAndReturn(func(e ...interface{}) (announcer.AnnounceResponse, error) {
 			_ = latch.CountDown()
-			return tracker.AnnounceResponse{Interval: 1000}, nil
+			return announcer.AnnounceResponse{Interval: 1000 * time.Second}, nil
 		}).
 		Times(1)
 

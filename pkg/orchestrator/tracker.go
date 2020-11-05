@@ -105,7 +105,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 				}
 				announceDone <- trackerAnnounceResult{
 					Err:       nil,
-					Interval:  time.Duration(res.Interval) * time.Second,
+					Interval:  res.Interval,
 					Completed: time.Now(),
 				}
 			}(*t)

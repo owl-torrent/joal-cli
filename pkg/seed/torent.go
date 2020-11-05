@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
@@ -149,7 +150,7 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 }
 
 func createAnnounceClosure(t *joalTorrent, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
-	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 
 		resp, err := client.Announce(ctx, u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event)
 		if err != nil {
@@ -160,7 +161,7 @@ func createAnnounceClosure(t *joalTorrent, client emulatedclient.IEmulatedClient
 					dispatcher.ClaimOrUpdate(t)
 				}
 			}
-			return tracker.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
+			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
 
 		if event != tracker.Stopped {

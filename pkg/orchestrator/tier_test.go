@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
@@ -206,11 +207,11 @@ func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucc
 	}
 
 	DefaultDurationWaitOnError = 1 * time.Millisecond
-	announceResponse := &tracker.AnnounceResponse{}
+	announceResponse := &announcer.AnnounceResponse{}
 	var errResponse = errors.New("nop")
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 	//noinspection GoVarAndConstTypeMayBeOmitted
-	var failAnnFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (tracker.AnnounceResponse, error) {
+	var failAnnFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		return *announceResponse, errResponse
 	}
 
@@ -233,7 +234,7 @@ func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucc
 		}
 	}
 
-	announceResponse = &tracker.AnnounceResponse{Interval: 1800}
+	announceResponse = &announcer.AnnounceResponse{Interval: 1800 * time.Second}
 	errResponse = nil
 
 	timeout = time.Now().Add(1 * time.Second)
@@ -304,7 +305,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTracke
 	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
+	if !latch.WaitTimeout(10 * time.Second) {
 		t.Fatal("not enough announce")
 	}
 }
@@ -749,7 +750,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
 
-	if !latch.WaitTimeout(5000 * time.Millisecond) {
+	if !latch.WaitTimeout(10 * time.Second) {
 		t.Fatal("latch has not released")
 	}
 	tier.stopAnnounceLoop()
