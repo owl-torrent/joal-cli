@@ -1,7 +1,5 @@
 package bandwidth
 
-//go:generate mockgen -destination=./random-provider_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/randutils -package=bandwidth github.com/anthonyraymond/joal-cli/pkg/bandwidth IRandomSpeedProvider
-
 import "github.com/anthonyraymond/joal-cli/pkg/utils/randutils"
 
 type IRandomSpeedProvider interface {

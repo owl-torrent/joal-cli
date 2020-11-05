@@ -1,7 +1,5 @@
 package announcer
 
-//go:generate mockgen -destination=./announcer_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/announcer -package=announcer github.com/anthonyraymond/joal-cli/pkg/announcer IHttpAnnouncer,IUdpAnnouncer
-
 import (
 	"context"
 	"fmt"
@@ -36,6 +34,10 @@ type AnnounceResponse struct {
 	Leechers int32
 	Seeders  int32
 	Peers    []tracker.Peer
+}
+
+type iAnnouncer interface {
+	Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
 }
 
 type Announcer struct {

@@ -1,7 +1,5 @@
 package seed
 
-//go:generate mockgen -destination=./seed_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/seed -package=seed github.com/anthonyraymond/joal-cli/pkg/seed ISeed
-
 import (
 	"context"
 	"github.com/anacrolix/torrent"

@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"net/url"
@@ -73,28 +72,86 @@ func TestAnnouncer_ShouldValidate(t *testing.T) {
 	}
 }
 
-func TestAnnouncer_AnnounceShouldCallAnnouncerCorrespondingToScheme(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+type fakeSubAnnouncer struct {
+	announce func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
+}
 
-	httpAnn := NewMockIHttpAnnouncer(ctrl)
-	udpAnn := NewMockIUdpAnnouncer(ctrl)
-	announcer := Announcer{
-		Http: httpAnn,
-		Udp:  udpAnn,
+func (f *fakeSubAnnouncer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+	if f.announce != nil {
+		return f.announce(u, announceRequest, ctx)
 	}
+	return AnnounceResponse{}, nil
+}
 
-	gomock.InOrder(
-		httpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("http://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
-		httpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("https://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
-		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
-		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp4://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
-		udpAnn.EXPECT().Announce(gomock.Eq(*testutils.MustParseUrl("udp6://localhost.fr")), gomock.Any(), gomock.Any()).Times(1),
-	)
+func (f *fakeSubAnnouncer) AfterPropertiesSet() error {
+	return nil
+}
+
+func TestAnnouncer_SelectAnnouncerBasedOnUrlScheme(t *testing.T) {
+	announceDone := 0
+
+	announcer := &Announcer{
+		Http: &fakeSubAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+			announceDone++
+			if u.Scheme != "http" && u.Scheme != "https" {
+				t.Fatal("non http scheme url passed to http announcer")
+			}
+			return AnnounceResponse{}, nil
+		}},
+		Udp: &fakeSubAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+			announceDone++
+			if u.Scheme != "udp" && u.Scheme != "udp4" && u.Scheme != "udp6" {
+				t.Fatal("non udp scheme url passed to udp announcer")
+			}
+			return AnnounceResponse{}, nil
+		}},
+	}
 
 	_, _ = announcer.Announce(*testutils.MustParseUrl("http://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("https://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp4://localhost.fr"), AnnounceRequest{}, context.Background())
 	_, _ = announcer.Announce(*testutils.MustParseUrl("udp6://localhost.fr"), AnnounceRequest{}, context.Background())
+
+	assert.Equal(t, 5, announceDone)
+}
+
+func TestAnnouncer_AnnounceHttpWithNilHttpAnnouncer(t *testing.T) {
+	announcer := &Announcer{
+		Udp: &fakeSubAnnouncer{},
+	}
+
+	_, err := announcer.Announce(*testutils.MustParseUrl("http://localhost.fr"), AnnounceRequest{}, context.Background())
+	if err == nil {
+		t.Fatal("should have returned an error")
+	}
+
+	assert.Contains(t, err.Error(), "'http' is not supported")
+}
+
+func TestAnnouncer_AnnounceUdpWithNilUdpAnnouncer(t *testing.T) {
+	announcer := &Announcer{
+		Http: &fakeSubAnnouncer{},
+	}
+
+	_, err := announcer.Announce(*testutils.MustParseUrl("udp://localhost.fr"), AnnounceRequest{}, context.Background())
+	if err == nil {
+		t.Fatal("should have returned an error")
+	}
+
+	assert.Contains(t, err.Error(), "'udp' is not supported")
+}
+
+func TestAnnouncer_AnnounceUnknownScheme(t *testing.T) {
+	announcer := &Announcer{
+		Http: &fakeSubAnnouncer{},
+		Udp:  &fakeSubAnnouncer{},
+	}
+
+	_, err := announcer.Announce(*testutils.MustParseUrl("belozic://localhost.fr"), AnnounceRequest{}, context.Background())
+	if err == nil {
+		t.Fatal("should have returned an error")
+	}
+
+	assert.Contains(t, err.Error(), "'belozic' is not supported")
 }

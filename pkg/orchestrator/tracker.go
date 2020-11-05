@@ -45,7 +45,7 @@ func (t trackerAnnouncer) announceOnce(ctx context.Context, announce AnnouncingF
 	}
 	return trackerAnnounceResult{
 		Err:       nil,
-		Interval:  time.Duration(res.Interval) * time.Second,
+		Interval:  res.Interval * time.Second,
 		Completed: time.Now(),
 	}
 }

@@ -20,7 +20,7 @@ import (
 )
 
 type IHttpAnnouncer interface {
-	Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
+	iAnnouncer
 	AfterPropertiesSet() error
 }
 

@@ -1,7 +1,5 @@
 package bandwidth
 
-//go:generate mockgen -destination=./dispatcher_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/bandwidth -package=bandwidth github.com/anthonyraymond/joal-cli/pkg/bandwidth ISwarm,IBandwidthClaimable,IDispatcher
-
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/timeutils"

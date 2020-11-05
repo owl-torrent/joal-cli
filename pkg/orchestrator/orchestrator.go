@@ -1,6 +1,6 @@
 package orchestrator
 
-//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator IOrchestrator,ITrackerAnnouncer,ITierAnnouncer
+//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator ITrackerAnnouncer,ITierAnnouncer
 
 import (
 	"context"

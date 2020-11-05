@@ -13,6 +13,36 @@ import (
 	"time"
 )
 
+type mockedTrackerAnnouncer struct {
+	annOnce      func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
+	startAnnLoop func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) trackerAnnounceResult
+	stopAnnLoop  func()
+	c            chan trackerAnnounceResult
+}
+
+func (m *mockedTrackerAnnouncer) announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
+	if m.annOnce != nil {
+		return m.annOnce(ctx, announce, event)
+	}
+	return trackerAnnounceResult{}
+}
+
+func (m *mockedTrackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) {
+	if m.startAnnLoop != nil {
+		m.startAnnLoop(announce, firstEvent)
+	}
+}
+
+func (m *mockedTrackerAnnouncer) Responses() <-chan trackerAnnounceResult {
+	return m.c
+}
+
+func (m *mockedTrackerAnnouncer) stopAnnounceLoop() {
+	if m.stopAnnLoop != nil {
+		m.stopAnnLoop()
+	}
+}
+
 func Test_TrackerAnnouncer_ShouldChangeNextAnnounceToNoneIfFirsAnnounceIsStarted(t *testing.T) {
 	var announceEvents []tracker.AnnounceEvent
 	latch := congo.NewCountDownLatch(2)
