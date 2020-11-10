@@ -12,7 +12,7 @@ func NewCryptoSeededSource() mrand.Source {
 	return mrand.NewSource(seed)
 }
 
-var globalRand *mrand.Rand = mrand.New(NewCryptoSeededSource())
+var globalRand = mrand.New(NewCryptoSeededSource())
 
 // Return a random number between min and max
 func Range(minInclusive int64, maxInclusive int64) int64 {

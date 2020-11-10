@@ -46,7 +46,7 @@ func (a *KeyGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			allTypes[i] = generatorType
 			i++
 		}
-		return errors.New(fmt.Sprintf("keyGenerator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes))
+		return fmt.Errorf("keyGenerator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes)
 	}
 
 	// if the generator is known create new empty instance of it
@@ -97,7 +97,7 @@ func (s *AccessAwareKey) Get() key.Key {
 
 // time elapsed since last access
 func (s *AccessAwareKey) LastAccess() time.Duration {
-	return time.Now().Sub(s.lastAccessed)
+	return time.Since(s.lastAccessed)
 }
 
 func evictOldEntries(entries map[torrent.InfoHash]*AccessAwareKey, evictAfter time.Duration) {

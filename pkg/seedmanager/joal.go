@@ -2,8 +2,8 @@ package seedmanager
 
 import (
 	"context"
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
-	"github.com/pkg/errors"
 	"path/filepath"
 	"sync"
 )
@@ -23,7 +23,7 @@ type joalPaths struct {
 
 func joalPathsNew(joalWorkingDirectory string) (*joalPaths, error) {
 	if !filepath.IsAbs(joalWorkingDirectory) {
-		return nil, errors.New("joalWorkingDirectory must be an absolute path")
+		return nil, fmt.Errorf("joalWorkingDirectory must be an absolute path")
 	}
 	return &joalPaths{
 		torrentFolder:        filepath.Join(joalWorkingDirectory, "torrents"),
@@ -59,7 +59,7 @@ func (j *Joal) Start() error {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 	if j.state == started {
-		return errors.New("joal is already seeding")
+		return fmt.Errorf("joal is already seeding")
 	}
 
 	conf, err := j.configManager.Get()

@@ -3,7 +3,6 @@ package algorithm
 import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key"
-	"github.com/pkg/errors"
 )
 
 var algorithmImplementations = map[string]func() IKeyAlgorithm{
@@ -37,7 +36,7 @@ func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			allTypes[i] = algKey
 			i++
 		}
-		return errors.New(fmt.Sprintf("algorithm type '%s' does not exists. Possible values are: %v", algorithmType.Name, allTypes))
+		return fmt.Errorf("algorithm type '%s' does not exists. Possible values are: %v", algorithmType.Name, allTypes)
 	}
 
 	algorithm := implFactory()

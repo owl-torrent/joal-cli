@@ -87,7 +87,7 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 	}
 
 	if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
-		return AnnounceResponse{}, errors.New(fmt.Sprintf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme))
+		return AnnounceResponse{}, fmt.Errorf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme)
 	}
 	log.Info("announcing to tracker",
 		zap.String("event", announceRequest.Event.String()),

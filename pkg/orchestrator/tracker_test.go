@@ -141,7 +141,7 @@ func Test_TrackerAnnouncer_ShouldAnnounceOnce(t *testing.T) {
 	latch := congo.NewCountDownLatch(1)
 
 	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
-		latch.CountDown()
+		_ = latch.CountDown()
 	})
 	go tr.announceOnce(context.Background(), annFunc, tracker.Started)
 

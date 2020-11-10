@@ -10,7 +10,6 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/seed"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
 	"github.com/anthonyraymond/watcher"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"os"
 	"path"
@@ -180,15 +179,16 @@ func (s *SeedManager) onTorrentFileRenamed(oldFilePath string, newFilesPath stri
 	for _, v := range s.seeds {
 		filename := filepath.Base(oldFilePath)
 		if filepath.Base(v.FilePath()) == filename {
-			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			v.StopSeeding(ctx)
+			cancel()
 			found = true
 			break
 		}
 	}
 	s.lock.Unlock()
 	if !found {
-		return errors.New("cannot remove torrent '%s' from seeding list: not found in list")
+		return fmt.Errorf("cannot remove torrent '%s' from seeding list: not found in list", oldFilePath)
 	}
 
 	return s.onTorrentFileCreate(newFilesPath)
@@ -201,14 +201,15 @@ func (s *SeedManager) onTorrentFileRemoved(filePath string) error {
 		filename := filepath.Base(filePath)
 		if filepath.Base(v.FilePath()) == filename {
 			go func(s seed.ISeed) {
-				ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				s.StopSeeding(ctx)
+				cancel()
 			}(v)
 			return nil
 		}
 	}
 
-	return errors.New("cannot remove torrent '%s' from seeding list: not found in list")
+	return fmt.Errorf("cannot remove torrent '%s' from seeding list: not found in list", filePath)
 }
 
 func (s *SeedManager) Stop(ctx context.Context) {

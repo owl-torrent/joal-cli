@@ -2,7 +2,7 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"github.com/anacrolix/torrent/tracker"
 	"net/url"
 	"sync"
@@ -49,7 +49,7 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.loopInProgress {
-		return nil, errors.New("already started")
+		return nil, fmt.Errorf("already started")
 	}
 	t.loopInProgress = true
 

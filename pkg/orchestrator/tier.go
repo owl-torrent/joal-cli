@@ -2,7 +2,7 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ func (t AllTrackersTierAnnouncer) LastKnownInterval() time.Duration {
 
 func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer, error) {
 	if len(trackers) == 0 {
-		return nil, errors.New("a tier can not have an empty tracker list")
+		return nil, fmt.Errorf("a tier can not have an empty tracker list")
 	}
 	t := &AllTrackersTierAnnouncer{
 		trackers:          trackers,
@@ -79,7 +79,7 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.loopInProgress {
-		return nil, errors.New("already started")
+		return nil, fmt.Errorf("already started")
 	}
 	t.loopInProgress = true
 
@@ -166,7 +166,7 @@ type FallbackTrackersTierAnnouncer struct {
 
 func newFallbackTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer, error) {
 	if len(trackers) == 0 {
-		return nil, errors.New("a tier can not have an empty tracker list")
+		return nil, fmt.Errorf("a tier can not have an empty tracker list")
 	}
 	list, err := newLinkedTrackerList(trackers)
 	if err != nil {
@@ -227,7 +227,7 @@ func (t *FallbackTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFun
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.loopInProgress {
-		return nil, errors.New("already started")
+		return nil, fmt.Errorf("already started")
 	}
 	t.loopInProgress = true
 

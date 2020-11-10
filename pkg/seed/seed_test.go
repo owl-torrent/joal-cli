@@ -180,7 +180,7 @@ func TestSeed_SeedResetSwarmWhenAnnounceErrorMoreThanTwice(t *testing.T) {
 	client.
 		EXPECT().
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.None), gomock.Any()).
-		Return(announcer.AnnounceResponse{}, errors.New("emulate an error")).
+		Return(announcer.AnnounceResponse{}, fmt.Errorf("emulate an error")).
 		MinTimes(2)
 
 	gomock.InOrder(
@@ -214,7 +214,7 @@ func TestSeed_SeedShouldNotFailIfAnnounceStartedIsAnError(t *testing.T) {
 		Announce(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(tracker.Started), gomock.Any()).
 		DoAndReturn(func(announceList *metainfo.AnnounceList, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent, ctx context.Context) (announcer.AnnounceResponse, error) {
 			_ = announceLatch.CountDown()
-			return announcer.AnnounceResponse{}, errors.New("emulate an error")
+			return announcer.AnnounceResponse{}, fmt.Errorf("emulate an error")
 		}).Times(1)
 
 	dispatcher.EXPECT().Release(gomock.Any()).AnyTimes()

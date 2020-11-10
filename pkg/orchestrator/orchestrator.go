@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/announcer"
@@ -56,7 +57,7 @@ type IConfig interface {
 func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error) {
 	log := logs.GetLogger()
 	if conf == nil {
-		return nil, errors.New("nil orchestrator config")
+		return nil, fmt.Errorf("nil orchestrator config")
 	}
 
 	if !conf.DoesSupportAnnounceList() {
@@ -86,7 +87,7 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 	}
 
 	if len(announceList) == 0 {
-		return nil, errors.New("announce-list is empty")
+		return nil, fmt.Errorf("announce-list is empty")
 	}
 
 	if !conf.DoesSupportAnnounceList() {
@@ -141,7 +142,7 @@ func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTie
 
 func newFallBackOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 	if len(tiers) == 0 {
-		return nil, errors.New("tiers list can not be empty")
+		return nil, fmt.Errorf("tiers list can not be empty")
 	}
 	list, err := newLinkedTierList(tiers)
 	if err != nil {
@@ -245,7 +246,7 @@ type AllOrchestrator struct {
 
 func newAllOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 	if len(tiers) == 0 {
-		return nil, errors.New("tiers list can not be empty")
+		return nil, fmt.Errorf("tiers list can not be empty")
 	}
 	return &AllOrchestrator{
 		tiers:          tiers,

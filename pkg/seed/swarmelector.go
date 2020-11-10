@@ -40,7 +40,7 @@ func errorSwarmUpdateRequest(trackerUrl url.URL) swarmUpdateRequest {
 func successSwarmUpdateRequest(trackerUrl url.URL, response announcer.AnnounceResponse) swarmUpdateRequest {
 	return swarmUpdateRequest{
 		trackerUrl: trackerUrl,
-		interval:   time.Duration(response.Interval) * time.Second,
+		interval:   response.Interval * time.Second,
 		seeders:    response.Seeders,
 		leechers:   response.Leechers,
 	}

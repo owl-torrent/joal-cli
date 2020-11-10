@@ -2,7 +2,7 @@ package emulatedclient
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -91,7 +91,7 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 
 func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
-		panic(errors.New("EmulatedClient listener is not started"))
+		panic(fmt.Errorf("EmulatedClient listener is not started"))
 	}
 	announceRequest := announcer.AnnounceRequest{
 		InfoHash:   infoHash,

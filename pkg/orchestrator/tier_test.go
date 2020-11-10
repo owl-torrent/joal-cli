@@ -2,7 +2,7 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/nvn1729/congo"
@@ -190,7 +190,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTracke
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
+	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { _ = latch.CountDown() })
 
 	latch = congo.NewCountDownLatch(uint(3 * len(trackers)))
 	tierStates, err := tier.startAnnounceLoop(annFunc, tracker.Started)
@@ -272,7 +272,7 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 		return trackerAnnounceResult{Err: nil}
 	}
 	t2.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 	t3.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
 		return trackerAnnounceResult{Err: nil}
@@ -293,10 +293,10 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
 	t1.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 	t2.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 	t3.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
 		return trackerAnnounceResult{Err: nil}
@@ -317,13 +317,13 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportDeadIf
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
 	t1.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 	t2.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 	t3.annOnce = func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult {
-		return trackerAnnounceResult{Err: errors.New("nop")}
+		return trackerAnnounceResult{Err: fmt.Errorf("nop")}
 	}
 
 	state := tier.announceOnce(context.Background(), nil, tracker.Started)
@@ -444,7 +444,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfT
 	}
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
+	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { _ = latch.CountDown() })
 
 	latch = congo.NewCountDownLatch(uint(3 * len(trackers)))
 	tierStates, err := tier.startAnnounceLoop(annFunc, tracker.Started)
@@ -526,13 +526,13 @@ func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceed(
 	drainTierStateChanContinuously(tierStates)
 
 	select {
-	case c1 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case c1 <- trackerAnnounceResult{Err: fmt.Errorf("nop"), Completed: time.Now()}:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
 
 	select {
-	case c2 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case c2 <- trackerAnnounceResult{Err: fmt.Errorf("nop"), Completed: time.Now()}:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
@@ -567,7 +567,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldStopTrackerBeforeMovingToNext(t *t
 	defer tier.stopAnnounceLoop()
 	drainTierStateChanContinuously(tierStates)
 
-	c1 <- trackerAnnounceResult{Err: errors.New("nop")}
+	c1 <- trackerAnnounceResult{Err: fmt.Errorf("nop")}
 
 	select {
 	case <-stopped:
@@ -608,13 +608,13 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 	drainTierStateChanContinuously(tierStates)
 
 	select {
-	case c1 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case c1 <- trackerAnnounceResult{Err: fmt.Errorf("nop"), Completed: time.Now()}:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout")
 	}
 
 	select {
-	case c2 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case c2 <- trackerAnnounceResult{Err: fmt.Errorf("nop"), Completed: time.Now()}:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timeout")
 	}

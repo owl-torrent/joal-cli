@@ -3,7 +3,6 @@ package algorithm
 import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid"
-	"github.com/pkg/errors"
 )
 
 var algorithmImplementations = map[string]func() IPeerIdAlgorithm{
@@ -38,7 +37,7 @@ func (a *PeerIdAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error
 			allTypes[i] = key
 			i++
 		}
-		return errors.New(fmt.Sprintf("algorithm type '%s' does not exists. Possible values are: %v", algorithmType.Name, allTypes))
+		return fmt.Errorf("algorithm type '%s' does not exists. Possible values are: %v", algorithmType.Name, allTypes)
 	}
 
 	algorithm := implFactory()

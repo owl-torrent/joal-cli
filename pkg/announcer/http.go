@@ -41,12 +41,12 @@ func (a *HttpAnnouncer) AfterPropertiesSet() error {
 	return nil
 }
 
-func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (ret AnnounceResponse, err error) {
+func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
 	log := logs.GetLogger()
 	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
 	if err != nil {
-		return ret, errors.Wrap(err, "fail to format query string")
+		return AnnounceResponse{}, errors.Wrap(err, "fail to format query string")
 	}
 	if len(_url.Query()) > 0 {
 		queryString = fmt.Sprintf("%s&%s", url.RawQuery, queryString)
@@ -55,14 +55,14 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 
 	req, err := http.NewRequestWithContext(ctx, "GET", _url.String(), nil)
 	if err != nil {
-		return
+		return AnnounceResponse{}, err
 	}
 
 	for _, v := range a.RequestHeaders {
 		req.Header.Add(v.Name, v.Value)
 	}
 	log.Debug("announce details",
-		zap.ByteString("infohash", []byte(string(announceRequest.InfoHash[:]))),
+		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 		zap.String("protocol", req.Proto),
 		zap.String("method", req.Method),
 		zap.String("url", req.URL.String()),
@@ -81,41 +81,37 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		},
 	}).Do(req)
 	if err != nil {
-		return
+		return AnnounceResponse{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	bodyBytes, err := readResponseBody(resp)
 	if err != nil {
-		err = errors.Wrap(err, "failed to read response body")
-		return
+		return AnnounceResponse{}, errors.Wrap(err, "failed to read response body")
 	}
 	if resp.StatusCode != 200 {
-		err = fmt.Errorf("response from tracker: %s: %s", resp.Status, fmt.Sprintf("%x", bodyBytes))
-		return
+		return AnnounceResponse{}, fmt.Errorf("response from tracker: %s: %s", resp.Status, fmt.Sprintf("%x", bodyBytes))
 	}
 	var trackerResponse tracker.HttpResponse
 	err = bencode.Unmarshal(bodyBytes, &trackerResponse)
-	if _, ok := err.(bencode.ErrUnusedTrailingBytes); ok {
-		err = nil
-	} else if err != nil {
-		err = errors.Wrapf(err, "error decoding %q", bodyBytes)
-		return
+	if _, ok := err.(bencode.ErrUnusedTrailingBytes); !ok {
+		return AnnounceResponse{}, errors.Wrapf(err, "error decoding %q", bodyBytes)
 	}
 	if trackerResponse.FailureReason != "" {
-		err = fmt.Errorf("tracker gave failure reason: %q", trackerResponse.FailureReason)
-		return
+		return AnnounceResponse{}, fmt.Errorf("tracker gave failure reason: %q", trackerResponse.FailureReason)
 	}
-	ret.Interval = time.Duration(trackerResponse.Interval) * time.Second
-	ret.Leechers = trackerResponse.Incomplete
-	ret.Seeders = trackerResponse.Complete
-	ret.Peers = trackerResponse.Peers
+	ret := AnnounceResponse{
+		Interval: time.Duration(trackerResponse.Interval) * time.Second,
+		Leechers: trackerResponse.Incomplete,
+		Seeders:  trackerResponse.Complete,
+		Peers:    trackerResponse.Peers,
+	}
 	for _, na := range trackerResponse.Peers6 {
 		ret.Peers = append(ret.Peers, tracker.Peer{
 			IP:   na.IP,
 			Port: na.Port,
 		})
 	}
-	return
+	return ret, nil
 }
 
 func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (string, error) {
@@ -124,11 +120,11 @@ func buildQueryString(queryTemplate *template.Template, ar AnnounceRequest) (str
 	return sb.String(), err
 }
 
-func readResponseBody(response *http.Response) (bodyBytes []byte, err error) {
+func readResponseBody(response *http.Response) ([]byte, error) {
 	var reader = response.Body
 
 	if response.Header.Get("Content-Encoding") == "gzip" {
-		reader, err = gzip.NewReader(response.Body)
+		reader, err := gzip.NewReader(response.Body)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decode gzip body content")
 		}

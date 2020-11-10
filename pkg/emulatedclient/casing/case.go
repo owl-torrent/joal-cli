@@ -3,7 +3,6 @@ package casing
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -71,7 +70,7 @@ func (c *Case) UnmarshalJSON(b []byte) error {
 	// Note that if the string cannot be found then it will be set to the zero value, 'Lower' in this case.
 	cc, ok := toID[j]
 	if !ok {
-		return errors.New(fmt.Sprintf("Failed to unmarshall Unknown Case '%s'", j))
+		return fmt.Errorf("failed to unmarshall Unknown Case '%s'", j)
 	}
 	*c = cc
 	return nil
@@ -86,7 +85,7 @@ func (c *Case) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Note that if the string cannot be found then it will be set to the zero value, 'Lower' in this case.
 	cc, ok := toID[j]
 	if !ok {
-		return errors.New(fmt.Sprintf("Failed to unmarshall Unknown Case '%s'", j))
+		return fmt.Errorf("failed to unmarshall Unknown Case '%s'", j)
 	}
 	*c = cc
 	return nil

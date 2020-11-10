@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
@@ -27,7 +28,7 @@ type manager struct {
 
 func ConfigManagerNew(configFilePath string) (IManager, error) {
 	if !filepath.IsAbs(configFilePath) {
-		return nil, errors.New("config file path must be an absolute path")
+		return nil, fmt.Errorf("config file path must be an absolute path")
 	}
 	return &manager{
 		configPath: configFilePath,

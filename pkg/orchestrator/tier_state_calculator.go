@@ -57,7 +57,7 @@ func (c *tierStateCalculator) setIndividualState(provider ITrackerAnnouncer, ali
 	}
 
 	// recalculate the tier state with the new information available
-	var stateAfterUpdate tierState = DEAD
+	var stateAfterUpdate = DEAD
 	for _, trackerAlive := range c.trackersLastState {
 		if trackerAlive {
 			stateAfterUpdate = ALIVE

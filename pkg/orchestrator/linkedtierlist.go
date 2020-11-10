@@ -1,7 +1,7 @@
 package orchestrator
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -35,7 +35,7 @@ func (l linkedTierList) isFirst() bool {
 
 func newLinkedTierList(tiers []ITierAnnouncer) (*linkedTierList, error) {
 	if len(tiers) == 0 {
-		return nil, errors.New("tiers list can not be empty")
+		return nil, fmt.Errorf("tiers list can not be empty")
 	}
 	return &linkedTierList{
 		ITierAnnouncer: tiers[0],

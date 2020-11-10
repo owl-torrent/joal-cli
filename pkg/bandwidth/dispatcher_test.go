@@ -80,12 +80,12 @@ func Test_calculateWeightShouldProvidePreciseValues(t *testing.T) {
 	assert.Zero(t, calculateWeight(&testSwarm{seeders: 0, leechers: 0}))
 	assert.Equal(t, 25.0, calculateWeight(&testSwarm{seeders: 1, leechers: 1}))
 	assert.Equal(t, 50000.0, calculateWeight(&testSwarm{seeders: 2000, leechers: 2000}))
-	assert.InDelta(t, float64(11.1), calculateWeight(&testSwarm{seeders: 2, leechers: 1}), 0.1)
-	assert.InDelta(t, float64(0.104058273), calculateWeight(&testSwarm{seeders: 30, leechers: 1}), 0.00000001)
-	assert.InDelta(t, float64(9611.687812), calculateWeight(&testSwarm{seeders: 2, leechers: 100}), 0.0001)
-	assert.InDelta(t, float64(73.01243916), calculateWeight(&testSwarm{seeders: 2000, leechers: 150}), 0.00001)
-	assert.InDelta(t, float64(173066.5224), calculateWeight(&testSwarm{seeders: 150, leechers: 2000}), 0.01)
-	assert.InDelta(t, float64(184911.2426), calculateWeight(&testSwarm{seeders: 80, leechers: 2000}), 0.1)
+	assert.InDelta(t, 11.1, calculateWeight(&testSwarm{seeders: 2, leechers: 1}), 0.1)
+	assert.InDelta(t, 0.104058273, calculateWeight(&testSwarm{seeders: 30, leechers: 1}), 0.00000001)
+	assert.InDelta(t, 9611.687812, calculateWeight(&testSwarm{seeders: 2, leechers: 100}), 0.0001)
+	assert.InDelta(t, 73.01243916, calculateWeight(&testSwarm{seeders: 2000, leechers: 150}), 0.00001)
+	assert.InDelta(t, 173066.5224, calculateWeight(&testSwarm{seeders: 150, leechers: 2000}), 0.01)
+	assert.InDelta(t, 184911.2426, calculateWeight(&testSwarm{seeders: 80, leechers: 2000}), 0.1)
 }
 
 type DumbSwarm struct {
@@ -185,7 +185,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 		infoHash:           ih1,
 		uploaded:           0,
 		swarm:              &DumbSwarm{seeders: 100, leechers: 100},
-		onFirstAddUploaded: func() { latch.CountDown() },
+		onFirstAddUploaded: func() { _ = latch.CountDown() },
 		addOnlyOnce:        true,
 		lock:               &sync.Mutex{},
 	}

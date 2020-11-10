@@ -3,7 +3,6 @@ package emulatedclient
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -91,5 +90,5 @@ func getPublicIp() (net.IP, error) {
 		return ip, nil
 	}
 
-	return nil, errors.New("failed to get public IP address.")
+	return nil, fmt.Errorf("failed to get public IP address")
 }

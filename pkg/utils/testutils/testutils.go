@@ -1,7 +1,7 @@
 package testutils
 
 import (
-	"errors"
+	"fmt"
 	"github.com/go-playground/validator/v10"
 	"net/url"
 	"sync"
@@ -42,7 +42,7 @@ func WaitOrFailAfterTimeout(wg *sync.WaitGroup, timeout time.Duration) error {
 	case <-c:
 		return nil // completed normally
 	case <-time.After(timeout):
-		return errors.New("WaitGroup.Wait() timeout") // timed out
+		return fmt.Errorf("WaitGroup.Wait() timeout") // timed out
 	}
 }
 

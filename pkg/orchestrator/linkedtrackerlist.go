@@ -1,7 +1,7 @@
 package orchestrator
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -53,7 +53,7 @@ func (l *linkedTrackerList) isLast() bool {
 
 func newLinkedTrackerList(tiers []ITrackerAnnouncer) (*linkedTrackerList, error) {
 	if len(tiers) == 0 {
-		return nil, errors.New("tiers list can not be empty")
+		return nil, fmt.Errorf("tiers list can not be empty")
 	}
 	return &linkedTrackerList{
 		ITrackerAnnouncer: tiers[0],

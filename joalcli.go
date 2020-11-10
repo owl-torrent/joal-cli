@@ -13,7 +13,7 @@ import (
 // especially for bencode and tracker subpackages
 //TODO check if init() is needed here, it used to be for log init
 func main() {
-	defer logs.GetLogger().Sync()
+	defer func() { _ = logs.GetLogger().Sync() }()
 	conf, err := config.ConfigManagerNew(os.Args[1])
 	if err != nil {
 		panic(err)
@@ -30,10 +30,7 @@ func main() {
 
 	timer := time.NewTimer(10 * time.Second)
 	<-timer.C
-	joal.Stop(nonCancellableTimeoutContext(5 * time.Second))
-}
-
-func nonCancellableTimeoutContext(duration time.Duration) context.Context {
-	ctx, _ := context.WithTimeout(context.Background(), duration)
-	return ctx
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	joal.Stop(ctx)
+	cancel()
 }

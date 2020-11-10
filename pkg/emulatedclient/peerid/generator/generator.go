@@ -47,7 +47,7 @@ func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error
 			allTypes[i] = key
 			i++
 		}
-		return errors.New(fmt.Sprintf("peerIdGenerator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes))
+		return fmt.Errorf("peerIdGenerator type '%s' does not exists. Possible values are: %v", unmarshalStruct.Name, allTypes)
 	}
 
 	generator := implFactory()
@@ -97,7 +97,7 @@ func (s *AccessAwarePeerId) Get() peerid.PeerId {
 
 // time elapsed since last access
 func (s *AccessAwarePeerId) LastAccess() time.Duration {
-	return time.Now().Sub(s.lastAccessed)
+	return time.Since(s.lastAccessed)
 }
 
 func evictOldEntries(entries map[torrent.InfoHash]*AccessAwarePeerId, evictAfter time.Duration) {

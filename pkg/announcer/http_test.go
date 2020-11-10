@@ -192,6 +192,9 @@ func TestHttpAnnouncer_AnnounceShouldUnderstandAndDecodeGzip(t *testing.T) {
 		var b bytes.Buffer
 		gz := gzip.NewWriter(&b)
 		_, err = gz.Write(respBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
 		_ = gz.Close()
 
 		w.Header().Add("Content-Encoding", "gzip")

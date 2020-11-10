@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
@@ -18,8 +17,7 @@ import (
 var NoOpAnnouncingFun AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 	return announcer.AnnounceResponse{}, nil
 }
-var ThirtyMinutesIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(30 * time.Minute)
-var ZeroIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(0 * time.Millisecond)
+var ThirtyMinutesIntervalNoOpAnnouncingFunc = buildAnnouncingFunc(30 * time.Minute)
 
 func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) AnnouncingFunction {
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
@@ -32,15 +30,6 @@ func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) A
 			Seeders:  0,
 			Peers:    []tracker.Peer{},
 		}, nil
-	}
-}
-
-func buildErrAnnouncingFunc(callbacks ...func(u url.URL)) AnnouncingFunction {
-	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
-		for _, c := range callbacks {
-			c(u)
-		}
-		return announcer.AnnounceResponse{}, errors.New("nop")
 	}
 }
 
@@ -359,7 +348,7 @@ func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *t
 				c := make(chan tierState)
 				go func() {
 					for {
-						latch.CountDown()
+						_ = latch.CountDown()
 						c <- DEAD
 					}
 				}()
@@ -692,7 +681,7 @@ func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testin
 				c := make(chan tierState)
 				go func() {
 					for {
-						latch.CountDown()
+						_ = latch.CountDown()
 						c <- DEAD
 						runtime.Gosched()
 					}
