@@ -124,7 +124,8 @@ func readResponseBody(response *http.Response) ([]byte, error) {
 	var reader = response.Body
 
 	if response.Header.Get("Content-Encoding") == "gzip" {
-		reader, err := gzip.NewReader(response.Body)
+		var err error
+		reader, err = gzip.NewReader(response.Body)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decode gzip body content")
 		}
