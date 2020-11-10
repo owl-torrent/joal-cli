@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -38,8 +37,6 @@ func Test_linkedTrackerList_isFirst(t *testing.T) {
 }
 
 func Test_linkedTrackerList_isLast(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	type fields struct {
 		current      ITrackerAnnouncer
 		currentIndex uint
@@ -69,10 +66,8 @@ func Test_linkedTrackerList_isLast(t *testing.T) {
 	}
 }
 
+//goland:noinspection GoNilness
 func Test_linkedTrackerList_ShouldGoToNextAndFinallyGetBackToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var ts []ITrackerAnnouncer
 	for i := 0; i < 50; i++ {
 		ts = append(ts, &mockedTrackerAnnouncer{})
@@ -94,9 +89,6 @@ func Test_linkedTrackerList_ShouldGoToNextAndFinallyGetBackToFirst(t *testing.T)
 }
 
 func Test_linkedTrackerList_ShouldPromoteToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	t1 := &mockedTrackerAnnouncer{}
 	t2 := &mockedTrackerAnnouncer{}
 	t3 := &mockedTrackerAnnouncer{}
@@ -137,9 +129,6 @@ func Test_linkedTrackerList_ShouldPromoteToFirst(t *testing.T) {
 }
 
 func Test_linkedTrackerList_ShouldPromoteLastToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	t1 := &mockedTrackerAnnouncer{}
 	t2 := &mockedTrackerAnnouncer{}
 	t3 := &mockedTrackerAnnouncer{}
@@ -164,9 +153,6 @@ func Test_linkedTrackerList_ShouldPromoteLastToFirst(t *testing.T) {
 }
 
 func Test_linkedTrackerList_ShouldPromoteToFirstWithSingleTracker(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	t1 := &mockedTrackerAnnouncer{}
 
 	list, _ := newLinkedTrackerList([]ITrackerAnnouncer{t1})
@@ -186,9 +172,6 @@ func Test_linkedTrackerList_ShouldPromoteToFirstWithSingleTracker(t *testing.T) 
 }
 
 func Test_linkedTrackerList_ShouldPromoteFirstToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	t1 := &mockedTrackerAnnouncer{}
 	t2 := &mockedTrackerAnnouncer{}
 	t3 := &mockedTrackerAnnouncer{}
@@ -210,9 +193,6 @@ func Test_linkedTrackerList_ShouldPromoteFirstToFirst(t *testing.T) {
 }
 
 func Test_linkedTrackerList_ShouldWorkWithOnlyOneEntry(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	ts := []ITrackerAnnouncer{&mockedTrackerAnnouncer{}}
 
 	list, _ := newLinkedTrackerList(ts)

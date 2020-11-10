@@ -31,10 +31,6 @@ jobs:
       - name: dependencies
         run: |
           go mod download
-          GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
-
-      - name: generate
-        run: go generate ./...
 
       - name: lint
         uses: golangci/golangci-lint-action@v2
@@ -64,10 +60,6 @@ jobs:
       - name: dependencies
         run: |
           go mod download
-          GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
-
-      - name: generate
-        run: go generate ./...
 
       - name: build
         run:  go build -v .

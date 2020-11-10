@@ -1,6 +1,7 @@
 # ROADMAP to v3.0
 
-- [ ] remove dependency to mockgen. It introduce too much CI clutering
+- [x] remove dependency to mockgen. It introduce too much CI clutering
+- [ ] add github actions
 - [ ] implement the new torrent struct
 - [ ] link torrent with orchestrator
 - [ ] link torrent with dispatcher

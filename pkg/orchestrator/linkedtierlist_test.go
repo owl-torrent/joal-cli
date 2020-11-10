@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -37,13 +36,11 @@ func Test_linkedTierList_isFirst(t *testing.T) {
 	}
 }
 
+//goland:noinspection GoNilness
 func Test_linkedTierList_ShouldGoToNextAndFinalyGetBackToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var ts []ITierAnnouncer
 	for i := 0; i < 50; i++ {
-		ts = append(ts, NewMockITierAnnouncer(ctrl))
+		ts = append(ts, &FallbackTrackersTierAnnouncer{})
 	}
 
 	list, _ := newLinkedTierList(ts)
@@ -61,13 +58,11 @@ func Test_linkedTierList_ShouldGoToNextAndFinalyGetBackToFirst(t *testing.T) {
 	assert.Same(t, list.ITierAnnouncer, ts[0])
 }
 
+//goland:noinspection GoNilness
 func Test_linkedTierList_ShouldForwardToFirst(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var ts []ITierAnnouncer
 	for i := 0; i < 50; i++ {
-		ts = append(ts, NewMockITierAnnouncer(ctrl))
+		ts = append(ts, &FallbackTrackersTierAnnouncer{})
 	}
 
 	list, _ := newLinkedTierList(ts)
@@ -87,10 +82,7 @@ func Test_linkedTierList_ShouldForwardToFirst(t *testing.T) {
 }
 
 func Test_linkedTierList_ShouldWorkWithOnlyOneEntry(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	ts := []ITierAnnouncer{NewMockITierAnnouncer(ctrl)}
+	ts := []ITierAnnouncer{&FallbackTrackersTierAnnouncer{}}
 
 	list, _ := newLinkedTierList(ts)
 

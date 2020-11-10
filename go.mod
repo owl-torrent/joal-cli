@@ -10,7 +10,6 @@ require (
 	github.com/benbjohnson/immutable v0.2.1 // indirect
 	github.com/elliotchance/orderedmap v1.3.0 // indirect
 	github.com/go-playground/validator/v10 v10.0.1
-	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2 // indirect

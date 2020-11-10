@@ -5,18 +5,21 @@ import (
 	"errors"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/announcer"
-	"github.com/golang/mock/gomock"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/nvn1729/congo"
 	"net/url"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
 
 //noinspection GoVarAndConstTypeMayBeOmitted
+var NoOpAnnouncingFun AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
+	return announcer.AnnounceResponse{}, nil
+}
 var ThirtyMinutesIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(30 * time.Minute)
 var ZeroIntervalNoOpAnnouncingFunc AnnouncingFunction = buildAnnouncingFunc(0 * time.Millisecond)
-var ErrorAnnouncingFunc AnnouncingFunction = buildErrAnnouncingFunc()
 
 func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) AnnouncingFunction {
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
@@ -49,718 +52,482 @@ func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {
 }
 
 func Test_FallbackOrchestrator_ShouldAnnounceOnlyOnFirstTierIfItSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var tiers []ITierAnnouncer
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	tiers = append(tiers, t3)
-
-	t4 := NewMockITierAnnouncer(ctrl)
-	tiers = append(tiers, t4)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
 	}
 
+	t2HasBeenStarted := make(chan struct{})
+	c2 := make(chan tierState)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			t2HasBeenStarted <- struct{}{}
+			return c2, nil
+		},
+	}
+
+	tiers := []ITierAnnouncer{t1, t2}
+
+	o, _ := newFallBackOrchestrator(tiers...)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	c1 <- ALIVE
+
 	runtime.Gosched()
-	time.Sleep(50 * time.Millisecond) // leave some time to ensure nothing more is called
+
+	select {
+	case <-time.After(50 * time.Millisecond):
+	case <-t2HasBeenStarted:
+		t.Fatal("tier2 was started")
+	}
+
 }
 
 func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var tiers []ITierAnnouncer
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	t4 := NewMockITierAnnouncer(ctrl)
-	c4 := make(chan tierState)
-	t4.EXPECT().States().Return(c4).AnyTimes()
-	t4.EXPECT().stopAnnounceLoop().AnyTimes()
-	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t4)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c1 <- tierState(DEAD) }).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c2 <- tierState(DEAD) }).Times(1),
-		t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c3 <- ALIVE
-			latch.CountDown()
-		}).Times(1),
-		t3.EXPECT().LastKnownInterval().Return(1800*time.Second, nil).Times(1),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
 	}
 
-	runtime.Gosched()
-	time.Sleep(50 * time.Millisecond) // leave some time to ensure nothing more is called
-}
-
-func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceedUpToLast(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var tiers []ITierAnnouncer
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	t4 := NewMockITierAnnouncer(ctrl)
-	c4 := make(chan tierState)
-	t4.EXPECT().States().Return(c4).AnyTimes()
-	t4.EXPECT().stopAnnounceLoop().AnyTimes()
-	t4.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t4)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c1 <- tierState(DEAD) }).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c2 <- tierState(DEAD) }).Times(1),
-		t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c3 <- tierState(DEAD) }).Times(1),
-		t4.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c4 <- ALIVE
-			latch.CountDown()
-		}).Times(1),
-		t4.EXPECT().LastKnownInterval().Return(1800*time.Second, nil).Times(1),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
 	}
 
-	runtime.Gosched()
-	time.Sleep(50 * time.Millisecond) // leave some time to ensure nothing more is called
+	c3 := make(chan tierState)
+	t3 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c3, nil
+		},
+	}
+
+	tiers := []ITierAnnouncer{t1, t2, t3}
+
+	o, _ := newFallBackOrchestrator(tiers...)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c3 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
 }
 
 func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		lastInterval: 24 * time.Hour,
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+	}
 
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	// After all tiers has failed, primary tier will be asked for the last known interval, this test will verify that the tier does wait for the interval and does not re-announce immediatly
-	t1.EXPECT().LastKnownInterval().Return(1800*time.Second, nil).AnyTimes()
-
-	shouldNotRelease := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- tierState(DEAD)
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- tierState(DEAD)
-		}).Times(1),
-		t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c3 <- tierState(DEAD)
-		}).Times(1),
-	)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		// this should not be called because the tier should be in pause
-		shouldNotRelease.CountDown()
-	}).Times(0)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	runtime.Gosched()
-	if shouldNotRelease.WaitTimeout(100 * time.Millisecond) {
-		t.Fatal("shouldNotRelease shouldn't have been release, startAnnounceLoop has been called immediatly after all tiers failed")
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case <-time.After(50 * time.Millisecond):
+	case c1 <- DEAD:
+		t.Fatal("orchestrator has not wait after all tracker failed to announce")
+	}
+}
+
+func Test_FallbackOrchestrator_ShouldGoBackToFirstTierIfAllFails(t *testing.T) {
+	c1 := make(chan tierState)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		lastInterval: 0 * time.Millisecond,
+	}
+
+	c2 := make(chan tierState)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+	}
+
+	tiers := []ITierAnnouncer{t1, t2}
+
+	o, _ := newFallBackOrchestrator(tiers...)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
 
 func Test_FallbackOrchestrator_ShouldReAnnounceOnFirstTrackerAfterABackupTierHasSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+		lastInterval: 0 * time.Millisecond,
+	}
 
-	t3 := NewMockITierAnnouncer(ctrl)
 	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
+	t3 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c3, nil
+		},
+	}
 
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c1 <- tierState(DEAD) }).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c2 <- ALIVE }).Times(1),
-		t2.EXPECT().LastKnownInterval().Return(1*time.Millisecond, nil).Times(1),
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.None)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- ALIVE
-			latch.CountDown()
-		}).Times(1),
-	)
+	tiers := []ITierAnnouncer{t1, t2, t3}
 
 	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
+	select {
+	case c2 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
 }
 
 func Test_FallbackOrchestrator_ShouldKeepAnnouncingToFirstTrackerIfItSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		lastInterval: 0 * time.Millisecond,
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+	}
 
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- ALIVE
-		}).Times(1),
-	)
-
-	shouldNotRelease := congo.NewCountDownLatch(1)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		// this should not be called because the tier should be in pause
-		shouldNotRelease.CountDown()
-	}).Times(0)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	runtime.Gosched()
-	if shouldNotRelease.WaitTimeout(100 * time.Millisecond) {
-		t.Fatal("shouldNotRelease shouldn't have been release, startAnnounceLoop has been called immediatly after all tiers failed")
+	select {
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
 
 func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingToNext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
+	stoppingOne := make(chan struct{})
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	t1.EXPECT().LastKnownInterval().Return(1800*time.Millisecond, nil).Times(1)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c1 <- tierState(DEAD) }).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c2 <- tierState(DEAD) }).Times(1),
-		t2.EXPECT().stopAnnounceLoop().Times(1),
-		t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c3 <- tierState(DEAD) }).Times(1),
-		t3.EXPECT().stopAnnounceLoop().Do(func() {
-			latch.CountDown()
-		}).Times(1),
-	)
-
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-
-	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		stopAnnLoop: func() {
+			stoppingOne <- struct{}{}
+		},
 	}
-}
 
-func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingBackToPrimaryAfterBackupSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	t2.EXPECT().LastKnownInterval().Return(1800*time.Millisecond, nil).Times(1)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c1 <- tierState(DEAD) }).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) { c2 <- ALIVE }).Times(1),
-		t2.EXPECT().stopAnnounceLoop().Do(func() {
-			latch.CountDown()
-		}).Times(1),
-	)
-
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-
-	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
 	}
-}
 
-func Test_FallbackOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-	)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	t1.EXPECT().stopAnnounceLoop().Times(1)
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	select {
+	case <-stoppingOne:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not stopped tier")
 	}
 }
 
 func Test_FallbackOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	o, _ := newFallBackOrchestrator(&mockedTierAnnouncer{}, &mockedTierAnnouncer{}, &mockedTierAnnouncer{})
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	o, _ := newFallBackOrchestrator(NewMockITierAnnouncer(ctrl))
-
-	latch := congo.NewCountDownLatch(1)
+	done := make(chan struct{})
 	go func() {
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		latch.CountDown()
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		done <- struct{}{}
 	}()
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("Should not have blocked")
+	select {
+	case <-done:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout")
 	}
 }
 
 func Test_FallbackOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	latch := congo.NewCountDownLatch(10000)
+	var tiers []ITierAnnouncer
+	var latch *congo.CountDownLatch
 
 	for i := 0; i < 3000; i++ {
-		tier := NewMockITierAnnouncer(ctrl)
-		c := make(chan tierState)
-		tier.EXPECT().States().Return(c).AnyTimes()
-		tier.EXPECT().stopAnnounceLoop().AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c <- tierState(DEAD)
-			latch.CountDown()
-		}).MinTimes(1)
-		tier.EXPECT().LastKnownInterval().Return(1*time.Millisecond, nil).AnyTimes()
-
-		tiers = append(tiers, tier)
+		t := &mockedTierAnnouncer{
+			lastInterval: 0 * time.Millisecond,
+			startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+				c := make(chan tierState)
+				go func() {
+					for {
+						latch.CountDown()
+						c <- DEAD
+					}
+				}()
+				return c, nil
+			},
+		}
+		tiers = append(tiers, t)
 	}
 
+	latch = congo.NewCountDownLatch(uint(3 * len(tiers)))
 	o, _ := newFallBackOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	if !latch.WaitTimeout(10 * time.Second) {
+	if !latch.WaitTimeout(50 * time.Second) {
 		t.Fatal("latch has not been released")
 	}
 }
 
 func Test_FallbackOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	type startStopMockedTierAnnouncer struct {
+		*mockedTierAnnouncer
+		wgStart *sync.WaitGroup
+		wgStop  *sync.WaitGroup
+	}
 
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &startStopMockedTierAnnouncer{
+		mockedTierAnnouncer: &mockedTierAnnouncer{},
+		wgStart:             &sync.WaitGroup{},
+		wgStop:              &sync.WaitGroup{},
+	}
+	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+		t1.wgStart.Done()
+		return c1, nil
+	}
+	t1.stopAnnLoop = func() {
+		t1.wgStop.Done()
+	}
 
-	latch := congo.NewCountDownLatch(1)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		c1 <- ALIVE
-		latch.CountDown()
-	}).Times(1)
+	tiers := []ITierAnnouncer{t1}
 
 	o, _ := newFallBackOrchestrator(tiers...)
 
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1.wgStart.Add(1)
+	o.Start(NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not started")
 	}
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
 
-	latch = congo.NewCountDownLatch(1)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		c1 <- ALIVE
-		latch.CountDown()
-	}).Times(1)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1.wgStop.Add(1)
+	o.Stop(context.Background(), NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not stopped")
 	}
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+
+	t1.wgStart.Add(1)
+	o.Start(NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not started")
+	}
+
+	t1.wgStop.Add(1)
+	o.Stop(context.Background(), NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not stopped")
+	}
 }
 
 func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
+	callAnnounceStop := make(chan struct{})
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	tiers = append(tiers, t2)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				close(callAnnounceStop)
+			}
 			return ALIVE
-		}),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+		},
 	}
 
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-}
-
-func Test_FallbackOrchestrator_ShouldAnnounceStopAndExitIfCurrentTierFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	tiers = append(tiers, t2)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			return tierState(DEAD)
-		}),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
 	}
 
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-}
-
-func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	tiers = append(tiers, t2)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			time.Sleep(5 * time.Hour)
-			return ALIVE
-		}),
-	)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newFallBackOrchestrator(tiers...)
+	o.Start(nil)
 
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
-	}
-
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Millisecond)
-
-	doneChan := make(chan struct{})
-	go func() {
-		o.Stop(ctx, ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		doneChan <- struct{}{}
-	}()
 	select {
-	case <-time.After(1 * time.Second):
-		t.Fatal("Stop has not exited when context has expired")
-	case <-doneChan:
-		// stop has exited
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
+	go o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	select {
+	case <-callAnnounceStop:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 }
 
-func Test_FallbackOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
+func Test_FallbackOrchestrator_ShouldAnnounceStopAndReturnIfAllTiersFails(t *testing.T) {
+	t1STOP := make(chan struct{})
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			time.Sleep(5 * time.Hour)
-			return ALIVE
-		}),
-	)
-
-	o, _ := newFallBackOrchestrator(tiers...)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t1STOP <- struct{}{}
+			}
+			return DEAD
+		},
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	t2STOP := make(chan struct{})
+	c2 := make(chan tierState)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t2STOP <- struct{}{}
+			}
+			return DEAD
+		},
+	}
 
-	doneChan := make(chan struct{})
-	go func() {
-		o.Stop(ctx, ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		doneChan <- struct{}{}
-	}()
+	tiers := []ITierAnnouncer{t1, t2}
+
+	o, _ := newFallBackOrchestrator(tiers...)
+	o.Start(nil)
+
 	select {
-	case <-time.After(1 * time.Second):
-		t.Fatal("Stop has not exited when context has expired")
-	case <-doneChan:
-		// stop has exited
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
+	doneStop := make(chan tierState)
+	go func() {
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		close(doneStop)
+	}()
+
+	select {
+	case <-t1STOP:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
+	}
+
+	select {
+	case <-doneStop:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("stop has not ended")
 	}
 }
 
@@ -772,419 +539,355 @@ func Test_AllOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {
 }
 
 func Test_AllOrchestrator_ShouldAnnounceOnAllTiers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-	latchs := make([]*congo.CountDownLatch, 0)
-
-	for i := 0; i < 5; i++ {
-		latch := congo.NewCountDownLatch(1)
-		tier := NewMockITierAnnouncer(ctrl)
-		c := make(chan tierState)
-		tier.EXPECT().States().Return(c).AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		tier.EXPECT().stopAnnounceLoop().AnyTimes()
-		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c <- ALIVE
-			latch.CountDown()
-		}).Times(1)
-
-		tiers = append(tiers, tier)
-		latchs = append(latchs, latch)
-	}
-
-	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	for i, latch := range latchs {
-		if !latch.WaitTimeout(500 * time.Millisecond) {
-			t.Fatalf("latch has not been released at index %d", i)
-		}
-	}
-}
-
-func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfOneTierFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+	}
 
-	latch := congo.NewCountDownLatch(2)
-
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c1 <- ALIVE
-	}).Times(1)
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c2 <- tierState(DEAD)
-	}).Times(1)
-
-	t1.EXPECT().stopAnnounceLoop().Times(0)
-	t2.EXPECT().stopAnnounceLoop().Times(0)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	runtime.Gosched()
-	time.Sleep(50 * time.Millisecond)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	select {
+	case c1 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- ALIVE:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
 
 func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfAllTierFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+	}
 
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	latch := congo.NewCountDownLatch(3)
-
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c1 <- tierState(DEAD)
-	}).Times(1)
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c2 <- tierState(DEAD)
-	}).Times(1)
-	t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c3 <- tierState(DEAD)
-	}).Times(1)
-
-	t1.EXPECT().stopAnnounceLoop().Times(0)
-	t2.EXPECT().stopAnnounceLoop().Times(0)
-	t3.EXPECT().stopAnnounceLoop().Times(0)
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+	select {
+	case c2 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
 
 func Test_AllOrchestrator_ShouldStartAndStopLoop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t2)
-
-	t3 := NewMockITierAnnouncer(ctrl)
-	c3 := make(chan tierState)
-	t3.EXPECT().States().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	tiers = append(tiers, t3)
-
-	latch := congo.NewCountDownLatch(3)
-
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c1 <- ALIVE
-	}).Times(1)
-	t1.EXPECT().stopAnnounceLoop().Times(1)
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c2 <- ALIVE
-	}).Times(1)
-	t2.EXPECT().stopAnnounceLoop().Times(1)
-	t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		defer latch.CountDown()
-		c3 <- ALIVE
-	}).Times(1)
-	t3.EXPECT().stopAnnounceLoop().Times(1)
-
-	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	type startStopMockedTierAnnouncer struct {
+		*mockedTierAnnouncer
+		wgStart *sync.WaitGroup
+		wgStop  *sync.WaitGroup
 	}
-}
 
-func Test_AllOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	var tiers []ITierAnnouncer
 
-	o, _ := newAllOrchestrator(NewMockITierAnnouncer(ctrl))
+	for i := 0; i < 30; i++ {
+		tier := &startStopMockedTierAnnouncer{
+			mockedTierAnnouncer: &mockedTierAnnouncer{},
+			wgStart:             &sync.WaitGroup{},
+			wgStop:              &sync.WaitGroup{},
+		}
+		tier.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			tier.wgStart.Done()
+			return make(chan tierState), nil
+		}
+		tier.stopAnnLoop = func() {
+			tier.wgStop.Done()
+		}
 
-	latch := congo.NewCountDownLatch(1)
-	go func() {
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		latch.CountDown()
-	}()
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("Should not have blocked")
-	}
-}
-
-func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	latch := congo.NewCountDownLatch(3000)
-
-	for i := 0; i < 3000; i++ {
-		tier := NewMockITierAnnouncer(ctrl)
-		c := make(chan tierState)
-		tier.EXPECT().States().Return(c).AnyTimes()
-		tier.EXPECT().stopAnnounceLoop().AnyTimes()
-		tier.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		tier.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			c <- ALIVE
-			latch.CountDown()
-		}).AnyTimes()
-		tier.EXPECT().LastKnownInterval().Return(1*time.Millisecond, nil).AnyTimes()
+		tier.wgStart.Add(1)
+		tier.wgStop.Add(1)
 
 		tiers = append(tiers, tier)
 	}
 
 	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
-	defer o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+	o.Start(nil)
 
-	if !latch.WaitTimeout(10 * time.Second) {
+	for _, ti := range tiers {
+		tier := ti.(*startStopMockedTierAnnouncer)
+		if testutils.WaitOrFailAfterTimeout(tier.wgStart, 500*time.Millisecond) != nil {
+			t.Fatal("not ALL the trackers have been instruct to start")
+		}
+	}
+
+	o.Stop(context.Background(), NoOpAnnouncingFun)
+	for _, ti := range tiers {
+		tier := ti.(*startStopMockedTierAnnouncer)
+		if testutils.WaitOrFailAfterTimeout(tier.wgStop, 500*time.Millisecond) != nil {
+			t.Fatal("not ALL the trackers have been instruct to start")
+		}
+	}
+}
+
+func Test_AllOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.T) {
+	o, _ := newAllOrchestrator(&mockedTierAnnouncer{}, &mockedTierAnnouncer{}, &mockedTierAnnouncer{})
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	done := make(chan struct{})
+	go func() {
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+}
+
+func Test_AllOrchestrator_ShouldBeSafeToRunWithTremendousAmountOfTiers(t *testing.T) {
+	var tiers []ITierAnnouncer
+	var latch *congo.CountDownLatch
+
+	for i := 0; i < 3000; i++ {
+		t := &mockedTierAnnouncer{
+			lastInterval: 0 * time.Millisecond,
+			startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+				c := make(chan tierState)
+				go func() {
+					for {
+						latch.CountDown()
+						c <- DEAD
+						runtime.Gosched()
+					}
+				}()
+				return c, nil
+			},
+		}
+		tiers = append(tiers, t)
+	}
+
+	latch = congo.NewCountDownLatch(uint(3 * len(tiers)))
+	o, _ := newAllOrchestrator(tiers...)
+	o.Start(nil)
+	defer o.Stop(context.Background(), NoOpAnnouncingFun)
+
+	if !latch.WaitTimeout(50 * time.Second) {
 		t.Fatal("latch has not been released")
 	}
 }
 
 func Test_AllOrchestrator_ShouldBeReusableAfterStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	type startStopMockedTierAnnouncer struct {
+		*mockedTierAnnouncer
+		wgStart *sync.WaitGroup
+		wgStop  *sync.WaitGroup
+	}
 
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &startStopMockedTierAnnouncer{
+		mockedTierAnnouncer: &mockedTierAnnouncer{},
+		wgStart:             &sync.WaitGroup{},
+		wgStop:              &sync.WaitGroup{},
+	}
+	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+		t1.wgStart.Done()
+		return c1, nil
+	}
+	t1.stopAnnLoop = func() {
+		t1.wgStop.Done()
+	}
 
-	latch := congo.NewCountDownLatch(1)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		c1 <- ALIVE
-		latch.CountDown()
-	}).Times(1)
+	tiers := []ITierAnnouncer{t1}
 
 	o, _ := newAllOrchestrator(tiers...)
-	go o.Start(nil)
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1.wgStart.Add(1)
+	o.Start(NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not started")
 	}
 
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-
-	latch = congo.NewCountDownLatch(1)
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-		c1 <- ALIVE
-		latch.CountDown()
-	}).Times(1)
-
-	go o.Start(nil)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t1.wgStop.Add(1)
+	o.Stop(context.Background(), NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not stopped")
 	}
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
+
+	t1.wgStart.Add(1)
+	o.Start(NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not started")
+	}
+
+	t1.wgStop.Add(1)
+	o.Stop(context.Background(), NoOpAnnouncingFun)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not stopped")
+	}
 }
 
 func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
+	t1STOP := make(chan struct{}, 1)
 	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t1STOP <- struct{}{}
+			}
+			return ALIVE
+		},
+	}
 
-	t2 := NewMockITierAnnouncer(ctrl)
+	t2STOP := make(chan struct{}, 1)
 	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	tiers = append(tiers, t2)
-
-	latch := congo.NewCountDownLatch(2)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			return ALIVE
-		}),
-	)
-	gomock.InOrder(
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c2 <- ALIVE
-		}).Times(1),
-		t2.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			return ALIVE
-		}),
-	)
-
-	o, _ := newAllOrchestrator(tiers...)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t2STOP <- struct{}{}
+			}
+			return DEAD
+		},
 	}
 
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-}
-
-func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfNoneSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	t2 := NewMockITierAnnouncer(ctrl)
-	c2 := make(chan tierState)
-	t2.EXPECT().States().Return(c2).AnyTimes()
-	tiers = append(tiers, t2)
-
-	latch := congo.NewCountDownLatch(2)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-	)
-	gomock.InOrder(
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t2.EXPECT().stopAnnounceLoop().Times(1),
-	)
-
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-		return tierState(DEAD)
-	})
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-		return tierState(DEAD)
-	})
+	tiers := []ITierAnnouncer{t1, t2}
 
 	o, _ := newAllOrchestrator(tiers...)
+	o.Start(nil)
 
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
-	}
-
-	o.Stop(context.Background(), ThirtyMinutesIntervalNoOpAnnouncingFunc)
-}
-
-func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndQuitIfContextExpires(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	tiers := make([]ITierAnnouncer, 0)
-
-	t1 := NewMockITierAnnouncer(ctrl)
-	c1 := make(chan tierState)
-	t1.EXPECT().States().Return(c1).AnyTimes()
-	tiers = append(tiers, t1)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Eq(tracker.Started)).Do(func(annFunc AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			c1 <- ALIVE
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Eq(tracker.Stopped)).DoAndReturn(func(ctx context.Context, annFunc AnnouncingFunction, e tracker.AnnounceEvent) tierState {
-			time.Sleep(5 * time.Hour)
-			return ALIVE
-		}),
-	)
-
-	o, _ := newAllOrchestrator(tiers...)
-
-	go o.Start(nil)
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
-	}
-
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Millisecond)
-
-	doneChan := make(chan struct{})
-	go func() {
-		o.Stop(ctx, ThirtyMinutesIntervalNoOpAnnouncingFunc)
-		doneChan <- struct{}{}
-	}()
 	select {
-	case <-time.After(1 * time.Second):
-		t.Fatal("Stop has not exited when context has expired")
-	case <-doneChan:
-		// stop has exited
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
+	doneStop := make(chan tierState)
+	go func() {
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		close(doneStop)
+	}()
+
+	select {
+	case <-t1STOP:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
+	}
+	select {
+	case <-t2STOP:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
+	}
+
+	select {
+	case <-doneStop:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("stop has not ended")
+	}
+}
+
+func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndReturnIfNoneSucceed(t *testing.T) {
+	t1STOP := make(chan struct{})
+	c1 := make(chan tierState)
+	t1 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c1, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t1STOP <- struct{}{}
+			}
+			return DEAD
+		},
+	}
+
+	t2STOP := make(chan struct{})
+	c2 := make(chan tierState)
+	t2 := &mockedTierAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+			return c2, nil
+		},
+		annOnce: func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+			if event == tracker.Stopped {
+				t2STOP <- struct{}{}
+			}
+			return DEAD
+		},
+	}
+
+	tiers := []ITierAnnouncer{t1, t2}
+
+	o, _ := newAllOrchestrator(tiers...)
+	o.Start(nil)
+
+	select {
+	case c1 <- DEAD:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
+	}
+
+	doneStop := make(chan tierState)
+	go func() {
+		o.Stop(context.Background(), NoOpAnnouncingFun)
+		close(doneStop)
+	}()
+
+	select {
+	case <-t1STOP:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
+	}
+	select {
+	case <-t2STOP:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout: orchestrator did not sent STOP announce")
+	}
+
+	select {
+	case <-doneStop:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("stop has not ended")
 	}
 }

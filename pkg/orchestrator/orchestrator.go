@@ -1,7 +1,5 @@
 package orchestrator
 
-//go:generate mockgen -destination=./orchestrator_mock.go -self_package=github.com/anthonyraymond/joal-cli/pkg/orchestrator -package=orchestrator github.com/anthonyraymond/joal-cli/pkg/orchestrator ITrackerAnnouncer,ITierAnnouncer
-
 import (
 	"context"
 	"github.com/anacrolix/torrent/metainfo"
@@ -17,13 +15,6 @@ import (
 )
 
 type AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
-type tierState = byte
-type trackerState = tierState
-
-const (
-	ALIVE tierState = iota
-	DEAD            = 0x01
-)
 
 type trackerAnnounceResult struct {
 	Err       error
@@ -33,16 +24,14 @@ type trackerAnnounceResult struct {
 
 type ITrackerAnnouncer interface {
 	announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
-	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
-	Responses() <-chan trackerAnnounceResult
+	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error)
 	stopAnnounceLoop()
 }
 
 type ITierAnnouncer interface {
 	announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState
-	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent)
-	States() <-chan tierState
-	LastKnownInterval() (time.Duration, error)
+	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error)
+	LastKnownInterval() time.Duration
 	stopAnnounceLoop()
 }
 
@@ -168,68 +157,56 @@ func newFallBackOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 
 func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 	o.lock.Lock()
+	defer o.lock.Unlock()
 	if o.loopInProgress {
-		o.lock.Unlock()
 		return
 	}
 	o.loopInProgress = true
-	o.lock.Unlock()
 
-	pauseBeforeLoop := time.After(0 * time.Millisecond)
+	go func() {
+		pauseBeforeLoop := time.After(0 * time.Millisecond)
+		currentEvent := tracker.Started
+		var tierStates <-chan tierState = nil
 
-	currentEvent := tracker.Started
-
-	for {
-		select {
-		case <-pauseBeforeLoop:
-			pauseBeforeLoop = nil
-			event := currentEvent
-			go o.tier.startAnnounceLoop(announce, event)
-		case st := <-o.tier.States():
-			if st == DEAD {
-				o.tier.stopAnnounceLoop()
-				drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
-				o.tier.next()
-				pauseBeforeLoop = time.After(0 * time.Millisecond)
-				if o.tier.isFirst() { // we have travel through the whole list and get back to the first tier, lets wait before trying to re-announce on the first tier
-					interval, err := o.tier.LastKnownInterval()
-					if err != nil {
-						interval = DefaultDurationWaitOnError
-					}
-					pauseBeforeLoop = time.After(interval)
-				}
-				break
-			}
-			currentEvent = tracker.None // as soon an event succeed we can proceed with None all the subsequent time
-
-			if !o.tier.isFirst() { // A backup tier has successfully announced, lets get back to primary tier
-				o.tier.stopAnnounceLoop()
-				drainStatesChannel(o.tier) // ensure no more event are queued. Otherwise next time we use next and get back to this tier we might have an old message
-				interval, err := o.tier.LastKnownInterval()
+		for {
+			select {
+			case <-pauseBeforeLoop:
+				pauseBeforeLoop = nil
+				event := currentEvent
+				var err error = nil
+				tierStates, err = o.tier.startAnnounceLoop(announce, event)
 				if err != nil {
-					interval = DefaultDurationWaitOnError
+					o.tier.stopAnnounceLoop()
+					tierStates = nil
+					o.tier.next()
+					pauseBeforeLoop = time.After(5 * time.Second)
 				}
-				pauseBeforeLoop = time.After(interval)
-				o.tier.backToFirst()
-			}
-		case doneStopping := <-o.stopping:
-			o.tier.stopAnnounceLoop()
-			drainStatesChannel(o.tier)
-			doneStopping <- struct{}{}
-			return
-		}
-	}
-}
+			case st := <-tierStates:
+				if st == DEAD {
+					o.tier.stopAnnounceLoop()
+					tierStates = nil
+					o.tier.next()
+					pauseBeforeLoop = time.After(0 * time.Millisecond)
+					if o.tier.isFirst() { // we have travel through the whole list and get back to the first tier, lets wait before trying to re-announce on the first tier
+						pauseBeforeLoop = time.After(o.tier.LastKnownInterval())
+					}
+					break
+				}
+				currentEvent = tracker.None // as soon an event succeed we can proceed with None all the subsequent time
 
-func drainStatesChannel(t ITierAnnouncer) {
-	for {
-		select {
-		case <-t.States():
-			continue
-		default:
-			return
+				if !o.tier.isFirst() { // A backup tier has successfully announced, lets get back to primary tier
+					o.tier.stopAnnounceLoop()
+					tierStates = nil
+					pauseBeforeLoop = time.After(o.tier.LastKnownInterval())
+					o.tier.backToFirst()
+				}
+			case doneStopping := <-o.stopping:
+				o.tier.stopAnnounceLoop()
+				doneStopping <- struct{}{}
+				return
+			}
 		}
-	}
+	}()
 }
 
 func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) {
@@ -249,22 +226,13 @@ func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunct
 	}
 
 	waitChan := make(chan struct{})
-	go func() {
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		go func(tier ITierAnnouncer) {
-			defer wg.Done()
-			tier.announceOnce(ctx, annFunc, tracker.Stopped)
-		}(o.tier)
-
-		wg.Wait()
-		close(waitChan)
-	}()
+	go func(tier ITierAnnouncer) {
+		defer close(waitChan)
+		tier.announceOnce(ctx, annFunc, tracker.Stopped)
+	}(o.tier)
 
 	select { // both case just going, if context is expired we still want to do the rest (which is non blocking and will return almost instantaneously
 	case <-waitChan:
-	case <-ctx.Done():
-		// TODO: log exit context done
 	}
 }
 
@@ -288,32 +256,27 @@ func newAllOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 }
 
 func (o *AllOrchestrator) Start(announce AnnouncingFunction) {
-	type tierAwareState struct {
-		state tierState
-		tier  ITierAnnouncer
-	}
-
 	o.lock.Lock()
+	defer o.lock.Unlock()
 	if o.loopInProgress {
-		o.lock.Unlock()
 		return
 	}
 	o.loopInProgress = true
-	o.lock.Unlock()
 
-	for _, tr := range o.tiers {
-		go tr.startAnnounceLoop(announce, tracker.Started)
-	}
-
-	stateReceived := make(chan tierAwareState, len(o.tiers))
 	stoppingLoops := make(chan chan struct{}, len(o.tiers))
 
 	for _, t := range o.tiers {
 		go func(t ITierAnnouncer) {
+			tierStates, err := t.startAnnounceLoop(announce, tracker.Started)
+			if err != nil {
+				t.stopAnnounceLoop()
+				logs.GetLogger().Warn("failed to start announcing", zap.Error(err))
+			}
+
 			for {
 				select {
-				case resp := <-t.States():
-					stateReceived <- tierAwareState{state: resp, tier: t}
+				case <-tierStates:
+					// dont care about the answer. All the tiers need to keeps announcing no matter what. We just want to consume the channel to prevent deadlock
 				case doneStopping := <-stoppingLoops:
 					t.stopAnnounceLoop()
 					doneStopping <- struct{}{}
@@ -323,28 +286,28 @@ func (o *AllOrchestrator) Start(announce AnnouncingFunction) {
 		}(t)
 	}
 
-	for {
-		select {
-		case <-stateReceived:
-			// dont give a **** about the answer. All the tiers need to keeps announcing no matter what. We just want to consume the chanel to prevent deadlock
-		case doneStopping := <-o.stopping:
-			wg := sync.WaitGroup{}
+	go func() {
+		for {
+			select {
+			case doneStopping := <-o.stopping:
+				wg := sync.WaitGroup{}
 
-			for range o.tiers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					done := make(chan struct{})
-					stoppingLoops <- done
-					<-done
-				}()
+				for range o.tiers {
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						done := make(chan struct{})
+						stoppingLoops <- done
+						<-done
+					}()
+				}
+				wg.Wait()
+				doneStopping <- struct{}{}
+
+				return
 			}
-			wg.Wait()
-			doneStopping <- struct{}{}
-
-			return
 		}
-	}
+	}()
 }
 
 func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) {
@@ -373,14 +336,11 @@ func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) 
 				tier.announceOnce(ctx, annFunc, tracker.Stopped)
 			}(tier)
 		}
-
 		wg.Wait()
 		close(waitChan)
 	}()
 
 	select { // both case just going, if context is expired we still want to do the rest (which is non blocking and will return almost instantaneously
 	case <-waitChan:
-	case <-ctx.Done():
-		// TODO: log exit context done
 	}
 }

@@ -3,18 +3,47 @@ package orchestrator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
-	"github.com/golang/mock/gomock"
 	"github.com/nvn1729/congo"
+	"github.com/stretchr/testify/assert"
 	"net/url"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+type mockedTierAnnouncer struct {
+	lastInterval time.Duration
+	annOnce      func(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState
+	startAnnLoop func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error)
+	stopAnnLoop  func()
+}
+
+func (t *mockedTierAnnouncer) announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) tierState {
+	if t.annOnce != nil {
+		return t.annOnce(ctx, announce, event)
+	}
+	return ALIVE
+}
+
+func (t *mockedTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {
+	if t.startAnnLoop != nil {
+		return t.startAnnLoop(announce, firstEvent)
+	}
+	return make(chan tierState), nil
+}
+
+func (t *mockedTierAnnouncer) LastKnownInterval() time.Duration {
+	return t.lastInterval
+}
+
+func (t *mockedTierAnnouncer) stopAnnounceLoop() {
+	if t.stopAnnLoop != nil {
+		t.stopAnnLoop()
+	}
+}
 
 func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testing.T) {
 	type startStopMockedTrackerAnnouncer struct {
@@ -27,13 +56,13 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 
 	for i := 0; i < 30; i++ {
 		tr := &startStopMockedTrackerAnnouncer{
-			mockedTrackerAnnouncer: mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)},
+			mockedTrackerAnnouncer: mockedTrackerAnnouncer{},
 			wgStart:                &sync.WaitGroup{},
 			wgStop:                 &sync.WaitGroup{},
 		}
-		tr.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) trackerAnnounceResult {
+		tr.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
 			tr.wgStart.Done()
-			return trackerAnnounceResult{}
+			return nil, nil
 		}
 		tr.stopAnnLoop = func() {
 			tr.wgStop.Done()
@@ -46,7 +75,11 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	tierStates, err := tier.startAnnounceLoop(NoOpAnnouncingFun, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainTierStateChanContinuously(tierStates)
 
 	for _, tr := range trackers {
 		tra := tr.(*startStopMockedTrackerAnnouncer)
@@ -62,7 +95,6 @@ func Test_AllTrackersTierAnnouncer_ShouldLoopAllTrackersAndStopAllLoop(t *testin
 			t.Fatal("not ALL the trackers have been instruct to start")
 		}
 	}
-
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
@@ -70,240 +102,70 @@ func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
+		t := &mockedTrackerAnnouncer{}
+		t.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			wg.Done()
+			return nil, nil
+		}
+		trackers = append(trackers, t)
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc = buildAnnouncingFunc(1*time.Minute, func(u url.URL) { wg.Done() })
 
 	wg.Add(len(trackers))
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainTierStateChanContinuously(tierStates)
+
 	if testutils.WaitOrFailAfterTimeout(&wg, 50*time.Millisecond) != nil {
 		t.Fatal("not ALL the trackers have been instruct to announce")
 	}
 	tier.stopAnnounceLoop()
 
 	wg.Add(len(trackers))
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	tierStates, err = tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainTierStateChanContinuously(tierStates)
+
 	if testutils.WaitOrFailAfterTimeout(&wg, 50*time.Millisecond) != nil {
 		t.Fatal("not ALL the trackers have been instruct to announce")
 	}
 	tier.stopAnnounceLoop()
 }
 
-func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *testing.T) {
+func Test_AllTrackersTierAnnounce_ShouldReportStates(t *testing.T) {
 	var trackers []ITrackerAnnouncer
 
-	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
+	c1 := make(chan trackerAnnounceResult)
+	t1 := &mockedTrackerAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			return c1, nil
+		},
 	}
+	trackers = append(trackers, t1)
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	go tier.startAnnounceLoop(ErrorAnnouncingFunc, tracker.Started)
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer tier.stopAnnounceLoop()
 
-	timeout := time.Now().Add(1 * time.Second)
-	for {
-		timeoutChan := time.After(timeout.Sub(time.Now()))
-
-		select {
-		case <-timeoutChan:
-			t.Fatal("timout reached, tracker has not reported is state as DEAD")
-		case s := <-tier.States():
-			if s == DEAD {
-				// success
-				return
-			}
-			// if alive continue
-		}
-	}
-}
-
-func Test_AllTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedButOtherNotAnswered(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	lock := &sync.Mutex{}
-	latch := congo.NewCountDownLatch(1)
-	var annFunc = buildErrAnnouncingFunc(func(u url.URL) {
-		lock.Lock() // first call lock the mutex to prevent any other announce to run
-		defer latch.CountDown()
-	})
-
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatalf("should have released the latch")
+	select {
+	case c1 <- trackerAnnounceResult{Interval: 24 * time.Hour}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("tracker result was not read by tier")
 	}
 
 	select {
-	case <-time.After(50 * time.Millisecond):
-		// perfect, it has not reported his state
-	case <-tier.States():
-		t.Fatalf("should not have reported his state yet")
-	}
-}
-
-func Test_AllTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	lock := &sync.Mutex{}
-	latch := congo.NewCountDownLatch(1)
-	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
-		lock.Lock() // first call lock the mutex to prevent any other announce to run
-		defer latch.CountDown()
-	})
-
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatalf("should have released the latch")
-	}
-
-	select {
-	case <-time.After(50 * time.Millisecond):
-		t.Fatalf("should have reported")
-	case s := <-tier.States():
-		if s != ALIVE {
-			t.Fatalf("should have reported state ALIVE")
-		}
-	}
-}
-
-func Test_AllTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSingleTracker(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 1; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-
-	go tier.startAnnounceLoop(ErrorAnnouncingFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	timeout := time.Now().Add(1 * time.Second)
-	for {
-		timeoutChan := time.After(timeout.Sub(time.Now()))
-
-		select {
-		case <-timeoutChan:
-			t.Fatal("timout reached, tracker has not reported is state as DEAD")
-		case s := <-tier.States():
-			if s == DEAD {
-				// success
-				return
-			}
-			// if alive continue
-		}
-	}
-}
-
-func Test_AllTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucceed(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 10; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	DefaultDurationWaitOnError = 1 * time.Millisecond
-	announceResponse := &announcer.AnnounceResponse{}
-	var errResponse = errors.New("nop")
-	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	//noinspection GoVarAndConstTypeMayBeOmitted
-	var failAnnFunc AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
-		return *announceResponse, errResponse
-	}
-
-	go tier.startAnnounceLoop(failAnnFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	timeout := time.Now().Add(1 * time.Second)
-	found := false
-	for found != true {
-		timeoutChan := time.After(timeout.Sub(time.Now()))
-
-		select {
-		case <-timeoutChan:
-			t.Fatal("timout reached, tracker has not reported his state as DEAD")
-		case s := <-tier.States():
-			if s == DEAD {
-				found = true
-			}
-			// if alive continue
-		}
-	}
-
-	announceResponse = &announcer.AnnounceResponse{Interval: 1800 * time.Second}
-	errResponse = nil
-
-	timeout = time.Now().Add(1 * time.Second)
-	found = false
-	for found != true {
-		timeoutChan := time.After(timeout.Sub(time.Now()))
-
-		select {
-		case <-timeoutChan:
-			t.Fatal("timout reached, tracker has not reported his state as ALIVE")
-		case s := <-tier.States():
-			if s == ALIVE {
-				found = true
-			}
-			// if alive continue
-		}
-	}
-}
-
-func Test_AllTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForeverToAnnounce(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 10; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-	latch := congo.NewCountDownLatch(uint(len(trackers)))
-
-	tier, _ := newAllTrackersTierAnnouncer(trackers...)
-	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) {
-		latch.CountDown()
-		time.Sleep(500 * time.Minute)
-	})
-
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
-
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("latch has not been released")
-	}
-	time.Sleep(5 * time.Millisecond) // Allow for the time.sleep to trigger in the annonce funcs
-
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		tier.stopAnnounceLoop()
-		wg.Done()
-	}()
-
-	if err := testutils.WaitOrFailAfterTimeout(wg, 500*time.Millisecond); err != nil {
-		t.Fatal("Should have stopped before the timeout")
+	case <-tierStates:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("no state received")
 	}
 }
 
@@ -312,16 +174,31 @@ func Test_AllTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTracke
 	var latch *congo.CountDownLatch
 
 	for i := 0; i < 3000; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
+		t := &mockedTrackerAnnouncer{}
+		t.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			c := make(chan trackerAnnounceResult)
+			go func() {
+				for {
+					response, _ := announce(context.Background(), url.URL{}, tracker.None)
+					time.Sleep(response.Interval)
+					c <- trackerAnnounceResult{Interval: response.Interval, Completed: time.Now()}
+				}
+			}()
+			return c, nil
+		}
+		trackers = append(trackers, t)
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
 
-	latch = congo.NewCountDownLatch(uint(5 * len(trackers)))
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
+	latch = congo.NewCountDownLatch(uint(3 * len(trackers)))
+	tierStates, err := tier.startAnnounceLoop(annFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer tier.stopAnnounceLoop()
+	drainTierStateChanContinuously(tierStates)
 
 	if !latch.WaitTimeout(10 * time.Second) {
 		t.Fatal("not enough announce")
@@ -335,36 +212,34 @@ func Test_AllTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *test
 	}
 }
 
-func Test_AllTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTierWasNotStarted(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 1; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
+func Test_AllTrackersTierAnnouncer_StopShouldBeANoOpIfNotStarted(t *testing.T) {
+	trackers := []ITrackerAnnouncer{
+		&mockedTrackerAnnouncer{},
+		&mockedTrackerAnnouncer{},
+		&mockedTrackerAnnouncer{},
 	}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
 
-	latch := congo.NewCountDownLatch(1)
+	done := make(chan struct{})
 	go func() {
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
-		tier.stopAnnounceLoop()
-		tier.stopAnnounceLoop()
-		tier.stopAnnounceLoop()
-		latch.CountDown()
+		done <- struct{}{}
 	}()
 
-	if !latch.WaitTimeout(500 * time.Millisecond) {
-		t.Fatal("Should not have blocked")
+	select {
+	case <-done:
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("timeout")
 	}
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveAllSucceed(t *testing.T) {
-	t1 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t2 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t3 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
+	t1 := &mockedTrackerAnnouncer{}
+	t2 := &mockedTrackerAnnouncer{}
+	t3 := &mockedTrackerAnnouncer{}
 	trackers := []ITrackerAnnouncer{t1, t2, t3}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
@@ -386,9 +261,9 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveA
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveIfSomeSucceed(t *testing.T) {
-	t1 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t2 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t3 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
+	t1 := &mockedTrackerAnnouncer{}
+	t2 := &mockedTrackerAnnouncer{}
+	t3 := &mockedTrackerAnnouncer{}
 	trackers := []ITrackerAnnouncer{t1, t2, t3}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
@@ -410,9 +285,9 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveIfOneSucceed(t *testing.T) {
-	t1 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t2 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t3 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
+	t1 := &mockedTrackerAnnouncer{}
+	t2 := &mockedTrackerAnnouncer{}
+	t3 := &mockedTrackerAnnouncer{}
 	trackers := []ITrackerAnnouncer{t1, t2, t3}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
@@ -434,9 +309,9 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportAliveI
 }
 
 func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportDeadIfAllFails(t *testing.T) {
-	t1 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t2 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
-	t3 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
+	t1 := &mockedTrackerAnnouncer{}
+	t2 := &mockedTrackerAnnouncer{}
+	t3 := &mockedTrackerAnnouncer{}
 	trackers := []ITrackerAnnouncer{t1, t2, t3}
 
 	tier, _ := newAllTrackersTierAnnouncer(trackers...)
@@ -459,16 +334,16 @@ func Test_AllTrackersTierAnnouncer_ShouldAnnounceOnceToAllTrackerAndReportDeadIf
 
 func Test_FallbackTrackersTierAnnouncer_ShouldLoopTrackersAndStopLoop(t *testing.T) {
 	var trackers []ITrackerAnnouncer
-	t1 := &mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)}
+	t1 := &mockedTrackerAnnouncer{}
 	trackers = append(trackers, t1)
 	wgStart := &sync.WaitGroup{}
 	wgStop := &sync.WaitGroup{}
 
 	wgStart.Add(1)
 	wgStop.Add(1)
-	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) trackerAnnounceResult {
+	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
 		wgStart.Done()
-		return trackerAnnounceResult{}
+		return nil, nil
 	}
 	t1.stopAnnLoop = func() {
 		wgStop.Done()
@@ -476,7 +351,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldLoopTrackersAndStopLoop(t *testing
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainTierStateChanContinuously(tierStates)
 
 	if err := testutils.WaitOrFailAfterTimeout(wgStart, 50*time.Millisecond); err != nil {
 		t.Fatal("not started")
@@ -494,20 +373,17 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 		wgStop  *sync.WaitGroup
 	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
 	t1 := &startStopMockedTrackerAnnouncer{
-		mockedTrackerAnnouncer: mockedTrackerAnnouncer{c: make(chan trackerAnnounceResult)},
+		mockedTrackerAnnouncer: mockedTrackerAnnouncer{},
 		wgStart:                &sync.WaitGroup{},
 		wgStop:                 &sync.WaitGroup{},
 	}
 	trackers = append(trackers, t1)
 
-	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) trackerAnnounceResult {
+	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
 		t1.wgStart.Done()
-		return trackerAnnounceResult{}
+		return nil, nil
 	}
 	t1.stopAnnLoop = func() {
 		t1.wgStop.Done()
@@ -516,7 +392,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
 	t1.wgStart.Add(1)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drainTierStateChanContinuously(tierStates)
 	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
 		t.Fatal("not started")
 	}
@@ -528,202 +408,55 @@ func Test_FallbackTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) 
 	}
 
 	t1.wgStart.Add(1)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
-		t.Fatal("not started again")
+	tierStates, err = tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
 	}
+	drainTierStateChanContinuously(tierStates)
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not started")
+	}
+
 	t1.wgStop.Add(1)
 	tier.stopAnnounceLoop()
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-	)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	select {
-	case st := <-tier.States():
-		if st != DEAD {
-			t.Fatalf("should have reported tier DEAD, %v received", st)
-		}
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("should have reported state before timeout")
+	if err := testutils.WaitOrFailAfterTimeout(t1.wgStart, 500*time.Millisecond); err != nil {
+		t.Fatal("not stopped")
 	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldConsiderTierDeadIfAllTrackerFailsWithSingleTracker(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-	)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	select {
-	case st := <-tier.States():
-		if st != DEAD {
-			t.Fatalf("should have reported tier DEAD, %v received", st)
-		}
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("should have reported state before timeout")
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldReconsiderDeadTierAliveIfOneTrackerSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	DefaultDurationWaitOnError = 1 * time.Millisecond
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
-		}).Times(1),
-	)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	select {
-	case st := <-tier.States():
-		if st != DEAD {
-			t.Fatalf("should have reported tier DEAD first, %v received", st)
-		}
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("should have reported state before timeout")
-	}
-
-	select {
-	case st := <-tier.States():
-		if st != ALIVE {
-			t.Fatalf("should have reported tier ALIVE, %v received", st)
-		}
-	case <-time.After(50 * time.Millisecond):
-		t.Fatal("should have reported state before timeout")
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldNotPreventStopIfATrackerIsTakingForeverToAnnounce(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			latch.CountDown()
-			time.Sleep(50 * time.Hour)
-		}).Times(1),
-	)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatal("latch has not released")
-	}
-	tier.stopAnnounceLoop()
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldBeSafeToRunWithTremendousAmountOfTrackers(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	latch := congo.NewCountDownLatch(10000)
 	var trackers []ITrackerAnnouncer
+	var latch *congo.CountDownLatch
 
-	DefaultDurationWaitOnError = 0 * time.Millisecond
 	for i := 0; i < 3000; i++ {
-		t := NewMockITrackerAnnouncer(ctrl)
-		c := make(chan trackerAnnounceResult)
-		t.EXPECT().Responses().Return(c).AnyTimes()
-		t.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-		t.EXPECT().stopAnnounceLoop().AnyTimes()
-		t.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).MinTimes(1)
-
+		t := &mockedTrackerAnnouncer{}
+		t.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			c := make(chan trackerAnnounceResult)
+			go func() {
+				for {
+					response, _ := announce(context.Background(), url.URL{}, tracker.None)
+					c <- trackerAnnounceResult{Interval: response.Interval, Completed: time.Now()}
+				}
+			}()
+			return c, nil
+		}
 		trackers = append(trackers, t)
 	}
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	var annFunc = buildAnnouncingFunc(1*time.Millisecond, func(u url.URL) { latch.CountDown() })
+
+	latch = congo.NewCountDownLatch(uint(3 * len(trackers)))
+	tierStates, err := tier.startAnnounceLoop(annFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tier.stopAnnounceLoop()
+	drainTierStateChanContinuously(tierStates)
 
 	if !latch.WaitTimeout(10 * time.Second) {
-		t.Fatal("latch has not released")
+		t.Fatal("not enough announce")
 	}
-	tier.stopAnnounceLoop()
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t *testing.T) {
@@ -733,380 +466,175 @@ func Test_FallbackTrackersTierAnnouncer_ShouldFailToBuildWithEmptyTrackerList(t 
 	}
 }
 
-func Test_FallbackTrackersTierAnnouncer_ShouldNotBlockWhenStopAnnounceLoopIsCalledButTheTierWasNotStarted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func Test_FallbackTrackersTierAnnouncer_StopShouldBeANoOpIfNotStarted(t *testing.T) {
+	trackers := []ITrackerAnnouncer{
+		&mockedTrackerAnnouncer{},
+		&mockedTrackerAnnouncer{},
+		&mockedTrackerAnnouncer{},
+	}
 
-	tier, _ := newFallbackTrackersTierAnnouncer(NewMockITrackerAnnouncer(ctrl))
+	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
 
-	c := make(chan struct{})
+	done := make(chan struct{})
 	go func() {
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
 		tier.stopAnnounceLoop()
-		tier.stopAnnounceLoop()
-		close(c)
+		done <- struct{}{}
 	}()
 
 	select {
-	case <-c:
+	case <-done:
 	case <-time.After(50 * time.Millisecond):
-		t.Fatal("timeout reached")
+		t.Fatal("timeout")
 	}
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
+
 	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c2 <- trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
-		}).Times(1),
-	)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatal("latch has not released")
+	t1 := &mockedTrackerAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			return c1, nil
+		},
 	}
-	tier.stopAnnounceLoop()
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldCallTrackerOneByOneTillOneSucceedUpToLast(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
 	trackers = append(trackers, t1)
 
-	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
+	t2 := &mockedTrackerAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			return c2, nil
+		},
+	}
 	trackers = append(trackers, t2)
 
-	t3 := NewMockITrackerAnnouncer(ctrl)
 	c3 := make(chan trackerAnnounceResult)
-	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
+	t3 := &mockedTrackerAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			return c3, nil
+		},
+	}
 	trackers = append(trackers, t3)
 
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c3 <- trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
-		}).Times(1),
-	)
-
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatal("latch has not released")
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
 	}
-	tier.stopAnnounceLoop()
+	defer tier.stopAnnounceLoop()
+	drainTierStateChanContinuously(tierStates)
+
+	select {
+	case c1 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	select {
+	case c2 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	select {
+	case c3 <- trackerAnnounceResult{Interval: 30 * time.Minute, Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldStopTrackerBeforeMovingToNext(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
+	stopped := make(chan struct{})
+
 	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t1.EXPECT().stopAnnounceLoop().Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c2 <- trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
-		}).Times(1),
-	)
+	t1 := &mockedTrackerAnnouncer{
+		startAnnLoop: func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+			return c1, nil
+		},
+		stopAnnLoop: func() {
+			stopped <- struct{}{}
+		},
+	}
+	trackers = append(trackers, t1, &mockedTrackerAnnouncer{})
 
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatal("latch has not released")
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
 	}
-	tier.stopAnnounceLoop()
+	defer tier.stopAnnounceLoop()
+	drainTierStateChanContinuously(tierStates)
+
+	c1 <- trackerAnnounceResult{Err: errors.New("nop")}
+
+	select {
+	case <-stopped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
 }
 
 func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSuccess(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
 	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
+	t1 := &mockedTrackerAnnouncer{}
+	t1.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+		return c1, nil
+	}
 	trackers = append(trackers, t1)
 
-	t2 := NewMockITrackerAnnouncer(ctrl)
 	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
+	t2 := &mockedTrackerAnnouncer{}
+	t2.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+		return c2, nil
+	}
 	trackers = append(trackers, t2)
 
-	t3 := NewMockITrackerAnnouncer(ctrl)
 	c3 := make(chan trackerAnnounceResult)
-	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
+	t3 := &mockedTrackerAnnouncer{}
+	t3.startAnnLoop = func(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error) {
+		return c3, nil
+	}
 	trackers = append(trackers, t3)
 
-	latch := congo.NewCountDownLatch(1)
-	gomock.InOrder(
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c1 <- trackerAnnounceResult{Err: errors.New("nop")}
-		}).Times(1),
-		t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			c2 <- trackerAnnounceResult{Interval: 1 * time.Millisecond, Completed: time.Now()}
-			c2 <- trackerAnnounceResult{Err: errors.New("nop")} // send a success then send an error
-		}).Times(1),
-		// t2 has succeed, the order should now be t2, t1, t3. When t2 fails it should go to t1
-		t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).Do(func(anF AnnouncingFunction, e tracker.AnnounceEvent) {
-			defer latch.CountDown()
-			c1 <- trackerAnnounceResult{Interval: 1800 * time.Second, Completed: time.Now()}
-		}).Times(1),
-	)
-
 	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	go tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatal("latch has not released")
+	tierStates, err := tier.startAnnounceLoop(ThirtyMinutesIntervalNoOpAnnouncingFunc, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
 	}
-	tier.stopAnnounceLoop()
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldNotReportAliveAfterFirstAnnounceFailedButOtherNotAnswered(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	lock := &sync.Mutex{}
-	latch := congo.NewCountDownLatch(1)
-	var annFunc = buildErrAnnouncingFunc(func(u url.URL) {
-		lock.Lock() // first call lock the mutex to prevent any other announce to run
-		defer latch.CountDown()
-	})
-
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
 	defer tier.stopAnnounceLoop()
+	drainTierStateChanContinuously(tierStates)
 
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatalf("should have released the latch")
+	select {
+	case c1 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
 	}
 
 	select {
-	case <-time.After(50 * time.Millisecond):
-		// perfect, it has not reported his state
-	case <-tier.States():
-		t.Fatalf("should not have reported his state yet")
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldReportAliveAfterFirstAnnounceSuccess(t *testing.T) {
-	var trackers []ITrackerAnnouncer
-
-	for i := 0; i < 30; i++ {
-		trackerUrl := testutils.MustParseUrl(fmt.Sprintf("http://localhost/%d", i))
-		trackers = append(trackers, newTracker(*trackerUrl))
-	}
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-	lock := &sync.Mutex{}
-	latch := congo.NewCountDownLatch(1)
-	var annFunc = buildAnnouncingFunc(1800*time.Second, func(u url.URL) {
-		lock.Lock() // first call lock the mutex to prevent any other announce to run
-		defer latch.CountDown()
-	})
-
-	go tier.startAnnounceLoop(annFunc, tracker.Started)
-	defer tier.stopAnnounceLoop()
-
-	if !latch.WaitTimeout(50 * time.Millisecond) {
-		t.Fatalf("should have released the latch")
+	case c2 <- trackerAnnounceResult{Err: errors.New("nop"), Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
 	}
 
 	select {
-	case <-time.After(50 * time.Millisecond):
-		// perfect, it has not reported his state
-	case s := <-tier.States():
-		if s != ALIVE {
-			t.Fatalf("should have reported state ALIVE")
+	case c3 <- trackerAnnounceResult{Interval: 30 * time.Minute, Completed: time.Now()}:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	fallbackTier := tier.(*FallbackTrackersTierAnnouncer)
+	assert.EqualValues(t, fallbackTier.tracker.list[fallbackTier.tracker.currentIndex], t3)
+}
+
+func drainTierStateChanContinuously(c <-chan tierState) {
+	go func() {
+		for {
+			select {
+			case <-c:
+			}
 		}
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceToFirstTrackerAndReturnIfSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	t3 := NewMockITrackerAnnouncer(ctrl)
-	c3 := make(chan trackerAnnounceResult)
-	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t3)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-
-	state := tier.announceOnce(context.Background(), nil, tracker.Started)
-	if state != ALIVE {
-		t.Fatal("should have returned tier alive")
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceByFallingBackUntilOnceSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	t3 := NewMockITrackerAnnouncer(ctrl)
-	c3 := make(chan trackerAnnounceResult)
-	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t3)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: nil}).Times(1)
-
-	state := tier.announceOnce(context.Background(), nil, tracker.Started)
-	if state != ALIVE {
-		t.Fatal("should have returned tier alive")
-	}
-}
-
-func Test_FallbackTrackersTierAnnouncer_ShouldAnnounceOnceByFallingBackAndReturnDeadIfNoneSucceed(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var trackers []ITrackerAnnouncer
-	t1 := NewMockITrackerAnnouncer(ctrl)
-	c1 := make(chan trackerAnnounceResult)
-	t1.EXPECT().Responses().Return(c1).AnyTimes()
-	t1.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t1.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t1)
-
-	t2 := NewMockITrackerAnnouncer(ctrl)
-	c2 := make(chan trackerAnnounceResult)
-	t2.EXPECT().Responses().Return(c2).AnyTimes()
-	t2.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t2.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t2)
-
-	t3 := NewMockITrackerAnnouncer(ctrl)
-	c3 := make(chan trackerAnnounceResult)
-	t3.EXPECT().Responses().Return(c3).AnyTimes()
-	t3.EXPECT().startAnnounceLoop(gomock.Any(), gomock.Any()).AnyTimes()
-	t3.EXPECT().stopAnnounceLoop().AnyTimes()
-	trackers = append(trackers, t3)
-
-	tier, _ := newFallbackTrackersTierAnnouncer(trackers...)
-
-	t1.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t2.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-	t3.EXPECT().announceOnce(gomock.Any(), gomock.Any(), gomock.Any()).Return(trackerAnnounceResult{Err: errors.New("nop")}).Times(1)
-
-	state := tier.announceOnce(context.Background(), nil, tracker.Started)
-	if state != DEAD {
-		t.Fatal("should have returned tier dead")
-	}
+	}()
 }
