@@ -119,7 +119,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
 	}
 	drainTierStateChanContinuously(tierStates)
 
-	if testutils.WaitOrFailAfterTimeout(&wg, 50*time.Millisecond) != nil {
+	if testutils.WaitOrFailAfterTimeout(&wg, 5*time.Second) != nil {
 		t.Fatal("not ALL the trackers have been instruct to announce")
 	}
 	tier.stopAnnounceLoop()
@@ -131,7 +131,7 @@ func Test_AllTrackersTierAnnouncer_ShouldBeReusableAfterStop(t *testing.T) {
 	}
 	drainTierStateChanContinuously(tierStates)
 
-	if testutils.WaitOrFailAfterTimeout(&wg, 50*time.Millisecond) != nil {
+	if testutils.WaitOrFailAfterTimeout(&wg, 5*time.Second) != nil {
 		t.Fatal("not ALL the trackers have been instruct to announce")
 	}
 	tier.stopAnnounceLoop()
@@ -231,7 +231,7 @@ func Test_AllTrackersTierAnnouncer_StopShouldBeANoOpIfNotStarted(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
 }
@@ -357,11 +357,11 @@ func Test_FallbackTrackersTierAnnouncer_ShouldLoopTrackersAndStopLoop(t *testing
 	}
 	drainTierStateChanContinuously(tierStates)
 
-	if err := testutils.WaitOrFailAfterTimeout(wgStart, 50*time.Millisecond); err != nil {
+	if err := testutils.WaitOrFailAfterTimeout(wgStart, 5*time.Second); err != nil {
 		t.Fatal("not started")
 	}
 	tier.stopAnnounceLoop()
-	if err := testutils.WaitOrFailAfterTimeout(wgStop, 50*time.Millisecond); err != nil {
+	if err := testutils.WaitOrFailAfterTimeout(wgStop, 5*time.Second); err != nil {
 		t.Fatal("not stopped")
 	}
 }
@@ -485,7 +485,7 @@ func Test_FallbackTrackersTierAnnouncer_StopShouldBeANoOpIfNotStarted(t *testing
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
 }

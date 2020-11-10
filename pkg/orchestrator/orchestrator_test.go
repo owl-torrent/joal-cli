@@ -116,20 +116,19 @@ func Test_FallbackOrchestrator_ShouldTryTiersOneByOneUntilOneSucceed(t *testing.
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c3 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
-
 }
 
 func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *testing.T) {
@@ -156,12 +155,12 @@ func Test_FallbackOrchestrator_ShouldPauseBeforeReAnnouncingIfAllTiersFails(t *t
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
@@ -195,17 +194,17 @@ func Test_FallbackOrchestrator_ShouldGoBackToFirstTierIfAllFails(t *testing.T) {
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
@@ -241,17 +240,17 @@ func Test_FallbackOrchestrator_ShouldReAnnounceOnFirstTrackerAfterABackupTierHas
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
@@ -281,12 +280,12 @@ func Test_FallbackOrchestrator_ShouldKeepAnnouncingToFirstTrackerIfItSucceed(t *
 
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
@@ -318,13 +317,13 @@ func Test_FallbackOrchestrator_ShouldStopPreviousTierWhenMovingToNext(t *testing
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
 	select {
 	case <-stoppingOne:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not stopped tier")
 	}
 }
@@ -344,7 +343,7 @@ func Test_FallbackOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *tes
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
 }
@@ -459,7 +458,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
@@ -467,7 +466,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 
 	select {
 	case <-callAnnounceStop:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 }
@@ -508,7 +507,7 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndReturnIfAllTiersFails(t *tes
 
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
@@ -520,13 +519,13 @@ func Test_FallbackOrchestrator_ShouldAnnounceStopAndReturnIfAllTiersFails(t *tes
 
 	select {
 	case <-t1STOP:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 
 	select {
 	case <-doneStop:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("stop has not ended")
 	}
 }
@@ -561,12 +560,12 @@ func Test_AllOrchestrator_ShouldAnnounceOnAllTiers(t *testing.T) {
 
 	select {
 	case c1 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- ALIVE:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
@@ -594,22 +593,22 @@ func Test_AllOrchestrator_ShouldContinueAnnouncingEvenIfAllTierFails(t *testing.
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 	select {
 	case c2 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 }
@@ -677,7 +676,7 @@ func Test_AllOrchestrator_ShouldNotBlockIfStopIsCalledWhenNotStarted(t *testing.
 
 	select {
 	case <-done:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout")
 	}
 }
@@ -800,7 +799,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
@@ -812,18 +811,18 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStop(t *testing.T) {
 
 	select {
 	case <-t1STOP:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 	select {
 	case <-t2STOP:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 
 	select {
 	case <-doneStop:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("stop has not ended")
 	}
 }
@@ -864,7 +863,7 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndReturnIfNoneSucceed(t *test
 
 	select {
 	case c1 <- DEAD:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not read the event => most likely because tier has not been started by orchestrator")
 	}
 
@@ -876,18 +875,18 @@ func Test_AllOrchestrator_ShouldAnnounceStopOnStopAndReturnIfNoneSucceed(t *test
 
 	select {
 	case <-t1STOP:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 	select {
 	case <-t2STOP:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("timeout: orchestrator did not sent STOP announce")
 	}
 
 	select {
 	case <-doneStop:
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(5 * time.Second):
 		t.Fatal("stop has not ended")
 	}
 }
