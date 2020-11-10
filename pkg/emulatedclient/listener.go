@@ -58,10 +58,16 @@ var publicIpProviders = []string{
 	"https://shtuff.it/myip/short",
 }
 
+// may be an ipv4 or ipv6
 func getPublicIp() (net.IP, error) {
 	for _, providerUri := range publicIpProviders {
 		client := &http.Client{Timeout: 10 * time.Second}
 		req, err := http.NewRequest("GET", providerUri, nil)
+		if err != nil {
+			// TODO: log error
+			fmt.Println(err)
+			continue
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			// TODO: log error

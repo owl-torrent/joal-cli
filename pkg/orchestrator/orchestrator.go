@@ -75,14 +75,14 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 	// dont trust your inputs: some url (or even tiers) may be empty, filter them
 	var announceList [][]string
 	for _, tier := range meta.AnnounceList {
-		tiers := make([]string, 0)
-		for _, u := range tier {
-			if strings.TrimSpace(u) != "" {
-				tier = append(tier, u)
+		currentTier := make([]string, 0)
+		for _, trackerUri := range tier {
+			if strings.TrimSpace(trackerUri) != "" {
+				currentTier = append(currentTier, trackerUri)
 			}
 		}
-		if len(tiers) > 0 {
-			announceList = append(announceList, tiers)
+		if len(currentTier) > 0 {
+			announceList = append(announceList, currentTier)
 		}
 	}
 
@@ -174,7 +174,7 @@ func (o *FallbackOrchestrator) Start(announce AnnouncingFunction) {
 			case <-pauseBeforeLoop:
 				pauseBeforeLoop = nil
 				event := currentEvent
-				var err error = nil
+				var err error
 				tierStates, err = o.tier.startAnnounceLoop(announce, event)
 				if err != nil {
 					o.tier.stopAnnounceLoop()
@@ -232,9 +232,7 @@ func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunct
 		tier.announceOnce(ctx, annFunc, tracker.Stopped)
 	}(o.tier)
 
-	select { // both case just going, if context is expired we still want to do the rest (which is non blocking and will return almost instantaneously
-	case <-waitChan:
-	}
+	<-waitChan
 }
 
 type AllOrchestrator struct {
@@ -288,26 +286,20 @@ func (o *AllOrchestrator) Start(announce AnnouncingFunction) {
 	}
 
 	go func() {
-		for {
-			select {
-			case doneStopping := <-o.stopping:
-				wg := sync.WaitGroup{}
+		doneStopping := <-o.stopping
+		wg := sync.WaitGroup{}
 
-				for range o.tiers {
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						done := make(chan struct{})
-						stoppingLoops <- done
-						<-done
-					}()
-				}
-				wg.Wait()
-				doneStopping <- struct{}{}
-
-				return
-			}
+		for range o.tiers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				done := make(chan struct{})
+				stoppingLoops <- done
+				<-done
+			}()
 		}
+		wg.Wait()
+		doneStopping <- struct{}{}
 	}()
 }
 
@@ -341,7 +333,5 @@ func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) 
 		close(waitChan)
 	}()
 
-	select { // both case just going, if context is expired we still want to do the rest (which is non blocking and will return almost instantaneously
-	case <-waitChan:
-	}
+	<-waitChan
 }

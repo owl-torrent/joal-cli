@@ -113,29 +113,24 @@ func (t *AllTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction
 	}
 
 	go func() {
-		select {
-		case doneStopping := <-t.stoppingTier:
-			wg := sync.WaitGroup{}
+		doneStopping := <-t.stoppingTier
+		wg := sync.WaitGroup{}
 
-			for range t.trackers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					done := make(chan struct{})
-					stoppingLoops <- done
-					for {
-						select {
-						case <-done:
-							return
-						}
-					}
+		for range t.trackers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				done := make(chan struct{})
+				stoppingLoops <- done
+				for range done {
+					return
+				}
 
-				}()
-			}
-			wg.Wait()
-			stateCalculator.Destroy()
-			doneStopping <- struct{}{}
+			}()
 		}
+		wg.Wait()
+		stateCalculator.Destroy()
+		doneStopping <- struct{}{}
 	}()
 
 	return stateCalculator.States(), nil
@@ -241,7 +236,7 @@ func (t *FallbackTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFun
 		for {
 			select {
 			case <-pauseBeforeLoop:
-				var err error = nil
+				var err error
 				responsesChan, err = t.tracker.startAnnounceLoop(announce, currentEvent)
 				if err != nil {
 					t.tracker.stopAnnounceLoop()

@@ -53,12 +53,12 @@ func createTorrentFile(t *testing.T, directory string) (string, torrent.InfoHash
 
 	meta := metainfo.MetaInfo{
 		InfoBytes:    buf.Bytes(),
-		Announce:     "http://announce.fr/announce",
+		Announce:     "http://localhost:8080/announce",
 		AnnounceList: metainfo.AnnounceList{},
 		Nodes:        []metainfo.Node{metainfo.Node("127.0.0.1:1001")},
 		CreationDate: 150000,
 		Comment:      "forged for test",
-		CreatedBy:    "joal test",
+		CreatedBy:    "me",
 	}
 
 	file, err := ioutil.TempFile(directory, "*.torrent")

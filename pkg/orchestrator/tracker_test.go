@@ -152,10 +152,7 @@ func Test_TrackerAnnouncer_ShouldAnnounceOnce(t *testing.T) {
 
 func drainTrackerResultChanContinuously(c <-chan trackerAnnounceResult) {
 	go func() {
-		for {
-			select {
-			case <-c:
-			}
+		for range c {
 		}
 	}()
 }

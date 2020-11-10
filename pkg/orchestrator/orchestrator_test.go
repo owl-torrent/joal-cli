@@ -1,11 +1,16 @@
 package orchestrator
 
 import (
+	"bytes"
 	"context"
+	"github.com/anacrolix/torrent/bencode"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/testutils"
 	"github.com/nvn1729/congo"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"net/url"
 	"runtime"
 	"sync"
@@ -31,6 +36,72 @@ func buildAnnouncingFunc(interval time.Duration, callbacks ...func(u url.URL)) A
 			Peers:    []tracker.Peer{},
 		}, nil
 	}
+}
+
+type dumbConfig struct {
+	doesSupportAnnounceList           bool
+	shouldAnnounceToAllTiers          bool
+	shouldAnnounceToAllTrackersInTier bool
+}
+
+func (d *dumbConfig) DoesSupportAnnounceList() bool {
+	return d.doesSupportAnnounceList
+}
+
+func (d *dumbConfig) ShouldAnnounceToAllTiers() bool {
+	return d.shouldAnnounceToAllTiers
+}
+
+func (d *dumbConfig) ShouldAnnounceToAllTrackersInTier() bool {
+	return d.shouldAnnounceToAllTrackersInTier
+}
+
+func Test_OrchestratorShouldFilterEmptyUrl(t *testing.T) {
+	name := make([]byte, 180)
+	rand.Read(name)
+	info := metainfo.Info{
+		PieceLength: 0,
+		Pieces:      []byte{},
+		Name:        string(name),
+		Length:      0,
+	}
+
+	buf := bytes.Buffer{}
+	err := bencode.NewEncoder(&buf).Encode(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := metainfo.MetaInfo{
+		InfoBytes: buf.Bytes(),
+		Announce:  "http://localhost:8000/announce",
+		AnnounceList: metainfo.AnnounceList{
+			{"", " ", "http://localhost:8080"},
+			{"", " ", "http://localhost:9090"},
+		},
+		Nodes:        []metainfo.Node{metainfo.Node("127.0.0.1:1001")},
+		CreationDate: 150000,
+		Comment:      "forged for test",
+		CreatedBy:    "me",
+	}
+
+	config := &dumbConfig{
+		doesSupportAnnounceList:           true,
+		shouldAnnounceToAllTiers:          true,
+		shouldAnnounceToAllTrackersInTier: true,
+	}
+
+	o, err := NewOrchestrator(meta, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orchestrator := o.(*AllOrchestrator)
+
+	assert.Len(t, orchestrator.tiers, 2)
+	assert.Len(t, orchestrator.tiers[0].(*AllTrackersTierAnnouncer).trackers, 1)
+	assert.Equal(t, orchestrator.tiers[0].(*AllTrackersTierAnnouncer).trackers[0].(*trackerAnnouncer).url.String(), "http://localhost:8080")
+	assert.Len(t, orchestrator.tiers[1].(*AllTrackersTierAnnouncer).trackers, 1)
+	assert.Equal(t, orchestrator.tiers[1].(*AllTrackersTierAnnouncer).trackers[0].(*trackerAnnouncer).url.String(), "http://localhost:9090")
 }
 
 func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {

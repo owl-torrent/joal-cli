@@ -631,10 +631,7 @@ func Test_FallbackTrackersTierAnnouncer_ShouldReorderTrackerListOnAnnounceSucces
 
 func drainTierStateChanContinuously(c <-chan tierState) {
 	go func() {
-		for {
-			select {
-			case <-c:
-			}
+		for range c {
 		}
 	}()
 }
