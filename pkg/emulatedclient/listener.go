@@ -55,7 +55,6 @@ var publicIpProviders = []string{
 	"http://wgetip.com",
 	"http://ip.appspot.com",
 	"http://ip.tyk.nu",
-	"https://shtuff.it/myip/short",
 }
 
 // may be an ipv4 or ipv6
