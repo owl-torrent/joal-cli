@@ -11,7 +11,7 @@ import (
 
 // torrent base library : https://github.com/anacrolix/torrent
 // especially for bencode and tracker subpackages
-//TODO check if init() is needed here, it used to be for log init
+
 func main() {
 	defer func() { _ = logs.GetLogger().Sync() }()
 	conf, err := config.ConfigManagerNew(os.Args[1])

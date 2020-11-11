@@ -90,7 +90,6 @@ func (s *seed) Seed(bitTorrentClient emulatedclient.IEmulatedClient, dispatcher 
 	log := logs.GetLogger()
 	s.lock.Lock()
 	if s.seeding {
-		// TODO: log already running
 		s.lock.Unlock()
 		return
 	}

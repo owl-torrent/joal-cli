@@ -38,7 +38,6 @@ type Joal struct {
 	joalPaths     *joalPaths
 	seedManager   *SeedManager
 	lock          *sync.Mutex
-	//TODO: eventListeners []EventListener // joal components will publish events from a chanel and seedmanager will relegate each of them in each of these publisher
 }
 
 func JoalNew(joalWorkingDirectory string, configManager config.IManager) (*Joal, error) {

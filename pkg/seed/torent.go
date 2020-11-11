@@ -76,7 +76,7 @@ func FromReader(filePath string) (ITorrent, error) {
 	infoHash := meta.HashInfoBytes()
 	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.ByteString("infohash", infoHash.Bytes()))
 
-	// TODO: move the tracker shuffling in orchestrator, it shouldn't be here
+	// Shuffling trackers according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
