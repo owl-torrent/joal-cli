@@ -54,27 +54,31 @@ type IConfig interface {
 	ShouldAnnounceToAllTrackersInTier() bool
 }
 
-func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error) {
+type TorrentInfo struct {
+	Announce     string
+	AnnounceList metainfo.AnnounceList
+}
+
+func NewOrchestrator(info *TorrentInfo, conf IConfig) (IOrchestrator, error) {
 	log := logs.GetLogger()
 	if conf == nil {
 		return nil, fmt.Errorf("nil orchestrator config")
 	}
 
 	if !conf.DoesSupportAnnounceList() {
-		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
+		log.Info("build orchestrator without support for announce-list", zap.String("url", info.Announce))
+		return createOrchestratorForAnnounceList([][]string{{info.Announce}}, true, true)
 	}
 
-	if !meta.AnnounceList.OverridesAnnounce(meta.Announce) {
-		log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", meta.Announce))
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
+	// AnnounceList contains only empty url but announce contains a valid url
+	if !info.AnnounceList.OverridesAnnounce(info.Announce) {
+		log.Info("build orchestrator with 'announce' because 'announce-list' is empty", zap.String("url", info.Announce))
+		return createOrchestratorForAnnounceList([][]string{{info.Announce}}, true, true)
 	}
 
 	// dont trust your inputs: some url (or even tiers) may be empty, filter them
 	var announceList [][]string
-	for _, tier := range meta.AnnounceList {
+	for _, tier := range info.AnnounceList {
 		currentTier := make([]string, 0)
 		for _, trackerUri := range tier {
 			if strings.TrimSpace(trackerUri) != "" {
@@ -90,11 +94,6 @@ func NewOrchestrator(meta metainfo.MetaInfo, conf IConfig) (IOrchestrator, error
 		return nil, fmt.Errorf("announce-list is empty")
 	}
 
-	if !conf.DoesSupportAnnounceList() {
-		log.Info("build orchestrator without support for announce-list", zap.String("url", meta.Announce))
-		var announceList = [][]string{{meta.Announce}}
-		return createOrchestratorForAnnounceList(announceList, true, true)
-	}
 	log.Info("build orchestrator with 'announce-list'", zap.Any("announce-list", announceList))
 	return createOrchestratorForAnnounceList(announceList, conf.ShouldAnnounceToAllTiers(), conf.ShouldAnnounceToAllTrackersInTier())
 }

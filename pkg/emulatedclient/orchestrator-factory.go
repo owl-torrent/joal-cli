@@ -1,7 +1,6 @@
 package emulatedclient
 
 import (
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 )
 
@@ -24,6 +23,6 @@ func (f orchestratorFactory) ShouldAnnounceToAllTrackersInTier() bool {
 	return f.AnnounceToAllTrackersInTier
 }
 
-func (f orchestratorFactory) createOrchestrator(meta metainfo.MetaInfo) (orchestrator.IOrchestrator, error) {
-	return orchestrator.NewOrchestrator(meta, f)
+func (f orchestratorFactory) createOrchestrator(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
+	return orchestrator.NewOrchestrator(info, f)
 }

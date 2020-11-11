@@ -32,9 +32,10 @@ type dispatcher struct {
 	dispatcherUpdateInterval    time.Duration
 	quit                        chan int
 	randomSpeedProvider         IRandomSpeedProvider
-	claimers                    map[IBandwidthClaimable]Weight
-	totalWeight                 float64
-	lock                        *sync.RWMutex
+	// TODO: this map of IBandwidthClaimable is bullshit, don't work with reference, store a link InfoHash => ref into another map and work with it
+	claimers    map[IBandwidthClaimable]Weight
+	totalWeight float64
+	lock        *sync.RWMutex
 }
 
 func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {

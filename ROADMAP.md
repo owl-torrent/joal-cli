@@ -1,11 +1,12 @@
 # ROADMAP to v3.0
 
 - [x] remove dependency to mockgen. It introduce too much CI clutering
-- [ ] add github actions
-- [ ] implement the new torrent struct
-- [ ] link torrent with orchestrator
-- [ ] link torrent with dispatcher
-- [ ] link torrent with emulatedClient
+- [x] add github actions
+- [x] implement the new torrent struct
+- [x] link torrent with orchestrator
+- [x] link torrent with dispatcher
+- [x] link torrent with emulatedClient
+- [ ] test the new torrent structure
 - [x] change logging library from logrus to [uber-go/zap](https://github.com/uber-go/zap)
 - [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
 - [ ] implement a replacement for seedmanager.seed-manager

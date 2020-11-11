@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/announcer"
 	keygenerator "github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/generator"
@@ -21,7 +20,7 @@ type IEmulatedClient interface {
 	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
-	CreateOrchestratorForTorrent(info metainfo.MetaInfo) (orchestrator.IOrchestrator, error)
+	CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
 }
 
 type EmulatedClient struct {
@@ -120,6 +119,6 @@ func (c *EmulatedClient) StopListener(ctx context.Context) {
 	c.Listener.Stop(ctx)
 }
 
-func (c *EmulatedClient) CreateOrchestratorForTorrent(info metainfo.MetaInfo) (orchestrator.IOrchestrator, error) {
+func (c *EmulatedClient) CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
 	return c.OrchestratorFactory.createOrchestrator(info)
 }

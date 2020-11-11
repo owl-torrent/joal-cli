@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -20,7 +21,7 @@ import (
 
 type ITorrent interface {
 	InfoHash() torrent.InfoHash
-	StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher)
+	StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) error
 	StopSeeding(ctx context.Context)
 }
 
@@ -46,17 +47,19 @@ type slimInfo struct {
 	Files       []metainfo.FileInfo
 }
 
+type stoppingRequest struct {
+	ctx          context.Context
+	doneStopping chan struct{}
+}
+
 type joalTorrent struct {
-	ISeedSession
-	path         string
-	metaInfo     *slimMetaInfo
-	info         *slimInfo
-	infoHash     torrent.InfoHash
-	isRunning    bool
-	stopping     chan chan struct{}
-	lock         *sync.Mutex
-	orchestrator orchestrator.IOrchestrator
-	swarm        *swarmElector
+	path      string
+	metaInfo  *slimMetaInfo
+	info      *slimInfo
+	infoHash  torrent.InfoHash
+	isRunning bool
+	stopping  chan *stoppingRequest
+	lock      *sync.Mutex
 }
 
 func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorrent, error) {
@@ -72,23 +75,16 @@ func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorren
 	}
 	infoHash := meta.HashInfoBytes()
 	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.ByteString("infohash", infoHash.Bytes()))
-	//TODO: move the tracker shuffling in orchestrator, it shouldn't be here
+
+	// TODO: move the tracker shuffling in orchestrator, it shouldn't be here
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
 		})
 	}
 
-	o, err := client.CreateOrchestratorForTorrent(*meta)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create orchestrator for torrent '%s'", filePath)
-	}
-
 	return &joalTorrent{
-		//TODO: init IseedSession
-		swarm:        nil,
-		orchestrator: o,
-		path:         filePath,
+		path: filePath,
 		metaInfo: &slimMetaInfo{
 			Announce:     meta.Announce,
 			AnnounceList: meta.AnnounceList,
@@ -109,7 +105,7 @@ func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorren
 		},
 		infoHash:  infoHash,
 		isRunning: false,
-		stopping:  make(chan chan struct{}),
+		stopping:  make(chan *stoppingRequest),
 		lock:      &sync.Mutex{},
 	}, nil
 }
@@ -118,97 +114,134 @@ func (t joalTorrent) InfoHash() torrent.InfoHash {
 	return t.infoHash
 }
 
-func (t joalTorrent) GetSwarm() bandwidth.ISwarm {
-	return t.swarm
-}
-
-func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) {
+func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) error {
 	t.lock.Lock()
+	defer t.lock.Unlock()
 	if t.isRunning {
-		t.lock.Unlock()
-		return
+		return fmt.Errorf("already started")
 	}
 	t.isRunning = true
-	t.lock.Unlock()
 
-	t.swarm = newSwarmElector()
-	t.ISeedSession = newSeedSession()
+	currentSession := &seedSession{
+		seedStats: newSeedStats(),
+		infoHash:  t.infoHash,
+		swarm:     newSwarmElector(),
+	}
 
-	//announceClosure := createAnnounceClosure(t, client, dispatcher)
+	orhestra, err := client.CreateOrchestratorForTorrent(&orchestrator.TorrentInfo{
+		Announce:     t.metaInfo.Announce,
+		AnnounceList: t.metaInfo.AnnounceList.Clone(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to create orchestrator for torrent '%s'", t.path)
+	}
 
-	// TODO: start orchestrator, swarm & everything needed here and create a goroutine
+	go func() {
+		defer dispatcher.Release(currentSession)
 
-	// TODO: on stop, nil t.swarm & t.ISeedSession
+		announceClosure := createAnnounceClosure(currentSession, client, dispatcher)
+		orhestra.Start(announceClosure)
 
-	panic("not implemented")
+		stopRequest := <-t.stopping
+		orhestra.Stop(stopRequest.ctx, announceClosure)
+		stopRequest.doneStopping <- struct{}{}
+	}()
+	return nil
 }
 
 func (t *joalTorrent) StopSeeding(ctx context.Context) {
-	panic("not implemented")
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if !t.isRunning {
+		return
+	}
+	t.isRunning = false
 
-	// TODO: send stop signal to main loop
+	stopRequest := &stoppingRequest{
+		ctx:          ctx,
+		doneStopping: make(chan struct{}),
+	}
+	t.stopping <- stopRequest
+
+	<-stopRequest.doneStopping
 }
 
-func createAnnounceClosure(t *joalTorrent, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
+func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 
-		resp, err := client.Announce(ctx, u, t.InfoHash(), t.Uploaded(), t.Downloaded(), t.Left(), event)
+		resp, err := client.Announce(ctx, u, currentSession.InfoHash(), currentSession.seedStats.Uploaded(), currentSession.seedStats.Downloaded(), currentSession.seedStats.Left(), event)
 		if err != nil {
 			if event != tracker.Stopped {
-				t.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
-				if t.swarm.HasChanged() {
-					t.swarm.ResetChanged()
-					dispatcher.ClaimOrUpdate(t)
+				currentSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
+				if currentSession.swarm.HasChanged() {
+					currentSession.swarm.ResetChanged()
+					dispatcher.ClaimOrUpdate(currentSession)
 				}
 			}
 			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
 
 		if event != tracker.Stopped {
-			t.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
-			if t.swarm.HasChanged() {
-				t.swarm.ResetChanged()
-				dispatcher.ClaimOrUpdate(t)
+			currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
+			if currentSession.swarm.HasChanged() {
+				currentSession.swarm.ResetChanged()
+				dispatcher.ClaimOrUpdate(currentSession)
 			}
 		}
-
-		//TODO: publish res & error (most likely create our own struct and publish to chan)
 
 		return resp, nil
 	}
 }
 
-type ISeedSession interface {
+type seedSession struct {
+	seedStats seedStats
+	infoHash  torrent.InfoHash
+	swarm     *swarmElector
+}
+
+func (c *seedSession) InfoHash() torrent.InfoHash {
+	return c.infoHash
+}
+
+func (c *seedSession) AddUploaded(bytes int64) {
+	c.seedStats.AddUploaded(bytes)
+}
+
+func (c *seedSession) GetSwarm() bandwidth.ISwarm {
+	return c.swarm
+}
+
+type seedStats interface {
 	Uploaded() int64
 	Downloaded() int64
 	Left() int64
 	AddUploaded(bytes int64)
 }
 
-type mutableSeedSession struct {
+type mutableSeedStats struct {
 	uploaded   int64
 	downloaded int64
 	left       int64
 }
 
-func newSeedSession() *mutableSeedSession {
-	return &mutableSeedSession{
+func newSeedStats() *mutableSeedStats {
+	return &mutableSeedStats{
 		uploaded:   0,
 		downloaded: 0,
 		left:       0,
 	}
 }
 
-func (m mutableSeedSession) Uploaded() int64 {
+func (m mutableSeedStats) Uploaded() int64 {
 	return m.uploaded
 }
-func (m mutableSeedSession) Downloaded() int64 {
+func (m mutableSeedStats) Downloaded() int64 {
 	return m.downloaded
 }
-func (m mutableSeedSession) Left() int64 {
+func (m mutableSeedStats) Left() int64 {
 	return m.left
 }
 
-func (m *mutableSeedSession) AddUploaded(bytes int64) {
+func (m *mutableSeedStats) AddUploaded(bytes int64) {
 	m.uploaded += bytes
 }
