@@ -62,7 +62,7 @@ type joalTorrent struct {
 	lock      *sync.Mutex
 }
 
-func FromReader(filePath string, client emulatedclient.IEmulatedClient) (ITorrent, error) {
+func FromReader(filePath string) (ITorrent, error) {
 	log := logs.GetLogger()
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
