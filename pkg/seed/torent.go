@@ -17,7 +17,10 @@ import (
 	"net/url"
 	"path/filepath"
 	"sync"
+	"time"
 )
+
+var randSeed = time.Now().UnixNano()
 
 type ITorrent interface {
 	InfoHash() torrent.InfoHash
@@ -62,7 +65,7 @@ type joalTorrent struct {
 	lock      *sync.Mutex
 }
 
-func FromReader(filePath string) (ITorrent, error) {
+func FromFile(filePath string) (ITorrent, error) {
 	log := logs.GetLogger()
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
@@ -77,10 +80,12 @@ func FromReader(filePath string) (ITorrent, error) {
 	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.ByteString("infohash", infoHash.Bytes()))
 
 	// Shuffling trackers according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
+	rand.Seed(randSeed)
 	for _, tier := range meta.AnnounceList {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
 		})
+		fmt.Println(tier)
 	}
 
 	return &joalTorrent{
@@ -172,9 +177,8 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 		resp, err := client.Announce(ctx, u, currentSession.InfoHash(), currentSession.seedStats.Uploaded(), currentSession.seedStats.Downloaded(), currentSession.seedStats.Left(), event)
 		if err != nil {
 			if event != tracker.Stopped {
-				currentSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
-				if currentSession.swarm.HasChanged() {
-					currentSession.swarm.ResetChanged()
+				swarmHasChanged := currentSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
+				if swarmHasChanged {
 					dispatcher.ClaimOrUpdate(currentSession)
 				}
 			}
@@ -182,9 +186,8 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 		}
 
 		if event != tracker.Stopped {
-			currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
-			if currentSession.swarm.HasChanged() {
-				currentSession.swarm.ResetChanged()
+			swarmHasChanged := currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
+			if swarmHasChanged {
 				dispatcher.ClaimOrUpdate(currentSession)
 			}
 		}

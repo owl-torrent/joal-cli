@@ -87,16 +87,6 @@ func (s swarmElector) CurrentSwarm() bandwidth.ISwarm {
 	return sw
 }
 
-func (s swarmElector) HasChanged() bool {
-	return s.hasChanged
-}
-
-func (s *swarmElector) ResetChanged() {
-	s.lock.Lock()
-	s.hasChanged = false
-	s.lock.Unlock()
-}
-
 func (s *swarmElector) GetSeeders() int32 {
 	var v int32 = 0
 
@@ -118,21 +108,20 @@ func (s *swarmElector) GetLeechers() int32 {
 	return v
 }
 
-func (s *swarmElector) UpdateSwarm(update swarmUpdateRequest) {
+// Update the warm with the new stats and return true if the swarm has changed, false if the swarm remains the same
+func (s *swarmElector) UpdateSwarm(update swarmUpdateRequest) bool {
 	newPeersStats := update.toPeersStats()
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.swarm[newPeersStats.trackerHost] = newPeersStats
 
 	newElected := findBestAndEvictExpired(s.swarm)
 	// has not changed
 	if newElected != nil && s.elected != nil && s.elected.trackerHost == newElected.trackerHost && s.elected.leechers == newElected.leechers && s.elected.seeders == newElected.seeders {
-		s.lock.Unlock()
-		return
+		return false
 	}
 	s.elected = newElected
-	s.hasChanged = true
-	s.lock.Unlock()
-
+	return true
 }
 
 func findBestAndEvictExpired(swarm map[string]*peersStats) *peersStats {
