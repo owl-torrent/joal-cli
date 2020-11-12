@@ -1,16 +1,106 @@
 package seed
 
 import (
+	"context"
 	"fmt"
+	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/pkg/announcer"
+	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
+	"net/url"
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
+
+type fakeOrchestrator struct {
+	start func(announce orchestrator.AnnouncingFunction)
+	stop  func(context context.Context, announce orchestrator.AnnouncingFunction)
+}
+
+func (o *fakeOrchestrator) Start(announce orchestrator.AnnouncingFunction) {
+	if o.start != nil {
+		o.start(announce)
+	}
+}
+
+func (o *fakeOrchestrator) Stop(context context.Context, announce orchestrator.AnnouncingFunction) {
+	if o.stop != nil {
+		o.stop(context, announce)
+	}
+}
+
+type fakeBandwidthDispatcher struct {
+	start         func()
+	stop          func()
+	claimOrUpdate func(claimer bandwidth.IBandwidthClaimable)
+	release       func(claimer bandwidth.IBandwidthClaimable)
+}
+
+func (d *fakeBandwidthDispatcher) Start() {
+	if d.start != nil {
+		d.start()
+	}
+}
+
+func (d *fakeBandwidthDispatcher) Stop() {
+	if d.stop != nil {
+		d.stop()
+	}
+}
+
+func (d *fakeBandwidthDispatcher) ClaimOrUpdate(claimer bandwidth.IBandwidthClaimable) {
+	if d.claimOrUpdate != nil {
+		d.claimOrUpdate(claimer)
+	}
+}
+
+func (d *fakeBandwidthDispatcher) Release(claimer bandwidth.IBandwidthClaimable) {
+	if d.release != nil {
+		d.release(claimer)
+	}
+}
+
+type fakeEmulatedClient struct {
+	announce                     func(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
+	startListener                func() error
+	stopListener                 func(ctx context.Context)
+	createOrchestratorForTorrent func(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
+}
+
+func (c *fakeEmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
+	if c.announce != nil {
+		return c.announce(ctx, u, infoHash, uploaded, downloaded, left, event)
+	}
+	return announcer.AnnounceResponse{}, nil
+}
+
+func (c *fakeEmulatedClient) StartListener() error {
+	if c.startListener != nil {
+		return c.startListener()
+	}
+	return nil
+}
+
+func (c *fakeEmulatedClient) StopListener(ctx context.Context) {
+	if c.stopListener != nil {
+		c.stopListener(ctx)
+	}
+}
+
+func (c *fakeEmulatedClient) CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
+	if c.createOrchestratorForTorrent != nil {
+		return c.createOrchestratorForTorrent(info)
+	}
+	return nil, nil
+}
 
 func createTorrentFile(t *testing.T, directory string, metaAdapters ...func(info *metainfo.Info, meta *metainfo.MetaInfo)) (string, metainfo.MetaInfo) {
 	meta := &metainfo.MetaInfo{
@@ -154,18 +244,137 @@ func Test_Torrent_ShouldShuffleTrackerInTiers(t *testing.T) {
 	assert.True(t, atLeastOneIsDifferentFromOriginal)
 }
 
-func Test_JoalTorrent_ShouldRegisterTorrentsToBandwidthDispatcherOnAnnounce(t *testing.T) {
-	t.Fatal("not implemented")
-}
+func Test_JoalTorrent_ShouldRegisterTorrentsToBandwidthDispatcherOnAnnounceAndUnregisterOnStop(t *testing.T) {
+	tmpDir := t.TempDir()
+	torrentFile, _ := createTorrentFile(t, tmpDir)
+	tor, err := FromFile(torrentFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-func Test_JoalTorrent_ShouldUnRegisterTorrentsFromBandwidthDispatcherOnStop(t *testing.T) {
-	t.Fatal("not implemented")
+	orchStarted := make(chan struct{})
+	var announcingFunc orchestrator.AnnouncingFunction
+	orch := &fakeOrchestrator{
+		start: func(announce orchestrator.AnnouncingFunction) {
+			announcingFunc = announce
+			close(orchStarted)
+		},
+	}
+
+	emulatedClient := &fakeEmulatedClient{
+		announce: func(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
+			return announcer.AnnounceResponse{Interval: 50 * time.Hour}, nil
+		},
+		createOrchestratorForTorrent: func(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
+			return orch, nil
+		},
+	}
+
+	dispatcherUpdated := make(chan bandwidth.IBandwidthClaimable, 1)
+	dispatcherStopped := make(chan struct{})
+	dispatcher := &fakeBandwidthDispatcher{
+		claimOrUpdate: func(claimer bandwidth.IBandwidthClaimable) {
+			dispatcherUpdated <- claimer
+		},
+		release: func(claimer bandwidth.IBandwidthClaimable) {
+			close(dispatcherStopped)
+		},
+	}
+
+	err = tor.StartSeeding(emulatedClient, dispatcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-orchStarted:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	_, err = announcingFunc(context.Background(), url.URL{}, tracker.Started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-dispatcherUpdated:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	_, err = announcingFunc(context.Background(), url.URL{}, tracker.None)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-dispatcherUpdated:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	// should not update on stop
+	_, err = announcingFunc(context.Background(), url.URL{}, tracker.Stopped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-dispatcherUpdated:
+		t.Fatal("should not have dispatched")
+	default:
+	}
+
+	tor.StopSeeding(context.Background())
+	select {
+	case <-dispatcherStopped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
 }
 
 func Test_JoalTorrent_ShouldStartOrchestratorOnStartAndStopOnStop(t *testing.T) {
-	t.Fatal("not implemented")
-}
+	tmpDir := t.TempDir()
+	torrentFile, _ := createTorrentFile(t, tmpDir)
+	tor, err := FromFile(torrentFile)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-func Test_JoalTorrent_ShouldNotifySwarmOnAnnyAnnounceResponseButStopped(t *testing.T) {
-	t.Fatal("not implemented")
+	orchStarted := make(chan struct{})
+	orchStopped := make(chan struct{})
+	orch := &fakeOrchestrator{
+		start: func(announce orchestrator.AnnouncingFunction) {
+			close(orchStarted)
+		},
+		stop: func(context context.Context, announce orchestrator.AnnouncingFunction) {
+			close(orchStopped)
+		},
+	}
+
+	emulatedClient := &fakeEmulatedClient{
+		announce: func(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
+			return announcer.AnnounceResponse{Interval: 50 * time.Hour}, nil
+		},
+		createOrchestratorForTorrent: func(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
+			return orch, nil
+		},
+	}
+
+	dispatcher := &fakeBandwidthDispatcher{}
+
+	err = tor.StartSeeding(emulatedClient, dispatcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-orchStarted:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
+
+	tor.StopSeeding(context.Background())
+	select {
+	case <-orchStopped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout")
+	}
 }
