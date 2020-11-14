@@ -3,6 +3,7 @@ package algorithm
 import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key"
+	"gopkg.in/yaml.v3"
 )
 
 var algorithmImplementations = map[string]func() IKeyAlgorithm{
@@ -18,11 +19,11 @@ type KeyAlgorithm struct {
 	IKeyAlgorithm `yaml:",inline" validate:"required"`
 }
 
-func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *KeyAlgorithm) UnmarshalYAML(value *yaml.Node) error {
 	algorithmType := &struct {
 		Name string `yaml:"type"`
 	}{}
-	err := unmarshal(&algorithmType)
+	err := value.Decode(&algorithmType)
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func (a *KeyAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	algorithm := implFactory()
-	err = unmarshal(algorithm)
+	err = value.Decode(algorithm)
 	if err != nil {
 		return err
 	}

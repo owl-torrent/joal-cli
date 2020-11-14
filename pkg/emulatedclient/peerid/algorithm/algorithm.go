@@ -3,6 +3,7 @@ package algorithm
 import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid"
+	"gopkg.in/yaml.v3"
 )
 
 var algorithmImplementations = map[string]func() IPeerIdAlgorithm{
@@ -19,11 +20,11 @@ type PeerIdAlgorithm struct {
 	IPeerIdAlgorithm `yaml:",inline" validate:"required"`
 }
 
-func (a *PeerIdAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *PeerIdAlgorithm) UnmarshalYAML(value *yaml.Node) error {
 	algorithmType := &struct {
 		Name string `yaml:"type"`
 	}{}
-	err := unmarshal(&algorithmType)
+	err := value.Decode(&algorithmType)
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func (a *PeerIdAlgorithm) UnmarshalYAML(unmarshal func(interface{}) error) error
 	}
 
 	algorithm := implFactory()
-	err = unmarshal(algorithm)
+	err = value.Decode(algorithm)
 	if err != nil {
 		return err
 	}

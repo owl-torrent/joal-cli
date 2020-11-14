@@ -1,23 +1,6 @@
 package seedmanager
 
-import (
-	"context"
-	"fmt"
-	"github.com/anacrolix/torrent"
-	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
-	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
-	"github.com/anthonyraymond/joal-cli/pkg/logs"
-	"github.com/anthonyraymond/joal-cli/pkg/seed"
-	"github.com/anthonyraymond/joal-cli/pkg/seedmanager/config"
-	"github.com/anthonyraymond/watcher"
-	"go.uber.org/zap"
-	"os"
-	"path"
-	"path/filepath"
-	"sync"
-	"time"
-)
-
+/*
 type SeedManager struct {
 	conf                *config.SeedConfig
 	joalPaths           *joalPaths
@@ -30,7 +13,7 @@ type SeedManager struct {
 }
 
 func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager, error) {
-	dispatcher := bandwidth.DispatcherNew(&bandwidth.RandomSpeedProvider{
+	dispatcher := bandwidth.dispatcherNew(&bandwidth.randomSpeedProvider{
 		MinimumBytesPerSeconds: conf.MinUploadRate,
 		MaximumBytesPerSeconds: conf.MaxUploadRate,
 	})
@@ -50,6 +33,7 @@ func SeedManagerNew(joalPaths *joalPaths, conf config.SeedConfig) (*SeedManager,
 		fileWatcherPoll:     1 * time.Second,
 		lock:                &sync.Mutex{},
 	}, nil
+	panic("not implemented")
 }
 
 func (s *SeedManager) Start() error {
@@ -147,7 +131,7 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 	} else {
 		_ = f.Close()
 	}
-	/*
+
 			torrentSeed, err := seed.LoadFromFile(filePath)
 			if err != nil {
 				return errors.Wrap(err, "failed to create torrent from file")
@@ -168,7 +152,7 @@ func (s *SeedManager) onTorrentFileCreate(filePath string) error {
 			} else {
 			log.Warn("Seed was not not started, seed map already contains this infohash.", zap.String("file", filepath.Base(filePath)))
 		}
-	*/
+
 
 	return nil
 }
@@ -236,3 +220,4 @@ func (s *SeedManager) Stop(ctx context.Context) {
 	wg.Wait()
 	s.seeds = make(map[torrent.InfoHash]seed.ISeed)
 }
+*/

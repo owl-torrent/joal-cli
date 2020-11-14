@@ -1,9 +1,8 @@
 package casing
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"strings"
 )
 
@@ -48,37 +47,13 @@ var toID = map[string]Case{
 	"capitalize": Capitalize,
 }
 
-// MarshalJSON marshals the enum as a quoted json string
-func (c Case) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(toString[c])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
-}
-
 func (c Case) MarshalYAML() ([]byte, error) {
 	return []byte(toString[c]), nil
 }
 
-// UnmarshalJSON unmashals a quoted json string to the enum value
-func (c *Case) UnmarshalJSON(b []byte) error {
+func (c *Case) UnmarshalYAML(value *yaml.Node) error {
 	var j string
-	err := json.Unmarshal(b, &j)
-	if err != nil {
-		return err
-	}
-	// Note that if the string cannot be found then it will be set to the zero value, 'Lower' in this case.
-	cc, ok := toID[j]
-	if !ok {
-		return fmt.Errorf("failed to unmarshall Unknown Case '%s'", j)
-	}
-	*c = cc
-	return nil
-}
-
-func (c *Case) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var j string
-	err := unmarshal(&j)
+	err := value.Decode(&j)
 	if err != nil {
 		return err
 	}

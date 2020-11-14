@@ -7,6 +7,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/key/algorithm"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 	"time"
 )
 
@@ -28,12 +29,12 @@ type KeyGenerator struct {
 	Algorithm     algorithm.IKeyAlgorithm `yaml:"algorithm" validate:"required"`
 }
 
-func (a *KeyGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *KeyGenerator) UnmarshalYAML(value *yaml.Node) error {
 	unmarshalStruct := &struct {
 		Name      string                  `yaml:"type"`
 		Algorithm *algorithm.KeyAlgorithm `yaml:"algorithm"`
 	}{}
-	err := unmarshal(&unmarshalStruct)
+	err := value.Decode(&unmarshalStruct)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (a *KeyGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	// if the generator is known create new empty instance of it
 	generator := implFactory()
-	err = unmarshal(generator)
+	err = value.Decode(generator)
 	if err != nil {
 		return err
 	}

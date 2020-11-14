@@ -25,7 +25,21 @@ type IDispatcher interface {
 	Release(claimer IBandwidthClaimable)
 }
 
-type Weight = float64
+type claimerWeight = float64
+
+type Config struct {
+	GlobalBandwidthRefreshInterval           time.Duration        `yaml:"globalBandwidthRefreshInterval"`
+	IntervalBetweenEachTorrentsSeedIncrement time.Duration        `yaml:"incrementSeedInterval"`
+	SpeedProviderConfig                      *SpeedProviderConfig `yaml:"globalBandwidthBps"`
+}
+
+func (c Config) Default() *Config {
+	return &Config{
+		GlobalBandwidthRefreshInterval:           20 * time.Minute,
+		IntervalBetweenEachTorrentsSeedIncrement: 5 * time.Second,
+		SpeedProviderConfig:                      SpeedProviderConfig{}.Default(),
+	}
+}
 
 type dispatcher struct {
 	speedProviderUpdateInterval time.Duration
@@ -33,17 +47,17 @@ type dispatcher struct {
 	quit                        chan int
 	randomSpeedProvider         IRandomSpeedProvider
 	// TODO: this map of IBandwidthClaimable is bullshit, don't work with reference, store a link InfoHash => ref into another map and work with it
-	claimers    map[IBandwidthClaimable]Weight
+	claimers    map[IBandwidthClaimable]claimerWeight
 	totalWeight float64
 	lock        *sync.RWMutex
 }
 
-func DispatcherNew(randomSpeedProvider IRandomSpeedProvider) IDispatcher {
+func dispatcherNew(conf *Config) IDispatcher {
 	return &dispatcher{
-		speedProviderUpdateInterval: 20 * time.Minute,
-		dispatcherUpdateInterval:    5 * time.Second,
-		randomSpeedProvider:         randomSpeedProvider,
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		speedProviderUpdateInterval: conf.GlobalBandwidthRefreshInterval,
+		dispatcherUpdateInterval:    conf.IntervalBetweenEachTorrentsSeedIncrement,
+		randomSpeedProvider:         newRandomSpeedProvider(conf.SpeedProviderConfig),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}

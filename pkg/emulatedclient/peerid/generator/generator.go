@@ -7,6 +7,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid"
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient/peerid/algorithm"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 	"time"
 )
 
@@ -28,12 +29,12 @@ type PeerIdGenerator struct {
 	Algorithm        algorithm.IPeerIdAlgorithm `yaml:"algorithm" validate:"required"`
 }
 
-func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *PeerIdGenerator) UnmarshalYAML(value *yaml.Node) error {
 	unmarshalStruct := &struct {
 		Name      string                     `yaml:"type"`
 		Algorithm *algorithm.PeerIdAlgorithm `yaml:"algorithm"`
 	}{}
-	err := unmarshal(&unmarshalStruct)
+	err := value.Decode(&unmarshalStruct)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (a *PeerIdGenerator) UnmarshalYAML(unmarshal func(interface{}) error) error
 	}
 
 	generator := implFactory()
-	err = unmarshal(generator)
+	err = value.Decode(generator)
 	if err != nil {
 		return err
 	}

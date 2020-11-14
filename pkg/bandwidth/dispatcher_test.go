@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,64 @@ func (s *testSwarm) GetSeeders() int32 {
 }
 func (s *testSwarm) GetLeechers() int32 {
 	return s.leechers
+}
+
+func TestConfig_Default_ShouldReturnDefaultConfig(t *testing.T) {
+	c := Config{}.Default()
+
+	assert.Equal(t, &Config{
+		GlobalBandwidthRefreshInterval:           20 * time.Minute,
+		IntervalBetweenEachTorrentsSeedIncrement: 5 * time.Second,
+		SpeedProviderConfig:                      SpeedProviderConfig{}.Default(),
+	}, c)
+}
+
+func TestConfig_Default_ShouldUnmarshal(t *testing.T) {
+	yamlStr := `
+globalBandwidthRefreshInterval: 300h
+incrementSeedInterval: 1h
+globalBandwidthBps:
+  min: 1
+  max: 1000
+`
+
+	c := &Config{}
+	err := yaml.Unmarshal([]byte(yamlStr), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, &Config{
+		GlobalBandwidthRefreshInterval:           300 * time.Hour,
+		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
+		SpeedProviderConfig: &SpeedProviderConfig{
+			MinimumBytesPerSeconds: 1,
+			MaximumBytesPerSeconds: 1000,
+		},
+	}, c)
+}
+
+func TestConfig_Default_ShouldUnmarshalAndReplaceDefault(t *testing.T) {
+	yamlStr := `
+globalBandwidthRefreshInterval: 300h
+globalBandwidthBps:
+  min: 1
+`
+
+	c := Config{}.Default()
+	err := yaml.Unmarshal([]byte(yamlStr), c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, &Config{
+		GlobalBandwidthRefreshInterval:           300 * time.Hour,
+		IntervalBetweenEachTorrentsSeedIncrement: Config{}.Default().IntervalBetweenEachTorrentsSeedIncrement,
+		SpeedProviderConfig: &SpeedProviderConfig{
+			MinimumBytesPerSeconds: 1,
+			MaximumBytesPerSeconds: SpeedProviderConfig{}.Default().MaximumBytesPerSeconds,
+		},
+	}, c)
 }
 
 func Test_calculateWeightShouldNeverGoBelowZero(t *testing.T) {
@@ -128,7 +187,7 @@ func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -148,7 +207,7 @@ func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Millisecond,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -174,7 +233,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &mockedRandomSpeedProvider{bps: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -206,7 +265,7 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -245,7 +304,7 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -284,7 +343,7 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 		speedProviderUpdateInterval: 1 * time.Hour,
 		dispatcherUpdateInterval:    1 * time.Millisecond,
 		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]Weight),
+		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
 		totalWeight:                 0,
 		lock:                        &sync.RWMutex{},
 	}
@@ -321,7 +380,7 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 
 func TestDispatcher_shouldNotRegisterIfSwarmIsNil(t *testing.T) {
 	dispatcher := &dispatcher{
-		claimers: make(map[IBandwidthClaimable]Weight),
+		claimers: make(map[IBandwidthClaimable]claimerWeight),
 		lock:     &sync.RWMutex{},
 	}
 	claimer1 := &DumbBandwidthClaimable{

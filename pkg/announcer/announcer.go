@@ -7,6 +7,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 	"net"
 	"net/url"
 	"strings"
@@ -45,12 +46,12 @@ type Announcer struct {
 	Udp  IUdpAnnouncer  `yaml:"udp" validate:"required_without_all=Http"`
 }
 
-func (a *Announcer) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (a *Announcer) UnmarshalYAML(value *yaml.Node) error {
 	announcer := &struct {
 		Http HttpAnnouncer `yaml:"http"`
 		// TODO: Udp UdpAnnouncer `yaml:"udp"`
 	}{}
-	err := unmarshal(&announcer)
+	err := value.Decode(&announcer)
 	if err != nil {
 		return err
 	}
