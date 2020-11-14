@@ -96,6 +96,23 @@ globalBandwidthBps:
 	}, c)
 }
 
+func TestDispatcher_ShouldBuildFromConfig(t *testing.T) {
+	conf := &Config{
+		GlobalBandwidthRefreshInterval:           10 * time.Minute,
+		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Minute,
+		SpeedProviderConfig: &SpeedProviderConfig{
+			MinimumBytesPerSeconds: 3000,
+			MaximumBytesPerSeconds: 50000,
+		},
+	}
+	d := dispatcherNew(conf)
+
+	assert.Equal(t, 10*time.Minute, d.(*dispatcher).globalBandwidthRefreshInterval)
+	assert.Equal(t, 1*time.Minute, d.(*dispatcher).intervalBetweenEachTorrentsSeedIncrement)
+	assert.Equal(t, int64(3000), d.(*dispatcher).randomSpeedProvider.(*randomSpeedProvider).MinimumBytesPerSeconds)
+	assert.Equal(t, int64(50000), d.(*dispatcher).randomSpeedProvider.(*randomSpeedProvider).MaximumBytesPerSeconds)
+}
+
 func Test_calculateWeightShouldNeverGoBelowZero(t *testing.T) {
 	type args struct {
 		swarm ISwarm
@@ -184,12 +201,12 @@ func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 	latch := congo.NewCountDownLatch(1)
 
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Hour,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Hour,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 
 	dispatcher.Start()
@@ -204,12 +221,12 @@ func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 	latch := congo.NewCountDownLatch(4)
 
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Millisecond,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Millisecond,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 
 	dispatcher.Start()
@@ -230,12 +247,12 @@ func (s *DumbStaticSpeedProvider) Refresh()                  { s.refreshCount +=
 
 func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Hour,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &mockedRandomSpeedProvider{bps: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Hour,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &mockedRandomSpeedProvider{bps: 10000000},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 
 	latch := congo.NewCountDownLatch(1)
@@ -262,12 +279,12 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 
 func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Hour,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Hour,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &DumbStaticSpeedProvider{speed: 10000000},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 	wg := sync.WaitGroup{}
 	ih1 := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
@@ -301,12 +318,12 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 
 func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Hour,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Hour,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &DumbStaticSpeedProvider{speed: 10000000},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 	wg := sync.WaitGroup{}
 	ih1 := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
@@ -340,26 +357,24 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 
 func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 	dispatcher := &dispatcher{
-		speedProviderUpdateInterval: 1 * time.Hour,
-		dispatcherUpdateInterval:    1 * time.Millisecond,
-		randomSpeedProvider:         &DumbStaticSpeedProvider{speed: 10000000},
-		claimers:                    make(map[IBandwidthClaimable]claimerWeight),
-		totalWeight:                 0,
-		lock:                        &sync.RWMutex{},
+		globalBandwidthRefreshInterval:           1 * time.Hour,
+		intervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+		randomSpeedProvider:                      &DumbStaticSpeedProvider{speed: 10000000},
+		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		totalWeight:                              0,
+		lock:                                     &sync.RWMutex{},
 	}
 	wg := sync.WaitGroup{}
-	ih1 := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	claimer1 := &DumbBandwidthClaimable{
-		infoHash:           ih1,
+		infoHash:           metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
 		uploaded:           0,
 		swarm:              &DumbSwarm{seeders: 0, leechers: 0},
 		onFirstAddUploaded: func() { wg.Done() },
 		addOnlyOnce:        true,
 		lock:               &sync.Mutex{},
 	}
-	ih2 := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	claimer2 := &DumbBandwidthClaimable{
-		infoHash:           ih2,
+		infoHash:           metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
 		uploaded:           0,
 		swarm:              &DumbSwarm{seeders: 100, leechers: 2500},
 		onFirstAddUploaded: func() { wg.Done() },
@@ -378,15 +393,17 @@ func TestDispatcher_shouldNotDispatchIfNoPeers(t *testing.T) {
 	assert.Greater(t, claimer2.uploaded, int64(0))
 }
 
-func TestDispatcher_shouldNotRegisterIfSwarmIsNil(t *testing.T) {
+func TestDispatcher_shouldRegisterWithZeroWeightIfSwarmIsNil(t *testing.T) {
 	dispatcher := &dispatcher{
-		claimers: make(map[IBandwidthClaimable]claimerWeight),
+		claimers: make(map[torrent.InfoHash]weigthedClaimer),
 		lock:     &sync.RWMutex{},
 	}
 	claimer1 := &DumbBandwidthClaimable{
-		swarm: nil,
+		infoHash: metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+		swarm:    nil,
 	}
 	dispatcher.ClaimOrUpdate(claimer1)
 
-	assert.Empty(t, dispatcher.claimers)
+	assert.Len(t, dispatcher.claimers, 1)
+	assert.Equal(t, dispatcher.claimers[claimer1.infoHash].weight, 0.0)
 }
