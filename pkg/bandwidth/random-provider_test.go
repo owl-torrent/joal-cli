@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+func TestRandomSpeedProvider_ShouldBuildFromConfig(t *testing.T) {
+	rsp := newRandomSpeedProvider(&SpeedProviderConfig{
+		MinimumBytesPerSeconds: 10,
+		MaximumBytesPerSeconds: 100,
+	})
+
+	assert.Equal(t, 10, rsp.(*randomSpeedProvider).MinimumBytesPerSeconds)
+	assert.Equal(t, 100, rsp.(*randomSpeedProvider).MaximumBytesPerSeconds)
+}
+
 func TestRandomSpeedProvider_RefreshShouldGenerateValueWithinRange(t *testing.T) {
 	type fields struct {
 		minimumBytesPerSeconds int64

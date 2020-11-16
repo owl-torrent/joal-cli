@@ -18,20 +18,6 @@ type ISwarm interface {
 	GetLeechers() int32
 }
 
-type Config struct {
-	GlobalBandwidthRefreshInterval           time.Duration        `yaml:"globalBandwidthRefreshInterval"`
-	IntervalBetweenEachTorrentsSeedIncrement time.Duration        `yaml:"incrementSeedInterval"`
-	SpeedProviderConfig                      *SpeedProviderConfig `yaml:"globalBandwidthBps"`
-}
-
-func (c Config) Default() *Config {
-	return &Config{
-		GlobalBandwidthRefreshInterval:           20 * time.Minute,
-		IntervalBetweenEachTorrentsSeedIncrement: 5 * time.Second,
-		SpeedProviderConfig:                      SpeedProviderConfig{}.Default(),
-	}
-}
-
 type IDispatcher interface {
 	Start()
 	Stop()
@@ -39,11 +25,11 @@ type IDispatcher interface {
 	Release(claimer IBandwidthClaimable)
 }
 
-func dispatcherNew(conf *Config) IDispatcher {
+func newDispatcher(conf *DispatcherConfig, rsp iRandomSpeedProvider) IDispatcher {
 	return &dispatcher{
 		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
 		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,
-		randomSpeedProvider:                      newRandomSpeedProvider(conf.SpeedProviderConfig),
+		randomSpeedProvider:                      rsp,
 		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
 		totalWeight:                              0,
 		lock:                                     &sync.RWMutex{},

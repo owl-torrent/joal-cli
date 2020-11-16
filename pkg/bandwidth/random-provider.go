@@ -7,18 +7,6 @@ type iRandomSpeedProvider interface {
 	Refresh()
 }
 
-type SpeedProviderConfig struct {
-	MinimumBytesPerSeconds int64 `yaml:"min"`
-	MaximumBytesPerSeconds int64 `yaml:"max"`
-}
-
-func (c SpeedProviderConfig) Default() *SpeedProviderConfig {
-	return &SpeedProviderConfig{
-		MinimumBytesPerSeconds: 5000,
-		MaximumBytesPerSeconds: 15000,
-	}
-}
-
 type randomSpeedProvider struct {
 	MinimumBytesPerSeconds int64
 	MaximumBytesPerSeconds int64
