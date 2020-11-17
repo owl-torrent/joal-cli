@@ -11,8 +11,8 @@ func TestRandomSpeedProvider_ShouldBuildFromConfig(t *testing.T) {
 		MaximumBytesPerSeconds: 100,
 	})
 
-	assert.Equal(t, 10, rsp.(*randomSpeedProvider).MinimumBytesPerSeconds)
-	assert.Equal(t, 100, rsp.(*randomSpeedProvider).MaximumBytesPerSeconds)
+	assert.Equal(t, int64(10), rsp.(*randomSpeedProvider).MinimumBytesPerSeconds)
+	assert.Equal(t, int64(100), rsp.(*randomSpeedProvider).MaximumBytesPerSeconds)
 }
 
 func TestRandomSpeedProvider_RefreshShouldGenerateValueWithinRange(t *testing.T) {
