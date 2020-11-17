@@ -2,7 +2,6 @@ package bandwidth
 
 import (
 	"github.com/anacrolix/torrent"
-	"github.com/anthonyraymond/joal-cli/pkg/utils/timeutils"
 	"sync"
 	"time"
 )
@@ -30,14 +29,16 @@ func newDispatcher(conf *DispatcherConfig, rsp iRandomSpeedProvider) IDispatcher
 		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
 		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,
 		randomSpeedProvider:                      rsp,
-		claimers:                                 make(map[torrent.InfoHash]weigthedClaimer),
+		claimers:                                 make(map[torrent.InfoHash]weightedClaimer),
 		totalWeight:                              0,
+		isRunning:                                false,
+		stopping:                                 make(chan chan struct{}),
 		lock:                                     &sync.RWMutex{},
 	}
 }
 
 type claimerWeight = float64
-type weigthedClaimer struct {
+type weightedClaimer struct {
 	IBandwidthClaimable
 	weight claimerWeight
 }
@@ -45,58 +46,83 @@ type weigthedClaimer struct {
 type dispatcher struct {
 	globalBandwidthRefreshInterval           time.Duration
 	intervalBetweenEachTorrentsSeedIncrement time.Duration
-	quit                                     chan int
 	randomSpeedProvider                      iRandomSpeedProvider
-	claimers                                 map[torrent.InfoHash]weigthedClaimer
+	claimers                                 map[torrent.InfoHash]weightedClaimer
 	totalWeight                              float64
-	lock                                     *sync.RWMutex
+
+	isRunning bool
+	stopping  chan chan struct{}
+	lock      *sync.RWMutex
 }
 
 func (d *dispatcher) Start() {
-	// TODO: rewrite properly with channels instead of timeutils.every
-	d.quit = make(chan int)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if d.isRunning {
+		return
+	}
+	d.isRunning = true
+
 	go func() {
 		d.randomSpeedProvider.Refresh()
-		speedProviderChan := timeutils.Every(d.globalBandwidthRefreshInterval, func() { d.randomSpeedProvider.Refresh() })
-		defer close(speedProviderChan)
-		ticker := time.NewTicker(d.intervalBetweenEachTorrentsSeedIncrement)
-		defer ticker.Stop()
+
+		globalBandwidthRefreshTicker := time.NewTicker(d.globalBandwidthRefreshInterval)
+		timeToAddSeedToClaimers := time.NewTicker(d.intervalBetweenEachTorrentsSeedIncrement)
+		secondsBetweenLoops := d.intervalBetweenEachTorrentsSeedIncrement.Seconds()
+
 		for {
 			select {
-			case <-ticker.C:
+			case <-globalBandwidthRefreshTicker.C:
+				d.randomSpeedProvider.Refresh()
+			case <-timeToAddSeedToClaimers.C:
 				if d.totalWeight == 0 {
 					continue
 				}
+				bytesToDispatch := float64(d.randomSpeedProvider.GetBytesPerSeconds()) * secondsBetweenLoops
 				d.lock.RLock()
-				bytesToDispatch := float64(d.randomSpeedProvider.GetBytesPerSeconds()) * d.intervalBetweenEachTorrentsSeedIncrement.Seconds()
 				for _, claimer := range d.claimers {
 					percentOfSpeedToAssign := claimer.weight / d.totalWeight
 					claimer.AddUploaded(int64(bytesToDispatch * percentOfSpeedToAssign))
 				}
 				d.lock.RUnlock()
-			case <-d.quit:
+			case doneStopping := <-d.stopping:
+				timeToAddSeedToClaimers.Stop()
+				globalBandwidthRefreshTicker.Stop()
+				doneStopping <- struct{}{}
 				return
 			}
 		}
 	}()
 }
+
 func (d *dispatcher) Stop() {
-	close(d.quit)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if !d.isRunning {
+		return
+	}
+	d.isRunning = false
+
+	doneStopping := make(chan struct{})
+	d.stopping <- doneStopping
+
+	<-doneStopping
 }
 
 // Register a IBandwidthClaimable as a bandwidth client. Will update his uploaded stats on a timer and the amount of uploaded given depend on this ISwarm of the IBandwidthClaimable.
 // If called with an already known IBandwidthClaimable, re-calculate his bandwidth attribution based on his ISwarm. Basically this methods should be called every time the IBandwidthClaimable receives new Peers from the tracker.
 func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
+	d.lock.RLock()
 	previousClaimer, previousClaimerExists := d.claimers[claimer.InfoHash()]
 	if previousClaimerExists {
 		d.totalWeight -= previousClaimer.weight
 	}
+	d.lock.RUnlock()
 
+	d.lock.Lock()
+	defer d.lock.Unlock()
 	weight := calculateWeight(claimer.GetSwarm())
-	d.claimers[claimer.InfoHash()] = weigthedClaimer{
+	d.claimers[claimer.InfoHash()] = weightedClaimer{
 		IBandwidthClaimable: claimer,
 		weight:              weight,
 	}
@@ -105,11 +131,14 @@ func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 
 // Unregister a IBandwidthClaimable. After being released a IBandwidthClaimable wont receive any more bandwidth
 func (d *dispatcher) Release(claimer IBandwidthClaimable) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
+	d.lock.RLock()
 	previousClaimerWeight, exists := d.claimers[claimer.InfoHash()]
+	d.lock.RUnlock()
+
 	if exists {
+		d.lock.Lock()
+		defer d.lock.Unlock()
+
 		d.totalWeight -= previousClaimerWeight.weight
 		delete(d.claimers, claimer.InfoHash())
 	}

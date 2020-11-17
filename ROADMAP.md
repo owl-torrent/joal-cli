@@ -9,7 +9,7 @@
 - [x] test the new torrent structure
 - [x] change logging library from logrus to [uber-go/zap](https://github.com/uber-go/zap)
 - [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
-- [ ] rewrite dispatcher with performance in mind. This is the bottleneck of the whole project.
+- [x] rewrite dispatcher with performance in mind. This is the bottleneck of the whole project.
 - [ ] implement a replacement for seedmanager.seed-manager
 - [ ] make listening port customizable
 - [ ] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818

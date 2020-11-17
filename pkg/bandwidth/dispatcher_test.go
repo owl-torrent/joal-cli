@@ -1,10 +1,13 @@
 package bandwidth
 
 import (
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/randutils"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -315,4 +318,81 @@ func TestDispatcher_shouldRegisterWithZeroWeightIfSwarmIsNil(t *testing.T) {
 
 	assert.Len(t, d.(*dispatcher).claimers, 1)
 	assert.Equal(t, d.(*dispatcher).claimers[claimer1.infoHash].weight, 0.0)
+}
+
+type mockedBandwidthClaimable struct {
+	infoHash    torrent.InfoHash
+	uploaded    int64
+	swarm       ISwarm
+	addUploaded func(bytes int64)
+}
+
+func (c *mockedBandwidthClaimable) InfoHash() torrent.InfoHash {
+	return c.infoHash
+}
+
+func (c *mockedBandwidthClaimable) AddUploaded(bytes int64) {
+	if c.addUploaded != nil {
+		c.addUploaded(bytes)
+		return
+	}
+	c.uploaded += bytes
+}
+
+func (c *mockedBandwidthClaimable) GetSwarm() ISwarm {
+	return c.swarm
+}
+
+func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
+	numberOfClaimers := 5000
+	claimers := make([]IBandwidthClaimable, numberOfClaimers)
+
+	d := newDispatcher(&DispatcherConfig{
+		GlobalBandwidthRefreshInterval:           1 * time.Hour,
+		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
+	}, &mockedRandomSpeedProvider{
+		bps: 1000,
+	})
+
+	latch := congo.NewCountDownLatch(uint(numberOfClaimers) * 20)
+	for i := 0; i < numberOfClaimers; i++ {
+		claimer := &mockedBandwidthClaimable{
+			infoHash: metainfo.NewHashFromHex(fmt.Sprintf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA%d", i)[len(strconv.Itoa(i)):]),
+			uploaded: 0,
+			swarm: &DumbSwarm{
+				seeders:  10,
+				leechers: 10,
+			},
+		}
+		claimer.addUploaded = func(bytes int64) {
+			claimer.uploaded += bytes
+			_ = latch.CountDown()
+		}
+		d.ClaimOrUpdate(claimer)
+		claimers[i] = claimer
+	}
+
+	go func() {
+		for {
+			claimer := claimers[randutils.Range(0, int64(numberOfClaimers)-1)]
+			claimer.(*mockedBandwidthClaimable).swarm = &DumbSwarm{
+				seeders:  int32(randutils.Range(1, 200)),
+				leechers: int32(randutils.Range(1, 200)),
+			}
+			d.ClaimOrUpdate(claimer)
+
+			time.Sleep(10 * time.Microsecond)
+		}
+	}()
+
+	d.Start()
+	defer d.Stop()
+
+	if !latch.WaitTimeout(2 * time.Second) {
+		t.Fatal("timeout")
+	}
+
+	for i := 0; i < numberOfClaimers; i++ {
+		d.Release(claimers[i])
+	}
 }
