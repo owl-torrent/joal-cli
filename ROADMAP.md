@@ -6,15 +6,17 @@
 - [x] link torrent with orchestrator
 - [x] link torrent with dispatcher
 - [x] link torrent with emulatedClient
-- [ ] test the new torrent structure
+- [x] test the new torrent structure
 - [x] change logging library from logrus to [uber-go/zap](https://github.com/uber-go/zap)
 - [x] shuffle tier (or tracker i don't remember which) list when reading torrent file
 - [ ] implement a replacement for seedmanager.seed-manager
 - [ ] make listening port customizable
+- [ ] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818
 - [ ] Udp support
-- [ ] allow proxy integration (via http client)
+- [ ] allow proxy integration both udp and tcp (via http client)
 - [ ] run some real life tests on public trackers
 - [ ] add a fake tracker for integration tests
+- [ ] add some benchmarks
 - [ ] write some integrations tests
 - [x] add multi tracker support (that mimic real clients)
 - [x] add multi tier support (that mimic real clients)
