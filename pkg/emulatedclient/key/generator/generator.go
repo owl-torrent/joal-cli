@@ -84,12 +84,6 @@ func AccessAwareKeyNew(k key.Key) *AccessAwareKey {
 		val:          k,
 	}
 }
-func AccessAwareKeyNewSince(k key.Key, lastAccessed time.Time) *AccessAwareKey {
-	return &AccessAwareKey{
-		lastAccessed: lastAccessed,
-		val:          k,
-	}
-}
 
 func (s *AccessAwareKey) Get() key.Key {
 	s.lastAccessed = time.Now()
@@ -97,13 +91,13 @@ func (s *AccessAwareKey) Get() key.Key {
 }
 
 // time elapsed since last access
-func (s *AccessAwareKey) LastAccess() time.Duration {
-	return time.Since(s.lastAccessed)
+func (s *AccessAwareKey) IsExpired() bool {
+	return time.Since(s.lastAccessed) > 3*time.Hour
 }
 
-func evictOldEntries(entries map[torrent.InfoHash]*AccessAwareKey, evictAfter time.Duration) {
+func evictOldEntries(entries map[torrent.InfoHash]*AccessAwareKey) {
 	for k, accessAware := range entries {
-		if accessAware.LastAccess() > evictAfter {
+		if accessAware.IsExpired() {
 			delete(entries, k)
 		}
 	}

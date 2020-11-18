@@ -78,15 +78,9 @@ type AccessAwarePeerId struct {
 	val          peerid.PeerId
 }
 
-func AccessAwarePeerIdNew(k peerid.PeerId) *AccessAwarePeerId {
+func accessAwarePeerIdNew(k peerid.PeerId) *AccessAwarePeerId {
 	return &AccessAwarePeerId{
 		lastAccessed: time.Now(),
-		val:          k,
-	}
-}
-func AccessAwarePeerIdNewSince(k peerid.PeerId, lastAccessed time.Time) *AccessAwarePeerId {
-	return &AccessAwarePeerId{
-		lastAccessed: lastAccessed,
 		val:          k,
 	}
 }
@@ -96,14 +90,13 @@ func (s *AccessAwarePeerId) Get() peerid.PeerId {
 	return s.val
 }
 
-// time elapsed since last access
-func (s *AccessAwarePeerId) LastAccess() time.Duration {
-	return time.Since(s.lastAccessed)
+func (s *AccessAwarePeerId) IsExpired() bool {
+	return time.Since(s.lastAccessed) > 3*time.Hour
 }
 
-func evictOldEntries(entries map[torrent.InfoHash]*AccessAwarePeerId, evictAfter time.Duration) {
+func evictOldEntries(entries map[torrent.InfoHash]*AccessAwarePeerId) {
 	for key, accessAware := range entries {
-		if accessAware.LastAccess() > evictAfter {
+		if accessAware.IsExpired() {
 			delete(entries, key)
 		}
 	}

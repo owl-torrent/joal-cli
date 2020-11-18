@@ -53,16 +53,15 @@ func TestGenerate_TorrentPersistentRefresh_ShouldProvideSingleValuePerTorrent(t 
 func TestGenerate_TorrentPersistentRefresh_ShouldEvictOldEntries(t *testing.T) {
 	generator := &TorrentPersistentGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 3600 * time.Second
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
 	// Add infohash A (old one)
-	generator.entries[infoHashA] = AccessAwareKeyNewSince(1, time.Now().Add(-10*time.Hour))
+	generator.entries[infoHashA] = &AccessAwareKey{val: 1, lastAccessed: time.Now().Add(-10 * time.Hour)}
 	// Add infohash B (now)
-	generator.entries[infoHashB] = AccessAwareKeyNewSince(2, time.Now())
+	generator.entries[infoHashB] = &AccessAwareKey{val: 2, lastAccessed: time.Now()}
 
 	for i := 0; i < 120; i++ {
 		// work on B to ensure the cleaning counter has revolute as least once

@@ -53,16 +53,13 @@ func TestGenerate_TorrentVolatileRefresh_ShouldProvideSingleValuePerTorrent(t *t
 func TestGenerate_TorrentVolatileRefresh_ShouldEvictOldEntries(t *testing.T) {
 	generator := &TorrentVolatileGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 3600 * time.Second
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
-	// Add infohash A (old one)
-	generator.entries[infoHashA] = AccessAwarePeerIdNewSince([20]byte{1}, time.Now().Add(-10*time.Hour))
-	// Add infohash B (now)
-	generator.entries[infoHashB] = AccessAwarePeerIdNewSince([20]byte{2}, time.Now())
+	generator.entries[infoHashA] = &AccessAwarePeerId{val: [20]byte{1}, lastAccessed: time.Now().Add(-10 * time.Hour)}
+	generator.entries[infoHashB] = &AccessAwarePeerId{val: [20]byte{2}, lastAccessed: time.Now()}
 
 	for i := 0; i < 120; i++ {
 		// work on B to ensure the cleaning counter has revolute as least once
@@ -77,16 +74,13 @@ func TestGenerate_TorrentVolatileRefresh_ShouldEvictOldEntries(t *testing.T) {
 func TestGenerate_TorrentVolatileRefresh_ShouldEvictAfterStop(t *testing.T) {
 	generator := &TorrentVolatileGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 1 * time.Millisecond
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
-	// Add infohash A (old one)
-	generator.entries[infoHashA] = AccessAwarePeerIdNewSince([20]byte{1}, time.Now())
-	// Add infohash B (now)
-	generator.entries[infoHashB] = AccessAwarePeerIdNewSince([20]byte{2}, time.Now())
+	generator.entries[infoHashA] = &AccessAwarePeerId{val: [20]byte{1}, lastAccessed: time.Now()}
+	generator.entries[infoHashB] = &AccessAwarePeerId{val: [20]byte{2}, lastAccessed: time.Now()}
 
 	// returned value on stopped must be the same as previous
 	value := generator.get(dumbAlg, infoHashA, tracker.Stopped)

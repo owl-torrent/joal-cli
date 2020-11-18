@@ -54,16 +54,15 @@ func TestGenerate_TorrentVolatileRefresh_ShouldProvideSingleValuePerTorrent(t *t
 func TestGenerate_TorrentVolatileRefresh_ShouldEvictOldEntries(t *testing.T) {
 	generator := &TorrentVolatileGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 3600 * time.Second
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
 	// Add infohash A (old one)
-	generator.entries[infoHashA] = AccessAwareKeyNewSince(1, time.Now().Add(-10*time.Hour))
+	generator.entries[infoHashA] = &AccessAwareKey{val: 1, lastAccessed: time.Now().Add(-10 * time.Hour)}
 	// Add infohash B (now)
-	generator.entries[infoHashB] = AccessAwareKeyNewSince(2, time.Now())
+	generator.entries[infoHashB] = &AccessAwareKey{val: 2, lastAccessed: time.Now()}
 
 	for i := 0; i < 120; i++ {
 		// work on B to ensure the cleaning counter has revolute as least once
@@ -78,16 +77,15 @@ func TestGenerate_TorrentVolatileRefresh_ShouldEvictOldEntries(t *testing.T) {
 func TestGenerate_TorrentVolatileRefresh_ShouldEvictAfterStop(t *testing.T) {
 	generator := &TorrentVolatileGenerator{}
 	_ = generator.afterPropertiesSet()
-	generator.evictAfter = 1 * time.Millisecond
 
 	infoHashA := metainfo.NewHashFromHex("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	infoHashB := metainfo.NewHashFromHex("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 	dumbAlg := &DumbAlgorithm{}
 
 	// Add infohash A (old one)
-	generator.entries[infoHashA] = AccessAwareKeyNewSince(50, time.Now())
+	generator.entries[infoHashA] = &AccessAwareKey{val: 50, lastAccessed: time.Now()}
 	// Add infohash B (now)
-	generator.entries[infoHashB] = AccessAwareKeyNewSince(60, time.Now())
+	generator.entries[infoHashB] = &AccessAwareKey{val: 60, lastAccessed: time.Now()}
 
 	// returned value on stopped must be the same as previous
 	value := generator.get(dumbAlg, infoHashA, tracker.Stopped)
