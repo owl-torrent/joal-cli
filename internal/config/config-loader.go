@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
@@ -75,15 +78,7 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 		}
 	}
 
-	f, err := os.Open(filepath.Join(l.configLocation, runtimeConfigFile))
-	if err != nil {
-		return nil, errors.Wrapf(err, "config loader: failed to open runtime config file '%s'", filepath.Join(l.configLocation, runtimeConfigFile))
-	}
-	runtimeConfig := RuntimeConfig{}.Default()
-	err = yaml.NewDecoder(f).Decode(&runtimeConfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "config loader: failed to parse runtime config file '%s'", filepath.Join(l.configLocation, runtimeConfigFile))
-	}
+	runtimeConfig := readRuntimeConfigOrDefault(filepath.Join(l.configLocation, runtimeConfigFile))
 
 	return &JoalConfig{
 		TorrentsDir:         filepath.Join(l.configLocation, torrentFolder),
@@ -91,6 +86,24 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 		ClientsDir:          filepath.Join(l.configLocation, clientsFolder),
 		RuntimeConfig:       runtimeConfig,
 	}, nil
+}
+
+func readRuntimeConfigOrDefault(filePath string) *RuntimeConfig {
+	log := logs.GetLogger()
+	runtimeConfig := RuntimeConfig{}.Default()
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		log.Error(fmt.Sprintf("config loader: failed to open runtime config file '%s', running with default config instead", filePath), zap.Error(err))
+		return runtimeConfig
+	}
+
+	err = yaml.NewDecoder(f).Decode(runtimeConfig)
+	if err != nil {
+		log.Error(fmt.Sprintf("config loader: failed to parse runtime config file '%s', running with default config instead", filePath), zap.Error(err))
+		return runtimeConfig
+	}
+	return runtimeConfig
 }
 
 // Check if all minimal required files are present on disk
