@@ -18,6 +18,25 @@ const (
 	clientFilesReleaseTag = "1.0.0"
 )
 
+type githubRepoService interface {
+	GetReleaseByTag(ctx context.Context, owner, repo, tag string) (*github.RepositoryRelease, *github.Response, error)
+}
+
+type gitHubClient struct {
+	Repositories githubRepoService
+	// optionally store and export the underlying *github.Client
+	// if you want easy access to client.Rate or other fields
+}
+
+func newGithubClient(httpClient *http.Client) *gitHubClient {
+	client := github.NewClient(httpClient)
+	// optionally set client.BaseURL, client.UserAgent, etc
+
+	return &gitHubClient{
+		Repositories: client.Repositories,
+	}
+}
+
 type iClientDownloader interface {
 	IsInstalled() (bool, error)
 	Install() error
@@ -25,14 +44,14 @@ type iClientDownloader interface {
 
 type githubClientDownloader struct {
 	clientsDirectory string
-	githubClient     *github.Client
+	githubClient     *gitHubClient
 	versionToInstall *semver.Version
 }
 
-func newClientDownloader(dest string) iClientDownloader {
+func newClientDownloader(dest string, gitHubClient *gitHubClient) iClientDownloader {
 	return &githubClientDownloader{
 		clientsDirectory: dest,
-		githubClient:     github.NewClient(nil),
+		githubClient:     gitHubClient,
 		versionToInstall: semver.MustParse(clientFilesReleaseTag),
 	}
 }

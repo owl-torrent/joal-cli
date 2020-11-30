@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,7 @@ type joalConfigLoader struct {
 	configLocation   string
 }
 
-func NewJoalConfigLoader(configDir string) (IConfigLoader, error) {
+func NewJoalConfigLoader(configDir string, client *http.Client) (IConfigLoader, error) {
 	configLocation := configDir
 
 	var err error
@@ -42,7 +43,7 @@ func NewJoalConfigLoader(configDir string) (IConfigLoader, error) {
 		return nil, errors.Wrapf(err, "config loader: failed to transform '%s' to an absolute path", configLocation)
 	}
 	return &joalConfigLoader{
-		clientDownloader: newClientDownloader(filepath.Join(configLocation, clientsFolder)),
+		clientDownloader: newClientDownloader(filepath.Join(configLocation, clientsFolder), newGithubClient(client)),
 		configLocation:   configLocation,
 	}, nil
 }
