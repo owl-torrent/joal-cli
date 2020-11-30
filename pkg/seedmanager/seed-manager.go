@@ -55,7 +55,7 @@ func (s *SeedManager) Start() error {
 	}
 	s.bandwidthDispatcher.Start()
 
-	// Trigger create events after watcher started
+	// Trigger create events after watcher started (to take into account already present torrent files on startup)
 	go func() {
 		s.torrentFileWatcher.Wait()
 		log.Debug("File watcher started, dispatching event for already present torrent files")

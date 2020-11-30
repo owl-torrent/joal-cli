@@ -22,7 +22,6 @@ announcer:
   http:
     urlEncoder:
       encodedHexCase: lower
-    shouldUrlEncode: false
     query: info_hash={{urlEncode (byteArray20ToString .InfoHash)}}&peer_id={{byteArray20ToString .PeerId}}&port={{.Port}}&uploaded={{.Uploaded}}&downloaded={{.Downloaded}}&left={{.Left}}&corrupt=0&key={{withLeadingZeroes (uint32ToHexString .Key) 8}}{{if ne .Event.String "empty"}}&event={{.Event.String}}{{end}}&numwant={{.NumWant}}&compact=1&no_peer_id=1&supportcrypto=1&redundant=0
     requestHeaders:
       - name: User-Agent

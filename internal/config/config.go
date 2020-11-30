@@ -5,10 +5,10 @@ import (
 )
 
 type JoalConfig struct {
-	torrentsDir         string
-	archivedTorrentsDir string
-	clientsDir          string
-	runtimeConfig       *RuntimeConfig
+	TorrentsDir         string
+	ArchivedTorrentsDir string
+	ClientsDir          string
+	RuntimeConfig       *RuntimeConfig
 }
 
 type RuntimeConfig struct {

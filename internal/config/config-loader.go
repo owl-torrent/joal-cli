@@ -86,10 +86,10 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 	}
 
 	return &JoalConfig{
-		torrentsDir:         filepath.Join(l.configLocation, torrentFolder),
-		archivedTorrentsDir: filepath.Join(l.configLocation, archivedTorrentFolders),
-		clientsDir:          filepath.Join(l.configLocation, clientsFolder),
-		runtimeConfig:       runtimeConfig,
+		TorrentsDir:         filepath.Join(l.configLocation, torrentFolder),
+		ArchivedTorrentsDir: filepath.Join(l.configLocation, archivedTorrentFolders),
+		ClientsDir:          filepath.Join(l.configLocation, clientsFolder),
+		RuntimeConfig:       runtimeConfig,
 	}, nil
 }
 
