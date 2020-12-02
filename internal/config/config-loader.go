@@ -62,9 +62,9 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 		return nil, errors.Wrap(err, "failed to apply migration step")
 	}
 
-	if setupRequired, err := requireInitialSetup(l.configLocation); err != nil {
+	if hasInitialSetup, err := hasInitialSetup(l.configLocation); err != nil {
 		return nil, err
-	} else if setupRequired {
+	} else if !hasInitialSetup {
 		if err := initialSetup(l.configLocation); err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func readRuntimeConfigOrDefault(filePath string) *RuntimeConfig {
 }
 
 // Check if all minimal required files are present on disk
-func requireInitialSetup(rootConfigFolder string) (bool, error) {
+func hasInitialSetup(rootConfigFolder string) (bool, error) {
 	requiredPath := []string{
 		rootConfigFolder,
 		filepath.Join(rootConfigFolder, torrentFolder),
@@ -123,11 +123,11 @@ func requireInitialSetup(rootConfigFolder string) (bool, error) {
 			return false, errors.Wrapf(err, "failed to read folder '%s'", dir)
 		}
 		if os.IsNotExist(err) {
-			return true, nil
+			return false, nil
 		}
 	}
 
-	return false, nil
+	return true, nil
 }
 
 // install all minimal required files to run
