@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/Masterminds/semver"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/c4milo/unpackit"
 	"github.com/google/go-github/v32/github"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -30,7 +32,6 @@ type gitHubClient struct {
 
 func newGithubClient(httpClient *http.Client) *gitHubClient {
 	client := github.NewClient(httpClient)
-	// optionally set client.BaseURL, client.UserAgent, etc
 
 	return &gitHubClient{
 		Repositories: client.Repositories,
@@ -57,8 +58,10 @@ func newClientDownloader(dest string, gitHubClient *gitHubClient) iClientDownloa
 }
 
 func (d *githubClientDownloader) IsInstalled() (bool, error) {
+	log := logs.GetLogger()
 	currentVersion, err := installedVersion(d.clientsDirectory)
 	if err != nil {
+		log.Info("client downloader: couldn't parse client version file, assume client are not installed", zap.NamedError("reason", err))
 		return false, nil
 	}
 
