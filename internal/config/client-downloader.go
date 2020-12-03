@@ -77,9 +77,6 @@ func (d *githubClientDownloader) Install() error {
 	if len(release.Assets) == 0 || len(release.Assets) > 1 {
 		return fmt.Errorf("client downloader : expected release '%s' to contains exactly one asset, asset contains %d", release.GetTagName(), len(release.Assets))
 	}
-	if len(release.Assets) > 1 {
-		return fmt.Errorf("client downloader : client release '%s' has more than one asset", release.GetTagName())
-	}
 	asset := release.Assets[0]
 
 	response, err := http.Get(asset.GetBrowserDownloadURL())
@@ -105,6 +102,7 @@ func installedVersion(dir string) (*semver.Version, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = f.Close() }()
 
 	versionString, err := ioutil.ReadAll(f)
 	if err != nil {
