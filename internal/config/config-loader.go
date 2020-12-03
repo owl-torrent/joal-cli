@@ -43,7 +43,7 @@ func NewJoalConfigLoader(configDir string, client *http.Client) (IConfigLoader, 
 		return nil, errors.Wrapf(err, "config loader: failed to transform '%s' to an absolute path", configLocation)
 	}
 	return &joalConfigLoader{
-		clientDownloader: newClientDownloader(filepath.Join(configLocation, clientsFolder), newGithubClient(client)),
+		clientDownloader: newClientDownloader(filepath.Join(configLocation, clientsFolder), client, newGithubClient(client)),
 		configLocation:   configLocation,
 	}, nil
 }
@@ -98,6 +98,7 @@ func readRuntimeConfigOrDefault(filePath string) *RuntimeConfig {
 		log.Error(fmt.Sprintf("config loader: failed to open runtime config file '%s', running with default config instead", filePath), zap.Error(err))
 		return runtimeConfig
 	}
+	defer func() { _ = f.Close() }()
 
 	err = yaml.NewDecoder(f).Decode(runtimeConfig)
 	if err != nil {
@@ -144,14 +145,20 @@ func initialSetup(rootConfigFolder string) error {
 			return errors.Wrapf(err, "failed to create folder '%s'", dir)
 		}
 	}
-	f, err := os.OpenFile(filepath.Join(rootConfigFolder, runtimeConfigFile), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return errors.Wrapf(err, "failed to open file '%s'", filepath.Join(rootConfigFolder, runtimeConfigFile))
+
+	// do not override config if already present
+	if _, err := os.Stat(filepath.Join(rootConfigFolder, runtimeConfigFile)); err != nil {
+		f, err := os.OpenFile(filepath.Join(rootConfigFolder, runtimeConfigFile), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			return errors.Wrapf(err, "failed to open file '%s'", filepath.Join(rootConfigFolder, runtimeConfigFile))
+		}
+		defer func() { _ = f.Close() }()
+
+		if err := yaml.NewEncoder(f).Encode(RuntimeConfig{}.Default()); err != nil {
+			return errors.Wrapf(err, "failed to marshal RuntimeConfig into '%s'", filepath.Join(rootConfigFolder, runtimeConfigFile))
+		}
 	}
 
-	if err := yaml.NewEncoder(f).Encode(RuntimeConfig{}.Default()); err != nil {
-		return errors.Wrapf(err, "failed to marshal RuntimeConfig into '%s'", filepath.Join(rootConfigFolder, runtimeConfigFile))
-	}
 	return nil
 }
 

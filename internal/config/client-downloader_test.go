@@ -77,15 +77,17 @@ func startHttpAssetDownloadServer(t *testing.T) (closeServer func()) {
 
 func TestGithubClientDownloader_newClientDownloader_ShouldCreateClientDownloader(t *testing.T) {
 	gc := &gitHubClient{Repositories: &mockedGithubRepoService{}}
-	d := newClientDownloader("/dev/null", gc)
+	c := &http.Client{}
+	d := newClientDownloader("/dev/null", c, gc)
 
 	assert.Equal(t, "/dev/null", d.(*githubClientDownloader).clientsDirectory)
+	assert.Equal(t, c, d.(*githubClientDownloader).httpClient)
 	assert.Equal(t, gc, d.(*githubClientDownloader).githubClient)
 	assert.Equal(t, clientFilesReleaseTag, d.(*githubClientDownloader).versionToInstall.String())
 }
 
 func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledDirectoryDoesNotExists(t *testing.T) {
-	d := newClientDownloader("/not/existing/path", &gitHubClient{Repositories: &mockedGithubRepoService{}})
+	d := newClientDownloader("/not/existing/path", &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 
 	installed, err := d.IsInstalled()
 	if err != nil {
@@ -96,7 +98,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledDirectoryD
 
 func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionFileIMissing(t *testing.T) {
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{}})
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 
 	installed, err := d.IsInstalled()
 	if err != nil {
@@ -107,7 +109,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionF
 
 func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionIsDifferent(t *testing.T) {
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{}})
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 	err := ioutil.WriteFile(filepath.Join(dir, clientVersionFileName), []byte("950.156.20"), 0755)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +124,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionI
 
 func TestGithubClientDownloader_IsInstalled_ShouldConsiderInstalledIfVersionIsTheSame(t *testing.T) {
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{}})
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 	err := ioutil.WriteFile(filepath.Join(dir, clientVersionFileName), []byte(clientFilesReleaseTag), 0755)
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +140,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldConsiderInstalledIfVersionIsTh
 func TestGithubClientDownloader_Install_ShouldCreateOutputFolderIfMissing(t *testing.T) {
 	assertDownloadUrl := "http://localhost:9876/my-asset"
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
 			Assets: []*github.ReleaseAsset{
 				{
@@ -166,7 +168,7 @@ func TestGithubClientDownloader_Install_ShouldCreateOutputFolderIfMissing(t *tes
 func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseWithMoreThanOneAsset(t *testing.T) {
 	assertDownloadUrl := "http://localhost:9876/my-asset"
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
 			Assets: []*github.ReleaseAsset{
 				{BrowserDownloadURL: &assertDownloadUrl},
@@ -186,7 +188,7 @@ func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseW
 
 func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseWithZeroAsset(t *testing.T) {
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
 			Assets: []*github.ReleaseAsset{},
 		},
@@ -204,7 +206,7 @@ func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseW
 func TestGithubClientDownloader_Install_ShouldUnpackArchiveToOutputFolder(t *testing.T) {
 	assertDownloadUrl := "http://localhost:9876/my-asset"
 	dir := t.TempDir()
-	d := newClientDownloader(dir, &gitHubClient{Repositories: &mockedGithubRepoService{
+	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
 			Assets: []*github.ReleaseAsset{
 				{

@@ -45,13 +45,15 @@ type iClientDownloader interface {
 
 type githubClientDownloader struct {
 	clientsDirectory string
+	httpClient       *http.Client
 	githubClient     *gitHubClient
 	versionToInstall *semver.Version
 }
 
-func newClientDownloader(dest string, gitHubClient *gitHubClient) iClientDownloader {
+func newClientDownloader(dest string, httpClient *http.Client, gitHubClient *gitHubClient) iClientDownloader {
 	return &githubClientDownloader{
 		clientsDirectory: dest,
+		httpClient:       httpClient,
 		githubClient:     gitHubClient,
 		versionToInstall: semver.MustParse(clientFilesReleaseTag),
 	}
@@ -79,7 +81,7 @@ func (d *githubClientDownloader) Install() error {
 	}
 	asset := release.Assets[0]
 
-	response, err := http.Get(asset.GetBrowserDownloadURL())
+	response, err := d.httpClient.Get(asset.GetBrowserDownloadURL())
 	if err != nil {
 		return errors.Wrapf(err, "client downloader: failed to GET release from '%s'", asset.GetBrowserDownloadURL())
 	}
