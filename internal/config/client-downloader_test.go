@@ -69,7 +69,7 @@ func startHttpAssetDownloadServer(t *testing.T) (closeServer func()) {
 	go func() {
 		err := server.Serve(listener)
 		if err != nil && err != http.ErrServerClosed {
-			t.Fatal(err)
+			panic(err)
 		}
 	}()
 	return func() { _ = server.Close() }
