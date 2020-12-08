@@ -71,7 +71,7 @@ func (d *githubClientDownloader) IsInstalled() (bool, error) {
 }
 
 func (d *githubClientDownloader) Install() error {
-	release, _, err := d.githubClient.Repositories.GetReleaseByTag(context.Background(), "joal-torrent", "joal-clients", clientFilesReleaseTag)
+	release, _, err := d.githubClient.Repositories.GetReleaseByTag(context.Background(), "owl-torrent", "owl-clients", clientFilesReleaseTag)
 	if err != nil {
 		return errors.Wrapf(err, "client downloader: error when fetching release with tag '%s'", clientFilesReleaseTag)
 	}
