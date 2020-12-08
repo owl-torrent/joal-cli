@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"github.com/google/go-github/v32/github"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -54,14 +55,14 @@ func createTarGzMockedArchive(t *testing.T) io.Reader {
 
 	return bytes.NewReader(b.Bytes())
 }
-func startHttpAssetDownloadServer(t *testing.T) (closeServer func()) {
+func startHttpAssetDownloadServer(t *testing.T, port int) (closeServer func()) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/my-asset", func(writer http.ResponseWriter, request *http.Request) {
 		if _, err := io.Copy(writer, createTarGzMockedArchive(t)); err != nil {
 			t.Fatal(err)
 		}
 	})
-	listener, err := net.Listen("tcp", ":9876")
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +73,14 @@ func startHttpAssetDownloadServer(t *testing.T) (closeServer func()) {
 			panic(err)
 		}
 	}()
-	return func() { _ = server.Close() }
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err = server.Shutdown(ctx)
+		if err != nil {
+			_ = server.Close()
+		}
+	}
 }
 
 func TestGithubClientDownloader_newClientDownloader_ShouldCreateClientDownloader(t *testing.T) {
@@ -154,7 +162,7 @@ func TestGithubClientDownloader_Install_ShouldCreateOutputFolderIfMissing(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	stopServer := startHttpAssetDownloadServer(t)
+	stopServer := startHttpAssetDownloadServer(t, 9876)
 	defer stopServer()
 
 	err = d.Install()
@@ -166,7 +174,7 @@ func TestGithubClientDownloader_Install_ShouldCreateOutputFolderIfMissing(t *tes
 }
 
 func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseWithMoreThanOneAsset(t *testing.T) {
-	assertDownloadUrl := "http://localhost:9876/my-asset"
+	assertDownloadUrl := "http://localhost:9877/my-asset"
 	dir := t.TempDir()
 	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
@@ -177,7 +185,7 @@ func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseW
 		},
 	}})
 
-	stopServer := startHttpAssetDownloadServer(t)
+	stopServer := startHttpAssetDownloadServer(t, 9877)
 	defer stopServer()
 
 	err := d.Install()
@@ -194,7 +202,7 @@ func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseW
 		},
 	}})
 
-	stopServer := startHttpAssetDownloadServer(t)
+	stopServer := startHttpAssetDownloadServer(t, 9878)
 	defer stopServer()
 
 	err := d.Install()
@@ -204,7 +212,7 @@ func TestGithubClientDownloader_Install_ShouldFailIfGithubServiceReturnsReleaseW
 }
 
 func TestGithubClientDownloader_Install_ShouldUnpackArchiveToOutputFolder(t *testing.T) {
-	assertDownloadUrl := "http://localhost:9876/my-asset"
+	assertDownloadUrl := "http://localhost:9879/my-asset"
 	dir := t.TempDir()
 	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{
 		release: &github.RepositoryRelease{
@@ -216,7 +224,7 @@ func TestGithubClientDownloader_Install_ShouldUnpackArchiveToOutputFolder(t *tes
 		},
 	}})
 
-	stopServer := startHttpAssetDownloadServer(t)
+	stopServer := startHttpAssetDownloadServer(t, 9879)
 	defer stopServer()
 
 	err := d.Install()
