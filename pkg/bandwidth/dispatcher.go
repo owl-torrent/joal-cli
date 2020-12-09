@@ -24,7 +24,7 @@ type IDispatcher interface {
 	Release(claimer IBandwidthClaimable)
 }
 
-func newDispatcher(conf *DispatcherConfig, rsp iRandomSpeedProvider) IDispatcher {
+func NewDispatcher(conf *DispatcherConfig, rsp iRandomSpeedProvider) IDispatcher {
 	return &dispatcher{
 		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
 		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,

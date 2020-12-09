@@ -13,7 +13,7 @@ type randomSpeedProvider struct {
 	value                  int64
 }
 
-func newRandomSpeedProvider(conf *SpeedProviderConfig) iRandomSpeedProvider {
+func NewRandomSpeedProvider(conf *SpeedProviderConfig) iRandomSpeedProvider {
 	return &randomSpeedProvider{
 		MinimumBytesPerSeconds: conf.MinimumBytesPerSeconds,
 		MaximumBytesPerSeconds: conf.MaximumBytesPerSeconds,
