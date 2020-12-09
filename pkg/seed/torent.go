@@ -85,7 +85,6 @@ func FromFile(filePath string) (ITorrent, error) {
 		rand.Shuffle(len(tier), func(i, j int) {
 			tier[i], tier[j] = tier[j], tier[i]
 		})
-		fmt.Println(tier)
 	}
 
 	return &joalTorrent{
