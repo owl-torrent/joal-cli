@@ -37,7 +37,7 @@ func (l *Listener) Start() error {
 	return nil
 }
 
-func (l *Listener) Stop(ctx context.Context) {
+func (l *Listener) Stop(context.Context) {
 	// TODO: implement
 }
 
