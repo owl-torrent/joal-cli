@@ -93,9 +93,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 	}
 	var trackerResponse tracker.HttpResponse
 	err = bencode.Unmarshal(bodyBytes, &trackerResponse)
-	if _, ok := err.(bencode.ErrUnusedTrailingBytes); !ok {
-		err = nil
-	} else if err != nil {
+	if _, ok := err.(bencode.ErrUnusedTrailingBytes); !ok && err != nil {
 		return AnnounceResponse{}, errors.Wrapf(err, "error decoding %q", bodyBytes)
 	}
 	if trackerResponse.FailureReason != "" {
