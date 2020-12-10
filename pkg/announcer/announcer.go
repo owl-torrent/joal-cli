@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"net"
 	"net/url"
@@ -77,7 +75,6 @@ func (a *Announcer) AfterPropertiesSet() error {
 }
 
 func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
-	log := logs.GetLogger()
 	var currentAnnouncer interface {
 		Announce(url url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
 	}
@@ -90,12 +87,6 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 	if currentAnnouncer == nil { // some client file may not contains definitions for http or udp or the scheme might be a weird one
 		return AnnounceResponse{}, fmt.Errorf("url='%s' => Scheme '%s' is not supported by the current client", u.String(), u.Scheme)
 	}
-	log.Info("announcing to tracker",
-		zap.String("event", announceRequest.Event.String()),
-		zap.ByteString("infohash", announceRequest.InfoHash[:]),
-		zap.Int64("uploaded", announceRequest.Uploaded),
-		zap.String("tracker", u.Host),
-	)
 
 	ret, err := currentAnnouncer.Announce(u, announceRequest, ctx)
 	if err != nil {

@@ -127,9 +127,10 @@ func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispat
 	t.isRunning = true
 
 	currentSession := &seedSession{
-		seedStats: newSeedStats(),
-		infoHash:  t.infoHash,
-		swarm:     newSwarmElector(),
+		seedStats:   newSeedStats(),
+		torrentName: t.info.Name,
+		infoHash:    t.infoHash,
+		swarm:       newSwarmElector(),
 	}
 
 	orhestra, err := client.CreateOrchestratorForTorrent(&orchestrator.TorrentInfo{
@@ -173,7 +174,13 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
 	log := logs.GetLogger()
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
-
+		log.Info("announcing to tracker",
+			zap.String("event", event.String()),
+			zap.String("name", currentSession.torrentName),
+			zap.String("uploaded", ByteCountSI(currentSession.seedStats.Uploaded())),
+			zap.String("tracker", u.Host),
+			zap.ByteString("infohash", currentSession.infoHash[:]),
+		)
 		resp, err := client.Announce(ctx, u, currentSession.InfoHash(), currentSession.seedStats.Uploaded(), currentSession.seedStats.Downloaded(), currentSession.seedStats.Left(), event)
 		if err != nil {
 			log.Warn("failed to announce", zap.String("tracker-url", u.String()), zap.Error(err))
@@ -185,6 +192,14 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 			}
 			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
+		log.Info("tracker answered",
+			zap.String("name", currentSession.torrentName),
+			zap.String("tracker", u.Host),
+			zap.String("interval", resp.Interval.String()),
+			zap.Int32("leechers", resp.Leechers),
+			zap.Int32("leechers", resp.Seeders),
+			zap.ByteString("infohash", currentSession.infoHash[:]),
+		)
 
 		if event != tracker.Stopped {
 			swarmHasChanged := currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
@@ -198,9 +213,10 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 }
 
 type seedSession struct {
-	seedStats seedStats
-	infoHash  torrent.InfoHash
-	swarm     *swarmElector
+	seedStats   seedStats
+	infoHash    torrent.InfoHash
+	torrentName string
+	swarm       *swarmElector
 }
 
 func (c *seedSession) InfoHash() torrent.InfoHash {
@@ -248,4 +264,18 @@ func (m mutableSeedStats) Left() int64 {
 
 func (m *mutableSeedStats) AddUploaded(bytes int64) {
 	m.uploaded += bytes
+}
+
+func ByteCountSI(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }
