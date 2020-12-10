@@ -225,10 +225,12 @@ func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunct
 	case <-ctx.Done():
 	}
 
+	stopAnnounceCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	waitChan := make(chan struct{})
 	go func(tier ITierAnnouncer) {
 		defer close(waitChan)
-		tier.announceOnce(ctx, annFunc, tracker.Stopped)
+		tier.announceOnce(stopAnnounceCtx, annFunc, tracker.Stopped)
 	}(o.tier)
 
 	<-waitChan
@@ -318,6 +320,8 @@ func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) 
 	case <-ctx.Done():
 	}
 
+	stopAnnounceCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	waitChan := make(chan struct{})
 	go func() {
 		wg := &sync.WaitGroup{}
@@ -325,7 +329,7 @@ func (o *AllOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunction) 
 			wg.Add(1)
 			go func(tier ITierAnnouncer) {
 				defer wg.Done()
-				tier.announceOnce(ctx, annFunc, tracker.Stopped)
+				tier.announceOnce(stopAnnounceCtx, annFunc, tracker.Stopped)
 			}(tier)
 		}
 		wg.Wait()
