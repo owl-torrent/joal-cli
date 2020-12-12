@@ -3,6 +3,8 @@ package emulatedclient
 import (
 	"context"
 	"fmt"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -26,6 +28,7 @@ func (l *Listener) AfterPropertiesSet() error {
 
 // Blocking call until the listener is ready and public ip is retrieved.
 func (l *Listener) Start() error {
+	log := logs.GetLogger()
 	ip, err := getPublicIp()
 	if err != nil {
 		return err
@@ -34,11 +37,17 @@ func (l *Listener) Start() error {
 	// TODO: Start listening on port for peers requests and answer
 	mockedPort := uint16(9000)
 	l.listeningPort = &mockedPort
+
+	log.Info("peer listener: started", zap.String("public-ip", l.ip.String()), zap.Uint16("port", *l.listeningPort))
 	return nil
 }
 
 func (l *Listener) Stop(context.Context) {
+	log := logs.GetLogger()
+
+	log.Info("peer listener: stopping")
 	// TODO: implement
+	log.Info("peer listener: stopped")
 }
 
 var publicIpProviders = []string{

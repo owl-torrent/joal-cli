@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/Masterminds/semver"
 	"github.com/google/go-github/v32/github"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -97,7 +98,7 @@ func TestGithubClientDownloader_newClientDownloader_ShouldCreateClientDownloader
 func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledDirectoryDoesNotExists(t *testing.T) {
 	d := newClientDownloader("/not/existing/path", &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 
-	installed, err := d.IsInstalled()
+	installed, _, err := d.IsInstalled()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionF
 	dir := t.TempDir()
 	d := newClientDownloader(dir, &http.Client{}, &gitHubClient{Repositories: &mockedGithubRepoService{}})
 
-	installed, err := d.IsInstalled()
+	installed, _, err := d.IsInstalled()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +124,7 @@ func TestGithubClientDownloader_IsInstalled_ShouldNotConsiderInstalledIfVersionI
 		t.Fatal(err)
 	}
 
-	installed, err := d.IsInstalled()
+	installed, _, err := d.IsInstalled()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,11 +139,12 @@ func TestGithubClientDownloader_IsInstalled_ShouldConsiderInstalledIfVersionIsTh
 		t.Fatal(err)
 	}
 
-	installed, err := d.IsInstalled()
+	installed, v, err := d.IsInstalled()
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.True(t, installed)
+	assert.Equal(t, semver.MustParse(clientFilesReleaseTag), v)
 }
 
 func TestGithubClientDownloader_Install_ShouldCreateOutputFolderIfMissing(t *testing.T) {

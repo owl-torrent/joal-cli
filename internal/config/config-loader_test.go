@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/Masterminds/semver"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -12,15 +13,15 @@ import (
 )
 
 type mockedClientDownloader struct {
-	isInstalled func() (bool, error)
+	isInstalled func() (bool, *semver.Version, error)
 	install     func() error
 }
 
-func (d *mockedClientDownloader) IsInstalled() (bool, error) {
+func (d *mockedClientDownloader) IsInstalled() (bool, *semver.Version, error) {
 	if d.isInstalled != nil {
 		return d.isInstalled()
 	}
-	return true, nil
+	return true, semver.MustParse("1.0.0"), nil
 }
 
 func (d *mockedClientDownloader) Install() error {
@@ -250,8 +251,8 @@ func TestJoalConfigLoader_LoadConfigAndInitIfNeeded_ShouldDownloadClientsIfNotIn
 		t.Fatal(err)
 	}
 	l.(*joalConfigLoader).clientDownloader = &mockedClientDownloader{
-		isInstalled: func() (bool, error) {
-			return false, nil
+		isInstalled: func() (bool, *semver.Version, error) {
+			return false, nil, nil
 		},
 		install: func() error {
 			hasInstalledClients = true
@@ -275,8 +276,8 @@ func TestJoalConfigLoader_LoadConfigAndInitIfNeeded_ShouldNotDownloadClientsIfAl
 		t.Fatal(err)
 	}
 	l.(*joalConfigLoader).clientDownloader = &mockedClientDownloader{
-		isInstalled: func() (bool, error) {
-			return true, nil
+		isInstalled: func() (bool, *semver.Version, error) {
+			return true, semver.MustParse("1.0.0"), nil
 		},
 		install: func() error {
 			hasInstalledClients = true

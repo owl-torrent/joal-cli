@@ -67,7 +67,7 @@ type joalTorrent struct {
 }
 
 func FromFile(filePath string) (ITorrent, error) {
-	log := logs.GetLogger()
+	log := logs.GetLogger().With(zap.String("torrent", filepath.Base(filePath)))
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
@@ -78,7 +78,7 @@ func FromFile(filePath string) (ITorrent, error) {
 		return nil, errors.Wrapf(err, "failed to load info from file '%s'", filePath)
 	}
 	infoHash := meta.HashInfoBytes()
-	log.Info("torrent parsed", zap.String("torrent", filepath.Base(filePath)), zap.ByteString("infohash", infoHash.Bytes()))
+	log.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
 
 	// Shuffling trackers according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
 	rand.Seed(randSeed)
@@ -163,13 +163,17 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	}
 	t.isRunning = false
 
+	log := logs.GetLogger().With(zap.String("torrent", filepath.Base(t.path)))
+
 	stopRequest := &stoppingRequest{
 		ctx:          ctx,
 		doneStopping: make(chan struct{}),
 	}
+	log.Info("torrent: stopping")
 	t.stopping <- stopRequest
 
 	<-stopRequest.doneStopping
+	log.Info("torrent: stopped")
 }
 
 func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {

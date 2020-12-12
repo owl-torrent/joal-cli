@@ -168,14 +168,13 @@ func (t *torrentManager) Seed() error {
 	// Trigger create events after watcher started (to take into account already present torrent files on startup)
 	go func() {
 		torrentFileWatcher.Wait()
-		log.Info("file watcher started, dispatching event for already present torrent files")
+		log.Info("file watcher: started", zap.String("monitored-folder", conf.TorrentsDir))
 		for fullPath, info := range torrentFileWatcher.WatchedFiles() {
 			torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
 	}()
 
 	go func() {
-		log.Info("starting file watcher")
 		if err := torrentFileWatcher.Start(1 * time.Second); err != nil {
 			log.Error("failed to run file watcher", zap.Error(err))
 		}
@@ -191,12 +190,15 @@ func (t *torrentManager) StopSeeding(ctx context.Context) {
 		return
 	}
 	t.isRunning = false
+	log := logs.GetLogger()
 
 	stopRequest := &stoppingRequest{
 		ctx:          ctx,
 		doneStopping: make(chan struct{}),
 	}
+	log.Info("torrent manager: stopping")
 	t.stopping <- stopRequest
 
 	<-stopRequest.doneStopping
+	log.Info("torrent manager: stopped")
 }

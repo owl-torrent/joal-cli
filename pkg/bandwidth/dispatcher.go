@@ -70,7 +70,7 @@ func (d *dispatcher) Start() {
 	log := logs.GetLogger()
 	go func() {
 		d.randomSpeedProvider.Refresh()
-		log.Info("bandwidth dispatcher has started",
+		log.Info("bandwidth dispatcher: started",
 			zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
 		)
 
@@ -82,7 +82,7 @@ func (d *dispatcher) Start() {
 			select {
 			case <-globalBandwidthRefreshTicker.C:
 				d.randomSpeedProvider.Refresh()
-				log.Info("bandwidth dispatcher has refreshed available bandwidth",
+				log.Info("bandwidth dispatcher: refreshed available bandwidth",
 					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
 				)
 			case <-timeToAddSeedToClaimers.C:
@@ -114,10 +114,14 @@ func (d *dispatcher) Stop() {
 	}
 	d.isRunning = false
 
+	log := logs.GetLogger()
+	log.Info("bandwidth dispatcher: stopping")
+
 	doneStopping := make(chan struct{})
 	d.stopping <- doneStopping
 
 	<-doneStopping
+	log.Info("bandwidth dispatcher: stopped")
 }
 
 // Register a IBandwidthClaimable as a bandwidth client. Will update his uploaded stats on a timer and the amount of uploaded given depend on this ISwarm of the IBandwidthClaimable.
