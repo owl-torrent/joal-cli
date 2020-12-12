@@ -1,7 +1,11 @@
 package bandwidth
 
 import (
+	"fmt"
 	"github.com/anacrolix/torrent"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/dataunit"
+	"go.uber.org/zap"
 	"sync"
 	"time"
 )
@@ -63,8 +67,12 @@ func (d *dispatcher) Start() {
 	}
 	d.isRunning = true
 
+	log := logs.GetLogger()
 	go func() {
 		d.randomSpeedProvider.Refresh()
+		log.Info("bandwidth dispatcher has started",
+			zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
+		)
 
 		globalBandwidthRefreshTicker := time.NewTicker(d.globalBandwidthRefreshInterval)
 		timeToAddSeedToClaimers := time.NewTicker(d.intervalBetweenEachTorrentsSeedIncrement)
@@ -74,6 +82,9 @@ func (d *dispatcher) Start() {
 			select {
 			case <-globalBandwidthRefreshTicker.C:
 				d.randomSpeedProvider.Refresh()
+				log.Info("bandwidth dispatcher has refreshed available bandwidth",
+					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
+				)
 			case <-timeToAddSeedToClaimers.C:
 				if d.totalWeight == 0 {
 					continue

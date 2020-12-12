@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -39,7 +40,7 @@ func newGithubClient(httpClient *http.Client) *gitHubClient {
 }
 
 type iClientDownloader interface {
-	IsInstalled() (bool, error)
+	IsInstalled() (bool, *semver.Version, error)
 	Install() error
 }
 
@@ -59,15 +60,15 @@ func newClientDownloader(dest string, httpClient *http.Client, gitHubClient *git
 	}
 }
 
-func (d *githubClientDownloader) IsInstalled() (bool, error) {
+func (d *githubClientDownloader) IsInstalled() (bool, *semver.Version, error) {
 	log := logs.GetLogger()
 	currentVersion, err := installedVersion(d.clientsDirectory)
 	if err != nil {
 		log.Info("client downloader: couldn't parse client version file, assume client are not installed", zap.NamedError("reason", err))
-		return false, nil
+		return false, nil, nil
 	}
 
-	return currentVersion.Equal(d.versionToInstall), nil
+	return currentVersion.Equal(d.versionToInstall), currentVersion, nil
 }
 
 func (d *githubClientDownloader) Install() error {
@@ -108,8 +109,12 @@ func installedVersion(dir string) (*semver.Version, error) {
 
 	versionString, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to read client version file '%s'", filepath.Join(dir, clientVersionFileName))
 	}
 
-	return semver.NewVersion(string(versionString))
+	version, err := semver.NewVersion(strings.TrimSpace(string(versionString)))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse version '%s' as semvers from client version file '%s'", versionString, filepath.Join(dir, clientVersionFileName))
+	}
+	return version, nil
 }

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,6 +15,7 @@ import (
 // especially for bencode and tracker subpackages
 
 func main() {
+	logs.SetLevel(zap.DebugLevel)
 	manager, err := seedmanager.NewTorrentManager(`D:\temp\trash\joaltest`)
 	if err != nil {
 		panic(err)

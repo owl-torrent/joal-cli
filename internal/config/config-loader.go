@@ -57,6 +57,7 @@ func getDefaultConfigFolder() (string, error) {
 }
 
 func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
+	log := logs.GetLogger()
 	err := applyMigrations()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migration step")
@@ -70,23 +71,27 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 		}
 	}
 
-	if isInstalled, err := l.clientDownloader.IsInstalled(); err != nil {
-		return nil, err
+	if isInstalled, version, err := l.clientDownloader.IsInstalled(); err != nil {
 	} else if !isInstalled {
+		log.Info("config loader: client files are not installed, going to install them")
 		err = l.clientDownloader.Install()
 		if err != nil {
 			return nil, err
 		}
+	} else if isInstalled {
+		log.Info("config loader: client files are installed", zap.String("version", version.String()))
 	}
 
 	runtimeConfig := readRuntimeConfigOrDefault(filepath.Join(l.configLocation, runtimeConfigFile))
 
-	return &JoalConfig{
+	conf := &JoalConfig{
 		TorrentsDir:         filepath.Join(l.configLocation, torrentFolder),
 		ArchivedTorrentsDir: filepath.Join(l.configLocation, archivedTorrentFolders),
 		ClientsDir:          filepath.Join(l.configLocation, clientsFolder),
 		RuntimeConfig:       runtimeConfig,
-	}, nil
+	}
+	log.Info("config loader: config successfully loaded", zap.Any("config", conf))
+	return conf, nil
 }
 
 func readRuntimeConfigOrDefault(filePath string) *RuntimeConfig {

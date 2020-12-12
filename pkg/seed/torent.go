@@ -11,6 +11,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/orchestrator"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/dataunit"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"math/rand"
@@ -175,9 +176,9 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 	log := logs.GetLogger()
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		log.Info("announcing to tracker",
+			zap.String("torrent", currentSession.torrentName),
 			zap.String("event", event.String()),
-			zap.String("name", currentSession.torrentName),
-			zap.String("uploaded", ByteCountSI(currentSession.seedStats.Uploaded())),
+			zap.String("uploaded", dataunit.ByteCountSI(currentSession.seedStats.Uploaded())),
 			zap.String("tracker", u.Host),
 			zap.ByteString("infohash", currentSession.infoHash[:]),
 		)
@@ -193,12 +194,11 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
 		log.Info("tracker answered",
-			zap.String("name", currentSession.torrentName),
+			zap.String("torrent", currentSession.torrentName),
 			zap.String("tracker", u.Host),
 			zap.String("interval", resp.Interval.String()),
 			zap.Int32("leechers", resp.Leechers),
 			zap.Int32("leechers", resp.Seeders),
-			zap.ByteString("infohash", currentSession.infoHash[:]),
 		)
 
 		if event != tracker.Stopped {
@@ -264,18 +264,4 @@ func (m mutableSeedStats) Left() int64 {
 
 func (m *mutableSeedStats) AddUploaded(bytes int64) {
 	m.uploaded += bytes
-}
-
-func ByteCountSI(b int64) string {
-	const unit = 1000
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB",
-		float64(b)/float64(div), "kMGTPE"[exp])
 }

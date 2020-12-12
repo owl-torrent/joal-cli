@@ -62,11 +62,11 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		req.Header.Add(v.Name, v.Value)
 	}
 	log.Debug("announce details",
-		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 		zap.String("protocol", req.Proto),
 		zap.String("method", req.Method),
 		zap.String("url", req.URL.String()),
 		zap.Reflect("headers", req.Header),
+		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 	)
 
 	resp, err := (&http.Client{

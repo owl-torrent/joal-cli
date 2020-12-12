@@ -1,31 +1,44 @@
 package logs
 
 import (
-	"encoding/json"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var log *zap.Logger
+var logLevel zap.AtomicLevel
 
 func init() {
-	var cfg zap.Config
-	rawJSON := []byte(`{
-		"level": "info",
-		"outputPaths": ["stdout"],
-		"errorOutputPaths": ["stderr"],
-		"encoding": "console",
-		"encoderConfig": {
-			"messageKey": "message",
-			"levelKey": "level",
-			"levelEncoder": "lowercase"
-		}
-	}`)
-	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
-		panic(err)
+	logLevel = zap.NewAtomicLevel()
+
+	config := zap.Config{
+		Level:       logLevel,
+		Development: true,
+		Encoding:    "console",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:  "ts",
+			LevelKey: "level",
+			NameKey:  "logger",
+			//CallerKey:      "caller",
+			MessageKey:     "msg",
+			StacktraceKey:  "stacktrace",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.CapitalLevelEncoder,
+			EncodeTime:     zapcore.ISO8601TimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+			//EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
-	log, _ = cfg.Build()
+
+	log, _ = config.Build()
 }
 
 func GetLogger() *zap.Logger {
 	return log
+}
+
+func SetLevel(level zapcore.Level) {
+	logLevel.SetLevel(level)
 }

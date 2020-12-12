@@ -168,7 +168,7 @@ func (t *torrentManager) Seed() error {
 	// Trigger create events after watcher started (to take into account already present torrent files on startup)
 	go func() {
 		torrentFileWatcher.Wait()
-		log.Debug("file watcher started, dispatching event for already present torrent files")
+		log.Info("file watcher started, dispatching event for already present torrent files")
 		for fullPath, info := range torrentFileWatcher.WatchedFiles() {
 			torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
