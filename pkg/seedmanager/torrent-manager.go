@@ -86,6 +86,7 @@ func (t *torrentManager) Seed() error {
 	go func() {
 		dispatcher := bandwidth.NewDispatcher(conf.RuntimeConfig.BandwidthConfig.Dispatcher, bandwidth.NewRandomSpeedProvider(conf.RuntimeConfig.BandwidthConfig.Speed))
 		dispatcher.Start()
+		log.Info("torrent manager: started")
 
 		for {
 			select {
