@@ -3,7 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
-	"github.com/Masterminds/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/c4milo/unpackit"
 	"github.com/google/go-github/v32/github"
