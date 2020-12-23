@@ -17,6 +17,8 @@ import (
 )
 
 type IEmulatedClient interface {
+	GetName() string
+	GetVersion() string
 	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
 	StartListener() error
 	StopListener(ctx context.Context)
@@ -86,6 +88,14 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 		return err
 	}
 	return nil
+}
+
+func (c *EmulatedClient) GetName() string {
+	return c.Name
+}
+
+func (c *EmulatedClient) GetVersion() string {
+	return c.Name
 }
 
 func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {

@@ -75,6 +75,14 @@ type fakeEmulatedClient struct {
 	createOrchestratorForTorrent func(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
 }
 
+func (c *fakeEmulatedClient) GetName() string {
+	return ""
+}
+
+func (c *fakeEmulatedClient) GetVersion() string {
+	return ""
+}
+
 func (c *fakeEmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 	if c.announce != nil {
 		return c.announce(ctx, u, infoHash, uploaded, downloaded, left, event)

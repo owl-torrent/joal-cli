@@ -1,21 +1,11 @@
 package web
 
 import (
-	"github.com/Masterminds/semver/v3"
 	"time"
 )
 
-type coreState string
-
-const (
-	CORE_STARTING coreState = "STARTING"
-	CORE_STARTED  coreState = "STARTED"
-	CORE_STOPPING coreState = "STARTING"
-	CORE_STOPPED  coreState = "STOPPED"
-)
-
 type State struct {
-	State     coreState          `json:"state"`
+	Started   bool               `json:"started"`
 	Client    *Client            `json:"client"`
 	Config    *Config            `json:"config"`
 	Torrents  map[string]Torrent `json:"torrents"`
@@ -23,8 +13,8 @@ type State struct {
 }
 
 type Client struct {
-	Name    string         `json:"name"`
-	Version semver.Version `json:"version"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 type Config struct {
@@ -44,31 +34,20 @@ type Torrent struct {
 	File                string            `json:"file"`
 	TrackerAnnounceUrls []string          `json:"trackerAnnounceUrls"`
 	Size                int64             `json:"size"`
-	AnnounceHistory     []IAnnounceResult `json:"announceHistory"`
+	AnnounceHistory     []*AnnounceResult `json:"announceHistory"`
 	Seeders             int               `json:"seeders"`
 	Leechers            int               `json:"leechers"`
 	Uploaded            int64             `json:"uploaded"`
 }
 
-type IAnnounceResult interface {
-	TrackerUrl() string
-	WasSuccessful() bool
-}
-
-type SuccessAnnounceResult struct {
+type AnnounceResult struct {
 	TrackerUrl    string    `json:"trackerUrl"`
 	WasSuccessful bool      `json:"wasSuccessful"`
 	Datetime      time.Time `json:"datetime"`
 	Seeders       int       `json:"seeders"`
 	Leechers      int       `json:"leechers"`
 	Interval      int       `json:"interval"`
-}
-
-type ErrorAnnounceResult struct {
-	TrackerUrl    string    `json:"trackerUrl"`
-	WasSuccessful bool      `json:"wasSuccessful"`
-	Datetime      time.Time `json:"datetime"`
-	Reason        string    `json:"reason"`
+	Error         string    `json:"reason,omitempty"`
 }
 
 type Bandwidth struct {
