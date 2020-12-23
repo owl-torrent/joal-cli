@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Masterminds/semver"
-	"github.com/anthonyraymond/joal-cli/pkg/logs"
+	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/c4milo/unpackit"
 	"github.com/google/go-github/v32/github"
 	"github.com/pkg/errors"

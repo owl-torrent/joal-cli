@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/pkg/logs"
-	"github.com/anthonyraymond/joal-cli/pkg/seedmanager"
+	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
+	"github.com/anthonyraymond/joal-cli/pkg/core/seedmanager"
 	"go.uber.org/zap"
 	"os"
 	"os/signal"

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/core/bandwidth"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	"testing"

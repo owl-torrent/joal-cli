@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/core/bandwidth"
 )
 
 type JoalConfig struct {

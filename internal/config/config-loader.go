@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/anthonyraymond/joal-cli/pkg/logs"
+	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
