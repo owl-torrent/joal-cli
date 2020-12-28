@@ -372,8 +372,15 @@ func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
 		claimers[i] = claimer
 	}
 
-	go func() {
+	stopClaiming := make(chan chan struct{})
+	go func(stopClaiming chan chan struct{}) {
 		for {
+			select {
+			case doneStopping := <-stopClaiming:
+				doneStopping <- struct{}{}
+				return
+			default:
+			}
 			claimer := claimers[randutils.Range(0, int64(numberOfClaimers)-1)]
 			claimer.(*mockedBandwidthClaimable).swarm = &DumbSwarm{
 				seeders:  int32(randutils.Range(1, 200)),
@@ -383,14 +390,18 @@ func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
 
 			time.Sleep(10 * time.Microsecond)
 		}
-	}()
+	}(stopClaiming)
 
 	d.Start()
 	defer d.Stop()
 
-	if !latch.WaitTimeout(2 * time.Second) {
+	if !latch.WaitTimeout(5 * time.Second) {
 		t.Fatal("timeout")
 	}
+	done := make(chan struct{})
+	stopClaiming <- done
+
+	<-done
 
 	for i := 0; i < numberOfClaimers; i++ {
 		d.Release(claimers[i])
