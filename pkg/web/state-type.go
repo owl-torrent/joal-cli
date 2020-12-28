@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net/url"
 	"time"
 )
 
@@ -29,19 +30,27 @@ type RuntimeConfig struct {
 }
 
 type Torrent struct {
-	Infohash            string            `json:"infohash"`
-	Name                string            `json:"name"`
-	File                string            `json:"file"`
-	TrackerAnnounceUrls []string          `json:"trackerAnnounceUrls"`
-	Size                int64             `json:"size"`
-	AnnounceHistory     []*AnnounceResult `json:"announceHistory"`
-	Seeders             int               `json:"seeders"`
-	Leechers            int               `json:"leechers"`
-	Uploaded            int64             `json:"uploaded"`
+	Infohash string            `json:"infohash"`
+	Name     string            `json:"name"`
+	File     string            `json:"file"`
+	Size     int64             `json:"size"`
+	Seeders  int               `json:"seeders"`
+	Leechers int               `json:"leechers"`
+	Uploaded int64             `json:"uploaded"`
+	Trackers []TorrentTrackers `json:"trackers"`
+}
+
+type TorrentTrackers struct {
+	Url             *url.URL          `json:"url"`
+	IsAnnouncing    bool              `json:"isAnnouncing"`
+	InUse           bool              `json:"inUse"`
+	Seeders         int               `json:"seeders"`
+	Leechers        int               `json:"leechers"`
+	Interval        int               `json:"interval"`
+	AnnounceHistory []*AnnounceResult `json:"announceHistory"`
 }
 
 type AnnounceResult struct {
-	TrackerUrl    string    `json:"trackerUrl"`
 	WasSuccessful bool      `json:"wasSuccessful"`
 	Datetime      time.Time `json:"datetime"`
 	Seeders       int       `json:"seeders"`

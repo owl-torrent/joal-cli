@@ -7,17 +7,14 @@ import (
 	"time"
 )
 
-// Event dispatched by the core when the seed has started
 type SeedStartedEvent struct {
 	Client  string
 	Version string
 }
 
-// Event dispatched by the core when the seed has stopped
 type SeedStoppedEvent struct {
 }
 
-// Event dispatched by the core when the RuntimeConfiguration has changed
 type ConfigChangedEvent struct {
 	NeedRestartToTakeEffect bool
 	RuntimeConfig           *config.RuntimeConfig
