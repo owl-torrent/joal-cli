@@ -17,7 +17,7 @@ type ICoreEventListener interface {
 	onBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent)
 }
 
-var listenersAggregator ICoreEventListener = &compositeListener{
+var listeners ICoreEventListener = &compositeListener{
 	listeners: []ICoreEventListener{},
 	lock:      &sync.RWMutex{},
 }
@@ -26,7 +26,7 @@ func RegisterListener(listener ICoreEventListener) (unregisterCallback func()) {
 	if listener == nil {
 		return
 	}
-	var listenersAggregator = listenersAggregator.(*compositeListener)
+	var listenersAggregator = listeners.(*compositeListener)
 	listenersAggregator.lock.Lock()
 	defer listenersAggregator.lock.Unlock()
 
