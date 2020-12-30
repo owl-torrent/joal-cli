@@ -1,16 +1,17 @@
 package web
 
 import (
+	"github.com/anacrolix/torrent/tracker"
 	"net/url"
 	"time"
 )
 
 type State struct {
-	Started   bool               `json:"started"`
-	Client    *Client            `json:"client"`
-	Config    *Config            `json:"config"`
-	Torrents  map[string]Torrent `json:"torrents"`
-	Bandwidth *Bandwidth         `json:"bandwidth"`
+	Started   bool                `json:"started"`
+	Client    *Client             `json:"client"`
+	Config    *Config             `json:"config"`
+	Torrents  map[string]*Torrent `json:"torrents"`
+	Bandwidth *Bandwidth          `json:"bandwidth"`
 }
 
 type Client struct {
@@ -24,20 +25,20 @@ type Config struct {
 }
 
 type RuntimeConfig struct {
-	MinimumBytesPerSeconds int    `json:"minimumBytesPerSeconds"`
-	MaximumBytesPerSeconds int    `json:"maximumBytesPerSeconds"`
+	MinimumBytesPerSeconds int64  `json:"minimumBytesPerSeconds"`
+	MaximumBytesPerSeconds int64  `json:"maximumBytesPerSeconds"`
 	Client                 string `json:"client"`
 }
 
 type Torrent struct {
-	Infohash string            `json:"infohash"`
-	Name     string            `json:"name"`
-	File     string            `json:"file"`
-	Size     int64             `json:"size"`
-	Seeders  int               `json:"seeders"`
-	Leechers int               `json:"leechers"`
-	Uploaded int64             `json:"uploaded"`
-	Trackers []TorrentTrackers `json:"trackers"`
+	Infohash string                      `json:"infohash"`
+	Name     string                      `json:"name"`
+	File     string                      `json:"file"`
+	Size     int64                       `json:"size"`
+	Seeders  int                         `json:"seeders"`
+	Leechers int                         `json:"leechers"`
+	Uploaded int64                       `json:"uploaded"`
+	Trackers map[string]*TorrentTrackers `json:"trackers"`
 }
 
 type TorrentTrackers struct {
@@ -51,12 +52,13 @@ type TorrentTrackers struct {
 }
 
 type AnnounceResult struct {
-	WasSuccessful bool      `json:"wasSuccessful"`
-	Datetime      time.Time `json:"datetime"`
-	Seeders       int       `json:"seeders"`
-	Leechers      int       `json:"leechers"`
-	Interval      int       `json:"interval"`
-	Error         string    `json:"reason,omitempty"`
+	AnnounceEvent tracker.AnnounceEvent `json:"announceEvent"`
+	WasSuccessful bool                  `json:"wasSuccessful"`
+	Datetime      time.Time             `json:"datetime"`
+	Seeders       int                   `json:"seeders"`
+	Leechers      int                   `json:"leechers"`
+	Interval      int                   `json:"interval"`
+	Error         string                `json:"reason,omitempty"`
 }
 
 type Bandwidth struct {

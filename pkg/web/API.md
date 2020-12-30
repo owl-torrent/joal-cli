@@ -33,8 +33,8 @@ Endpoint to get the current state of the application
       "seeders": 20,
       "leechers": 5,
       "uploaded": 5942,
-      "trackers": [
-        {
+      "trackers": {
+        "http://tracker.example.com/announce": {
           "url": "http://tracker.example.com/announce",
           "isAnnouncing": false,
           "inUse": true,
@@ -63,7 +63,7 @@ Endpoint to get the current state of the application
             }
           ]
         },
-        {
+        "http://tracker2.example.com/announce": {
           "url": "http://tracker2.example.com/announce",
           "isAnnouncing": false,
           "inUse": true,
@@ -92,7 +92,7 @@ Endpoint to get the current state of the application
             }
           ]
         },
-        {
+        "http://tracker3.example.com/announce": {
           "url": "http://tracker3.example.com/announce",
           "isAnnouncing": false,
           "inUse": false,
@@ -101,7 +101,7 @@ Endpoint to get the current state of the application
           "interval": 0,
           "announceHistory": []
         }
-      ]
+      }
     }
   },
   "bandwidth": {
@@ -313,8 +313,8 @@ Endpoint to remove a torrent
   "seeders": 20,
   "leechers": 5,
   "uploaded": 5942,
-  "trackers": [
-    {
+  "trackers": {
+    "http://tracker.example.com/announce": {
       "url": "http://tracker.example.com/announce",
       "isAnnouncing": false,
       "inUse": true,
@@ -343,7 +343,7 @@ Endpoint to remove a torrent
         }
       ]
     },
-    {
+    "http://tracker2.example.com/announce": {
       "url": "http://tracker2.example.com/announce",
       "isAnnouncing": false,
       "inUse": true,
@@ -372,7 +372,7 @@ Endpoint to remove a torrent
         }
       ]
     },
-    {
+    "http://tracker3.example.com/announce": {
       "url": "http://tracker3.example.com/announce",
       "isAnnouncing": false,
       "inUse": false,
@@ -381,7 +381,7 @@ Endpoint to remove a torrent
       "interval": 0,
       "announceHistory": []
     }
-  ]
+  }
 }
 ```
 

@@ -4,6 +4,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/config"
+	"net/url"
 	"time"
 )
 
@@ -24,20 +25,21 @@ type TorrentAddedEvent struct {
 	Infohash            torrent.InfoHash
 	Name                string
 	File                string
-	TrackerAnnounceUrls []string
+	TrackerAnnounceUrls []*url.URL
 	Size                int64
 }
 
 type TorrentAnnouncingEvent struct {
 	Infohash      torrent.InfoHash
 	TrackerUrl    string
-	announceEvent tracker.AnnounceEvent
+	AnnounceEvent tracker.AnnounceEvent
+	Uploaded      int64
 }
 
 type TorrentAnnounceSuccessEvent struct {
 	Infohash      torrent.InfoHash
 	TrackerUrl    string
-	announceEvent tracker.AnnounceEvent
+	AnnounceEvent tracker.AnnounceEvent
 	Datetime      time.Time
 	Seeder        int
 	Leechers      int
@@ -47,7 +49,7 @@ type TorrentAnnounceSuccessEvent struct {
 type TorrentAnnounceFailedEvent struct {
 	Infohash      torrent.InfoHash
 	TrackerUrl    string
-	announceEvent tracker.AnnounceEvent
+	AnnounceEvent tracker.AnnounceEvent
 	Datetime      time.Time
 	Error         string
 }

@@ -1,6 +1,6 @@
 package web
 
-type CliBridge interface {
+type ICliBridge interface {
 	StartSeeding() error
 	StopSeeding() error
 	UpdateConfig(config *Config) (Config, error)
