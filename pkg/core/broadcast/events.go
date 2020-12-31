@@ -65,7 +65,8 @@ type TorrentRemovedEvent struct {
 }
 
 type NoticeableErrorEvent struct {
-	Error error
+	Error    error
+	Datetime time.Time
 }
 
 type GlobalBandwidthChangedEvent struct {

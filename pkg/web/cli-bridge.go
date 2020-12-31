@@ -1,6 +1,6 @@
 package web
 
-type ICliBridge interface {
+type ICoreBridge interface {
 	StartSeeding() error
 	StopSeeding() error
 	UpdateConfig(config *Config) (Config, error)
