@@ -91,7 +91,7 @@ func (t *torrentManager) Seed() error {
 		for {
 			select {
 			case event := <-torrentFileWatcher.Event:
-				t.lock.Lock()
+				t.lock.Lock() // FIXME: possible deadlock if Stop tries to write to Stop chan and a file arrives
 
 				switch event.Op {
 				case watcher.Create:

@@ -90,7 +90,7 @@ func (d *dispatcher) Start() {
 					continue
 				}
 				bytesToDispatch := float64(d.randomSpeedProvider.GetBytesPerSeconds()) * secondsBetweenLoops
-				d.lock.RLock()
+				d.lock.RLock() // FIXME: if the stopped has been called but we get to this point after stop().Lock => deadlock
 				for _, claimer := range d.claimers {
 					percentOfSpeedToAssign := claimer.weight / d.totalWeight
 					claimer.AddUploaded(int64(bytesToDispatch * percentOfSpeedToAssign))
