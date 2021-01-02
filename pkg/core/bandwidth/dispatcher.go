@@ -128,6 +128,10 @@ func (d *dispatcher) Stop() {
 // If called with an already known IBandwidthClaimable, re-calculate his bandwidth attribution based on his ISwarm. Basically this methods should be called every time the IBandwidthClaimable receives new Peers from the tracker.
 func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 	d.lock.RLock()
+	if !d.isRunning {
+		d.lock.RUnlock()
+		return
+	}
 	previousClaimer, previousClaimerExists := d.claimers[claimer.InfoHash()]
 	if previousClaimerExists {
 		d.totalWeight -= previousClaimer.weight
@@ -147,6 +151,10 @@ func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
 // Unregister a IBandwidthClaimable. After being released a IBandwidthClaimable wont receive any more bandwidth
 func (d *dispatcher) Release(claimer IBandwidthClaimable) {
 	d.lock.RLock()
+	if !d.isRunning {
+		d.lock.RUnlock()
+		return
+	}
 	previousClaimerWeight, exists := d.claimers[claimer.InfoHash()]
 	d.lock.RUnlock()
 

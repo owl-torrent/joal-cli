@@ -91,8 +91,6 @@ func (t *torrentManager) Seed() error {
 		for {
 			select {
 			case event := <-torrentFileWatcher.Event:
-				t.lock.Lock() // FIXME: possible deadlock if Stop tries to write to Stop chan and a file arrives
-
 				switch event.Op {
 				case watcher.Create:
 					log.Info(event.String())
@@ -131,7 +129,6 @@ func (t *torrentManager) Seed() error {
 					// does not handle WRITE since the write may occur while the file is being written before CREATE
 					log.Info("Event is ignored", zap.String("file", filepath.Base(event.Path)), zap.String("event", event.Op.String()))
 				}
-				t.lock.Unlock()
 			case err := <-torrentFileWatcher.Error:
 				log.Warn("file watcher has reported an error", zap.Error(err))
 			case stopRequest := <-t.stopping:
