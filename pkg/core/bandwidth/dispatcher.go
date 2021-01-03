@@ -124,6 +124,10 @@ func (d *dispatcher) Stop() {
 	log.Info("bandwidth dispatcher: stopped")
 }
 
+// TODO: refactor this component. The torrents should register to a "seeding pool" which will be in charge on computing weights.
+//  This component should (once every x second) add stats to the BandwidthClaimables.
+// 	Doing so will decouple the locks in bandiwdthdispatcher and map access and remove the deadlock problem.
+
 // Register a IBandwidthClaimable as a bandwidth client. Will update his uploaded stats on a timer and the amount of uploaded given depend on this ISwarm of the IBandwidthClaimable.
 // If called with an already known IBandwidthClaimable, re-calculate his bandwidth attribution based on his ISwarm. Basically this methods should be called every time the IBandwidthClaimable receives new Peers from the tracker.
 func (d *dispatcher) ClaimOrUpdate(claimer IBandwidthClaimable) {
