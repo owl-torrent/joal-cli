@@ -37,34 +37,34 @@ func (o *fakeOrchestrator) Stop(context context.Context, announce orchestrator.A
 	}
 }
 
-type fakeBandwidthDispatcher struct {
-	start         func()
-	stop          func()
-	claimOrUpdate func(claimer bandwidth.IBandwidthClaimable)
-	release       func(claimer bandwidth.IBandwidthClaimable)
+type fakeBandwidthClaimerPool struct {
+	start          func()
+	stop           func()
+	addOrUpdate    func(claimer bandwidth.IBandwidthClaimable)
+	removeFromPool func(claimer bandwidth.IBandwidthClaimable)
 }
 
-func (d *fakeBandwidthDispatcher) Start() {
+func (d *fakeBandwidthClaimerPool) Start() {
 	if d.start != nil {
 		d.start()
 	}
 }
 
-func (d *fakeBandwidthDispatcher) Stop() {
+func (d *fakeBandwidthClaimerPool) Stop() {
 	if d.stop != nil {
 		d.stop()
 	}
 }
 
-func (d *fakeBandwidthDispatcher) ClaimOrUpdate(claimer bandwidth.IBandwidthClaimable) {
-	if d.claimOrUpdate != nil {
-		d.claimOrUpdate(claimer)
+func (d *fakeBandwidthClaimerPool) AddOrUpdate(claimer bandwidth.IBandwidthClaimable) {
+	if d.addOrUpdate != nil {
+		d.addOrUpdate(claimer)
 	}
 }
 
-func (d *fakeBandwidthDispatcher) Release(claimer bandwidth.IBandwidthClaimable) {
-	if d.release != nil {
-		d.release(claimer)
+func (d *fakeBandwidthClaimerPool) RemoveFromPool(claimer bandwidth.IBandwidthClaimable) {
+	if d.removeFromPool != nil {
+		d.removeFromPool(claimer)
 	}
 }
 
@@ -280,11 +280,11 @@ func Test_JoalTorrent_ShouldRegisterTorrentsToBandwidthDispatcherOnAnnounceAndUn
 
 	dispatcherUpdated := make(chan bandwidth.IBandwidthClaimable, 1)
 	dispatcherStopped := make(chan struct{})
-	dispatcher := &fakeBandwidthDispatcher{
-		claimOrUpdate: func(claimer bandwidth.IBandwidthClaimable) {
+	dispatcher := &fakeBandwidthClaimerPool{
+		addOrUpdate: func(claimer bandwidth.IBandwidthClaimable) {
 			dispatcherUpdated <- claimer
 		},
-		release: func(claimer bandwidth.IBandwidthClaimable) {
+		removeFromPool: func(claimer bandwidth.IBandwidthClaimable) {
 			close(dispatcherStopped)
 		},
 	}
@@ -367,7 +367,7 @@ func Test_JoalTorrent_ShouldStartOrchestratorOnStartAndStopOnStop(t *testing.T) 
 		},
 	}
 
-	dispatcher := &fakeBandwidthDispatcher{}
+	dispatcher := &fakeBandwidthClaimerPool{}
 
 	err = tor.StartSeeding(emulatedClient, dispatcher)
 	if err != nil {

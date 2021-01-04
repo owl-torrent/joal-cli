@@ -25,7 +25,7 @@ var randSeed = time.Now().UnixNano()
 
 type ITorrent interface {
 	InfoHash() torrent.InfoHash
-	StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) error
+	StartSeeding(client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) error
 	StopSeeding(ctx context.Context)
 }
 
@@ -119,7 +119,7 @@ func (t joalTorrent) InfoHash() torrent.InfoHash {
 	return t.infoHash
 }
 
-func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) error {
+func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.isRunning {
@@ -143,9 +143,9 @@ func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, dispat
 	}
 
 	go func() {
-		defer dispatcher.Release(currentSession)
+		defer bandwidthClaimerPool.RemoveFromPool(currentSession)
 
-		announceClosure := createAnnounceClosure(currentSession, client, dispatcher)
+		announceClosure := createAnnounceClosure(currentSession, client, bandwidthClaimerPool)
 		orhestra.Start(announceClosure)
 
 		stopRequest := <-t.stopping
@@ -176,7 +176,7 @@ func (t *joalTorrent) StopSeeding(ctx context.Context) {
 	log.Info("torrent: stopped")
 }
 
-func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IEmulatedClient, dispatcher bandwidth.IDispatcher) orchestrator.AnnouncingFunction {
+func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) orchestrator.AnnouncingFunction {
 	log := logs.GetLogger()
 	return func(ctx context.Context, u url.URL, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
 		log.Info("announcing to tracker",
@@ -192,7 +192,7 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 			if event != tracker.Stopped {
 				swarmHasChanged := currentSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
 				if swarmHasChanged {
-					dispatcher.ClaimOrUpdate(currentSession)
+					bandwidthClaimerPool.AddOrUpdate(currentSession)
 				}
 			}
 			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
@@ -208,7 +208,7 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 		if event != tracker.Stopped {
 			swarmHasChanged := currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
 			if swarmHasChanged {
-				dispatcher.ClaimOrUpdate(currentSession)
+				bandwidthClaimerPool.AddOrUpdate(currentSession)
 			}
 		}
 

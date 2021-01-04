@@ -84,7 +84,8 @@ func (t *torrentManager) Seed() error {
 	_ = torrentFileWatcher.Add(conf.TorrentsDir)
 
 	go func() {
-		dispatcher := bandwidth.NewDispatcher(conf.RuntimeConfig.BandwidthConfig.Dispatcher, bandwidth.NewRandomSpeedProvider(conf.RuntimeConfig.BandwidthConfig.Speed))
+		claimerPool := bandwidth.NewWeightedClaimerPool()
+		dispatcher := bandwidth.NewDispatcher(conf.RuntimeConfig.BandwidthConfig.Dispatcher, claimerPool, bandwidth.NewRandomSpeedProvider(conf.RuntimeConfig.BandwidthConfig.Speed))
 		dispatcher.Start()
 		log.Info("torrent manager: started")
 
@@ -99,7 +100,7 @@ func (t *torrentManager) Seed() error {
 						log.Error("failed to parse torrent from file", zap.Error(err))
 						break
 					}
-					err = t.StartSeeding(client, dispatcher)
+					err = t.StartSeeding(client, claimerPool)
 					if err != nil {
 						log.Error("failed to start seeding", zap.Error(err))
 						break
