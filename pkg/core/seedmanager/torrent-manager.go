@@ -2,8 +2,8 @@ package seedmanager
 
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/internal/config"
 	"github.com/anthonyraymond/joal-cli/pkg/core/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/anthonyraymond/joal-cli/pkg/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/core/seed"

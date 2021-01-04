@@ -3,7 +3,7 @@ package broadcast
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/config"
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"net/url"
 	"time"
 )
