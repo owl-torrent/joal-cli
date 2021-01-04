@@ -35,10 +35,11 @@ func main() {
 		panic(err)
 	}
 
+	coreBridge := plugins.NewCoreBridge(manager)
 	for _, p := range plugs {
 		if p.Enabled() {
-			p.AfterCoreLoaded(manager)
-		} // TODO: do not pass the manager as is, pass a wrapper to the manager
+			p.AfterCoreLoaded(coreBridge)
+		}
 	}
 
 	err = manager.StartSeeding()
