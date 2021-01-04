@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	githubRepoOwner       = "owl-torrents"
+	githubRepoName        = "owl-clients"
 	clientVersionFileName = ".version"
 	clientFilesReleaseTag = "1.0.0"
 )
@@ -72,7 +74,7 @@ func (d *githubClientDownloader) IsInstalled() (bool, *semver.Version, error) {
 }
 
 func (d *githubClientDownloader) Install() error {
-	release, _, err := d.githubClient.Repositories.GetReleaseByTag(context.Background(), "owl-torrent", "owl-clients", clientFilesReleaseTag)
+	release, _, err := d.githubClient.Repositories.GetReleaseByTag(context.Background(), githubRepoOwner, githubRepoName, clientFilesReleaseTag)
 	if err != nil {
 		return errors.Wrapf(err, "client downloader: error when fetching release with tag '%s'", clientFilesReleaseTag)
 	}

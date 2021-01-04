@@ -4,9 +4,12 @@ import (
 	"context"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/core/seedmanager"
+	"github.com/anthonyraymond/joal-cli/pkg/plugins"
+	"github.com/anthonyraymond/joal-cli/pkg/plugins/web"
 	"go.uber.org/zap"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -15,13 +18,30 @@ import (
 // especially for bencode and tracker subpackages
 
 func main() {
+	plugs := []plugins.IJoalPlugin{
+		&web.Plugin{},
+	}
+
 	logs.SetLevel(zap.DebugLevel)
-	manager, err := seedmanager.NewTorrentManager(`D:\temp\trash\joaltest`)
+
+	for _, p := range plugs {
+		if err := p.Initialize(filepath.Join(`D:\temp\trash\joaltest`, p.SubFolder())); err != nil {
+			logs.GetLogger().Error("failed to initialize plugin, this plugin will stay off for the rest of the execution", zap.String("plugin", p.SubFolder()), zap.Error(err))
+		}
+	}
+
+	manager, err := seedmanager.NewTorrentManager(`D:\temp\trash\joaltest\core`)
 	if err != nil {
 		panic(err)
 	}
 
-	err = manager.Seed()
+	for _, p := range plugs {
+		if p.Enabled() {
+			p.AfterCoreLoaded(manager)
+		} // TODO: do not pass the manager as is, pass a wrapper to the manager
+	}
+
+	err = manager.StartSeeding()
 	if err != nil {
 		panic(err)
 	}
@@ -33,4 +53,12 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	manager.StopSeeding(ctx)
+
+	ctxPlugin, cancelPlugin := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelPlugin()
+	for _, p := range plugs {
+		if p.Enabled() {
+			p.Shutdown(ctxPlugin)
+		}
+	}
 }

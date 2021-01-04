@@ -21,8 +21,11 @@ import (
 // gere les mouvement dans les dossiers
 
 type ITorrentManager interface {
-	Seed() error
+	StartSeeding() error
 	StopSeeding(ctx context.Context)
+	/*UpdateCoreConfig(config *config.RuntimeConfig) (*config.RuntimeConfig, error)
+	RemoveTorrent(infohash torrent.InfoHash) error
+	AddTorrent(file []byte) error*/
 }
 
 type torrentManager struct {
@@ -50,7 +53,7 @@ type stoppingRequest struct {
 	doneStopping chan struct{}
 }
 
-func (t *torrentManager) Seed() error {
+func (t *torrentManager) StartSeeding() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.isRunning {

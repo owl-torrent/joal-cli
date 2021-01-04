@@ -53,7 +53,7 @@ func getDefaultConfigFolder() (string, error) {
 	// Mac     => $HOME/Library/Application Support/joal
 	// Linux   => $XDG_CONFIG_HOME/joal or $HOME/.config/joal
 	dir, err := os.UserConfigDir()
-	return filepath.Join(dir, "joal"), err
+	return filepath.Join(dir, "joal", "core"), err
 }
 
 func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
