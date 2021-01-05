@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	githubRepoOwner       = "owl-torrents"
+	githubRepoOwner       = "owl-torrent"
 	githubRepoName        = "owl-clients"
 	clientVersionFileName = ".version"
 	clientFilesReleaseTag = "1.0.0"

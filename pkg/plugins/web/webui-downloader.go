@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	githubRepoOwner      = "owl-torrents"
-	githubRepoName       = "owl-ui"
+	githubRepoOwner      = "owl-torrent"
+	githubRepoName       = "owl-webui"
 	webuiVersionFileName = ".version"
 	webuiFilesReleaseTag = "1.0.0"
 )
