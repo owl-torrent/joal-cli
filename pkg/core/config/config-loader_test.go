@@ -42,20 +42,6 @@ func TestNewJoalConfigLoader_ShouldCreateNewConfigLoader(t *testing.T) {
 	assert.NotNil(t, l.(*joalConfigLoader).clientDownloader)
 }
 
-func TestNewJoalConfigLoader_ShouldCreateNewConfigLoaderWithDefaultConfigPath(t *testing.T) {
-	l, err := NewJoalConfigLoader("", &http.Client{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	osDefault, err := os.UserConfigDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Contains(t, l.(*joalConfigLoader).configLocation, osDefault)
-}
-
 func TestInitialSetup_ShouldCreateAllRequiredAndConfigFileFoldersIfMissing(t *testing.T) {
 	dir := t.TempDir()
 	if err := initialSetup(dir); err != nil {
