@@ -19,7 +19,7 @@ type appStateCoreListener struct {
 	stompPublisher *stomp.Conn
 }
 
-func (l *appStateCoreListener) onSeedStart(event broadcast.SeedStartedEvent) {
+func (l *appStateCoreListener) OnSeedStart(event broadcast.SeedStartedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -40,7 +40,7 @@ func (l *appStateCoreListener) onSeedStart(event broadcast.SeedStartedEvent) {
 	}
 }
 
-func (l *appStateCoreListener) onSeedStop(_ broadcast.SeedStoppedEvent) {
+func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -62,7 +62,7 @@ func (l *appStateCoreListener) onSeedStop(_ broadcast.SeedStoppedEvent) {
 	}
 }
 
-func (l *appStateCoreListener) onConfigChanged(event broadcast.ConfigChangedEvent) {
+func (l *appStateCoreListener) OnConfigChanged(event broadcast.ConfigChangedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -82,7 +82,7 @@ func (l *appStateCoreListener) onConfigChanged(event broadcast.ConfigChangedEven
 	}
 }
 
-func (l *appStateCoreListener) onTorrentAdded(event broadcast.TorrentAddedEvent) {
+func (l *appStateCoreListener) OnTorrentAdded(event broadcast.TorrentAddedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -115,7 +115,7 @@ func (l *appStateCoreListener) onTorrentAdded(event broadcast.TorrentAddedEvent)
 	}
 }
 
-func (l *appStateCoreListener) onTorrentAnnouncing(event broadcast.TorrentAnnouncingEvent) {
+func (l *appStateCoreListener) OnTorrentAnnouncing(event broadcast.TorrentAnnouncingEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -126,7 +126,7 @@ func (l *appStateCoreListener) onTorrentAnnouncing(event broadcast.TorrentAnnoun
 
 	l.state.Torrents[event.Infohash.String()].Uploaded = event.Uploaded
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
 	tr.InUse = true
 	tr.IsAnnouncing = true
 
@@ -136,7 +136,7 @@ func (l *appStateCoreListener) onTorrentAnnouncing(event broadcast.TorrentAnnoun
 	}
 }
 
-func (l *appStateCoreListener) onTorrentAnnounceSuccess(event broadcast.TorrentAnnounceSuccessEvent) {
+func (l *appStateCoreListener) OnTorrentAnnounceSuccess(event broadcast.TorrentAnnounceSuccessEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -145,7 +145,7 @@ func (l *appStateCoreListener) onTorrentAnnounceSuccess(event broadcast.TorrentA
 		return
 	}
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
 	tr.IsAnnouncing = false
 	tr.Interval = int(event.Interval.Seconds())
 	tr.Seeders = event.Seeder
@@ -176,7 +176,7 @@ func (l *appStateCoreListener) onTorrentAnnounceSuccess(event broadcast.TorrentA
 	}
 }
 
-func (l *appStateCoreListener) onTorrentAnnounceFailed(event broadcast.TorrentAnnounceFailedEvent) {
+func (l *appStateCoreListener) OnTorrentAnnounceFailed(event broadcast.TorrentAnnounceFailedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -185,7 +185,7 @@ func (l *appStateCoreListener) onTorrentAnnounceFailed(event broadcast.TorrentAn
 		return
 	}
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
 	tr.IsAnnouncing = false
 	tr.Interval = -1
 	tr.Seeders = 0
@@ -214,7 +214,7 @@ func (l *appStateCoreListener) onTorrentAnnounceFailed(event broadcast.TorrentAn
 	}
 }
 
-func (l *appStateCoreListener) onTorrentSwarmChanged(event broadcast.TorrentSwarmChangedEvent) {
+func (l *appStateCoreListener) OnTorrentSwarmChanged(event broadcast.TorrentSwarmChangedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -233,7 +233,7 @@ func (l *appStateCoreListener) onTorrentSwarmChanged(event broadcast.TorrentSwar
 	}
 }
 
-func (l *appStateCoreListener) onTorrentRemoved(event broadcast.TorrentRemovedEvent) {
+func (l *appStateCoreListener) OnTorrentRemoved(event broadcast.TorrentRemovedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -253,7 +253,7 @@ func (l *appStateCoreListener) onTorrentRemoved(event broadcast.TorrentRemovedEv
 	}
 }
 
-func (l *appStateCoreListener) onNoticeableError(event broadcast.NoticeableErrorEvent) {
+func (l *appStateCoreListener) OnNoticeableError(event broadcast.NoticeableErrorEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -268,7 +268,7 @@ func (l *appStateCoreListener) onNoticeableError(event broadcast.NoticeableError
 	}
 }
 
-func (l *appStateCoreListener) onGlobalBandwidthChanged(event broadcast.GlobalBandwidthChangedEvent) {
+func (l *appStateCoreListener) OnGlobalBandwidthChanged(event broadcast.GlobalBandwidthChangedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -290,7 +290,7 @@ func (l *appStateCoreListener) onGlobalBandwidthChanged(event broadcast.GlobalBa
 	}
 }
 
-func (l *appStateCoreListener) onBandwidthWeightHasChanged(event broadcast.BandwidthWeightHasChangedEvent) {
+func (l *appStateCoreListener) OnBandwidthWeightHasChanged(event broadcast.BandwidthWeightHasChangedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()

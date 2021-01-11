@@ -1,6 +1,9 @@
 package bandwidth
 
-import "github.com/anthonyraymond/joal-cli/pkg/utils/randutils"
+import (
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
+	"github.com/anthonyraymond/joal-cli/pkg/utils/randutils"
+)
 
 type iRandomSpeedProvider interface {
 	GetBytesPerSeconds() int64
@@ -13,7 +16,7 @@ type randomSpeedProvider struct {
 	value                  int64
 }
 
-func NewRandomSpeedProvider(conf *SpeedProviderConfig) iRandomSpeedProvider {
+func NewRandomSpeedProvider(conf *config.SpeedProviderConfig) iRandomSpeedProvider {
 	return &randomSpeedProvider{
 		MinimumBytesPerSeconds: conf.MinimumBytesPerSeconds,
 		MaximumBytesPerSeconds: conf.MaximumBytesPerSeconds,

@@ -3,18 +3,18 @@ package broadcast
 import "sync"
 
 type ICoreEventListener interface {
-	onSeedStart(event SeedStartedEvent)
-	onSeedStop(event SeedStoppedEvent)
-	onConfigChanged(event ConfigChangedEvent)
-	onTorrentAdded(event TorrentAddedEvent)
-	onTorrentAnnouncing(event TorrentAnnouncingEvent)
-	onTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent)
-	onTorrentAnnounceFailed(event TorrentAnnounceFailedEvent)
-	onTorrentSwarmChanged(event TorrentSwarmChangedEvent)
-	onTorrentRemoved(event TorrentRemovedEvent)
-	onNoticeableError(event NoticeableErrorEvent)
-	onGlobalBandwidthChanged(event GlobalBandwidthChangedEvent)
-	onBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent)
+	OnSeedStart(event SeedStartedEvent)
+	OnSeedStop(event SeedStoppedEvent)
+	OnConfigChanged(event ConfigChangedEvent)
+	OnTorrentAdded(event TorrentAddedEvent)
+	OnTorrentAnnouncing(event TorrentAnnouncingEvent)
+	OnTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent)
+	OnTorrentAnnounceFailed(event TorrentAnnounceFailedEvent)
+	OnTorrentSwarmChanged(event TorrentSwarmChangedEvent)
+	OnTorrentRemoved(event TorrentRemovedEvent)
+	OnNoticeableError(event NoticeableErrorEvent)
+	OnGlobalBandwidthChanged(event GlobalBandwidthChangedEvent)
+	OnBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent)
 }
 
 var listeners ICoreEventListener = &compositeListener{
@@ -56,75 +56,75 @@ type compositeListener struct {
 	lock      *sync.RWMutex
 }
 
-func (cl *compositeListener) onSeedStart(event SeedStartedEvent) {
+func (cl *compositeListener) OnSeedStart(event SeedStartedEvent) {
 	for _, l := range cl.listeners {
-		go l.onSeedStart(event)
+		go l.OnSeedStart(event)
 	}
 }
 
-func (cl *compositeListener) onSeedStop(event SeedStoppedEvent) {
+func (cl *compositeListener) OnSeedStop(event SeedStoppedEvent) {
 	for _, l := range cl.listeners {
-		go l.onSeedStop(event)
+		go l.OnSeedStop(event)
 	}
 }
 
-func (cl *compositeListener) onConfigChanged(event ConfigChangedEvent) {
+func (cl *compositeListener) OnConfigChanged(event ConfigChangedEvent) {
 	for _, l := range cl.listeners {
-		go l.onConfigChanged(event)
+		go l.OnConfigChanged(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentAdded(event TorrentAddedEvent) {
+func (cl *compositeListener) OnTorrentAdded(event TorrentAddedEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentAdded(event)
+		go l.OnTorrentAdded(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentAnnouncing(event TorrentAnnouncingEvent) {
+func (cl *compositeListener) OnTorrentAnnouncing(event TorrentAnnouncingEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentAnnouncing(event)
+		go l.OnTorrentAnnouncing(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent) {
+func (cl *compositeListener) OnTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentAnnounceSuccess(event)
+		go l.OnTorrentAnnounceSuccess(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentAnnounceFailed(event TorrentAnnounceFailedEvent) {
+func (cl *compositeListener) OnTorrentAnnounceFailed(event TorrentAnnounceFailedEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentAnnounceFailed(event)
+		go l.OnTorrentAnnounceFailed(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentSwarmChanged(event TorrentSwarmChangedEvent) {
+func (cl *compositeListener) OnTorrentSwarmChanged(event TorrentSwarmChangedEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentSwarmChanged(event)
+		go l.OnTorrentSwarmChanged(event)
 	}
 }
 
-func (cl *compositeListener) onTorrentRemoved(event TorrentRemovedEvent) {
+func (cl *compositeListener) OnTorrentRemoved(event TorrentRemovedEvent) {
 	for _, l := range cl.listeners {
-		go l.onTorrentRemoved(event)
+		go l.OnTorrentRemoved(event)
 	}
 }
 
-func (cl *compositeListener) onNoticeableError(event NoticeableErrorEvent) {
+func (cl *compositeListener) OnNoticeableError(event NoticeableErrorEvent) {
 	for _, l := range cl.listeners {
-		go l.onNoticeableError(event)
+		go l.OnNoticeableError(event)
 	}
 }
 
-func (cl *compositeListener) onGlobalBandwidthChanged(event GlobalBandwidthChangedEvent) {
+func (cl *compositeListener) OnGlobalBandwidthChanged(event GlobalBandwidthChangedEvent) {
 	for _, l := range cl.listeners {
-		go l.onGlobalBandwidthChanged(event)
+		go l.OnGlobalBandwidthChanged(event)
 	}
 }
 
-func (cl *compositeListener) onBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent) {
+func (cl *compositeListener) OnBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent) {
 	for _, l := range cl.listeners {
-		go l.onBandwidthWeightHasChanged(event)
+		go l.OnBandwidthWeightHasChanged(event)
 	}
 }
 
@@ -156,73 +156,73 @@ func (l *BaseCoreEventListener) Unregister() {
 	}
 }
 
-func (l *BaseCoreEventListener) onSeedStart(event SeedStartedEvent) {
+func (l *BaseCoreEventListener) OnSeedStart(event SeedStartedEvent) {
 	if l.OnSeedStartFunc != nil {
 		l.OnSeedStartFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onSeedStop(event SeedStoppedEvent) {
+func (l *BaseCoreEventListener) OnSeedStop(event SeedStoppedEvent) {
 	if l.OnSeedStopFunc != nil {
 		l.OnSeedStopFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onConfigChanged(event ConfigChangedEvent) {
+func (l *BaseCoreEventListener) OnConfigChanged(event ConfigChangedEvent) {
 	if l.OnConfigChangedFunc != nil {
 		l.OnConfigChangedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentAdded(event TorrentAddedEvent) {
+func (l *BaseCoreEventListener) OnTorrentAdded(event TorrentAddedEvent) {
 	if l.OnTorrentAddedFunc != nil {
 		l.OnTorrentAddedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentAnnouncing(event TorrentAnnouncingEvent) {
+func (l *BaseCoreEventListener) OnTorrentAnnouncing(event TorrentAnnouncingEvent) {
 	if l.OnTorrentAnnouncingFunc != nil {
 		l.OnTorrentAnnouncingFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent) {
+func (l *BaseCoreEventListener) OnTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent) {
 	if l.OnTorrentAnnounceSuccessFunc != nil {
 		l.OnTorrentAnnounceSuccessFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentAnnounceFailed(event TorrentAnnounceFailedEvent) {
+func (l *BaseCoreEventListener) OnTorrentAnnounceFailed(event TorrentAnnounceFailedEvent) {
 	if l.OnTorrentAnnounceFailedFunc != nil {
 		l.OnTorrentAnnounceFailedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentSwarmChanged(event TorrentSwarmChangedEvent) {
+func (l *BaseCoreEventListener) OnTorrentSwarmChanged(event TorrentSwarmChangedEvent) {
 	if l.OnTorrentSwarmChangedFunc != nil {
 		l.OnTorrentSwarmChangedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onTorrentRemoved(event TorrentRemovedEvent) {
+func (l *BaseCoreEventListener) OnTorrentRemoved(event TorrentRemovedEvent) {
 	if l.OnTorrentRemovedFunc != nil {
 		l.OnTorrentRemovedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onNoticeableError(event NoticeableErrorEvent) {
+func (l *BaseCoreEventListener) OnNoticeableError(event NoticeableErrorEvent) {
 	if l.OnNoticeableErrorFunc != nil {
 		l.OnNoticeableErrorFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onGlobalBandwidthChanged(event GlobalBandwidthChangedEvent) {
+func (l *BaseCoreEventListener) OnGlobalBandwidthChanged(event GlobalBandwidthChangedEvent) {
 	if l.OnGlobalBandwidthChangedFunc != nil {
 		l.OnGlobalBandwidthChangedFunc(event)
 	}
 }
 
-func (l *BaseCoreEventListener) onBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent) {
+func (l *BaseCoreEventListener) OnBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent) {
 	if l.OnBandwidthWeightHasChangedFunc != nil {
 		l.OnBandwidthWeightHasChangedFunc(event)
 	}

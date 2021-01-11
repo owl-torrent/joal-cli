@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"github.com/anthonyraymond/joal-cli/pkg/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/plugins"
 	"github.com/go-stomp/stomp"
@@ -21,13 +22,14 @@ import (
 )
 
 type Plugin struct {
-	enabled        bool
-	coreBridge     plugins.ICoreBridge
-	stompServer    net.Listener
-	stompPublisher *stomp.Conn
-	coreListener   *appStateCoreListener
-	httpServer     *http.Server
-	wsListener     net.Listener
+	enabled            bool
+	coreBridge         plugins.ICoreBridge
+	stompServer        net.Listener
+	stompPublisher     *stomp.Conn
+	coreListener       *appStateCoreListener
+	httpServer         *http.Server
+	wsListener         net.Listener
+	unregisterListener func()
 }
 
 func (w *Plugin) Name() string {
@@ -117,6 +119,7 @@ func (w *Plugin) Initialize(configFolder string) error {
 		lock:           &sync.Mutex{},
 		stompPublisher: stompPublisher,
 	}
+	w.unregisterListener = broadcast.RegisterListener(w.coreListener)
 
 	return nil
 }
@@ -156,6 +159,9 @@ func shutdown(w *Plugin, ctx context.Context) {
 	}
 	if w.stompServer != nil {
 		_ = w.stompServer.Close()
+	}
+	if w.unregisterListener != nil {
+		w.unregisterListener()
 	}
 }
 

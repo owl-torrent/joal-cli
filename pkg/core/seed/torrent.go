@@ -8,6 +8,7 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/pkg/core/announcer"
 	"github.com/anthonyraymond/joal-cli/pkg/core/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/pkg/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/core/orchestrator"
@@ -17,6 +18,7 @@ import (
 	"math/rand"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,6 +27,10 @@ var randSeed = time.Now().UnixNano()
 
 type ITorrent interface {
 	InfoHash() torrent.InfoHash
+	Name() string
+	File() string
+	TrackerAnnounceUrls() []*url.URL
+	Size() int64
 	StartSeeding(client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) error
 	StopSeeding(ctx context.Context)
 }
@@ -115,8 +121,56 @@ func FromFile(filePath string) (ITorrent, error) {
 	}, nil
 }
 
-func (t joalTorrent) InfoHash() torrent.InfoHash {
+func (t *joalTorrent) InfoHash() torrent.InfoHash {
 	return t.infoHash
+}
+
+func (t *joalTorrent) Name() string {
+	return t.info.Name
+}
+
+func (t *joalTorrent) File() string {
+	return t.path
+}
+func (t *joalTorrent) TrackerAnnounceUrls() []*url.URL {
+	uniqueRegistry := map[string]bool{}
+	var urls []*url.URL
+	u, err := url.Parse(t.metaInfo.Announce)
+	if err == nil {
+		u.RawPath = ""
+		u.RawQuery = ""
+		u.ForceQuery = false
+		u.Fragment = ""
+		uniqueRegistry[u.String()] = true
+
+		urls = append(urls, u)
+	}
+
+	for a := range t.metaInfo.AnnounceList.DistinctValues() {
+		if strings.TrimSpace(a) == "" {
+			continue
+		}
+		u, err := url.Parse(a)
+		if err != nil {
+			continue
+		}
+		u.RawPath = ""
+		u.RawQuery = ""
+		u.ForceQuery = false
+		u.Fragment = ""
+		uniqueRegistry[u.String()] = true
+
+		if _, contains := uniqueRegistry[u.String()]; contains {
+			continue
+		}
+		uniqueRegistry[u.String()] = true
+		urls = append(urls, u)
+	}
+
+	return urls
+}
+func (t *joalTorrent) Size() int64 {
+	return t.info.Length
 }
 
 func (t *joalTorrent) StartSeeding(client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) error {
@@ -186,17 +240,44 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 			zap.String("tracker", u.Host),
 			zap.ByteString("infohash", currentSession.infoHash[:]),
 		)
+		broadcast.EmitTorrentAnnouncing(broadcast.TorrentAnnouncingEvent{
+			Infohash:      currentSession.infoHash,
+			TrackerUrl:    u,
+			AnnounceEvent: event,
+			Uploaded:      currentSession.seedStats.Uploaded(),
+		})
 		resp, err := client.Announce(ctx, u, currentSession.InfoHash(), currentSession.seedStats.Uploaded(), currentSession.seedStats.Downloaded(), currentSession.seedStats.Left(), event)
 		if err != nil {
 			log.Warn("failed to announce", zap.String("tracker-url", u.String()), zap.Error(err))
 			if event != tracker.Stopped {
 				swarmHasChanged := currentSession.swarm.UpdateSwarm(errorSwarmUpdateRequest(u))
 				if swarmHasChanged {
+					broadcast.EmitTorrentSwarmChanged(broadcast.TorrentSwarmChangedEvent{
+						Infohash: currentSession.infoHash,
+						Seeder:   resp.Seeders,
+						Leechers: resp.Leechers,
+					})
 					bandwidthClaimerPool.AddOrUpdate(currentSession)
 				}
 			}
+			broadcast.EmitTorrentAnnounceFailed(broadcast.TorrentAnnounceFailedEvent{
+				Infohash:      currentSession.infoHash,
+				TrackerUrl:    u,
+				AnnounceEvent: event,
+				Datetime:      time.Now(),
+				Error:         err.Error(),
+			})
 			return announcer.AnnounceResponse{}, errors.Wrap(err, "failed to announce")
 		}
+		broadcast.EmitTorrentAnnounceSuccess(broadcast.TorrentAnnounceSuccessEvent{
+			Infohash:      currentSession.infoHash,
+			TrackerUrl:    u,
+			AnnounceEvent: event,
+			Datetime:      time.Now(),
+			Seeder:        resp.Seeders,
+			Leechers:      resp.Leechers,
+			Interval:      resp.Interval,
+		})
 		log.Info("tracker answered",
 			zap.String("torrent", currentSession.torrentName),
 			zap.String("tracker", u.Host),
@@ -208,6 +289,11 @@ func createAnnounceClosure(currentSession *seedSession, client emulatedclient.IE
 		if event != tracker.Stopped {
 			swarmHasChanged := currentSession.swarm.UpdateSwarm(successSwarmUpdateRequest(u, resp))
 			if swarmHasChanged {
+				broadcast.EmitTorrentSwarmChanged(broadcast.TorrentSwarmChangedEvent{
+					Infohash: currentSession.infoHash,
+					Seeder:   resp.Seeders,
+					Leechers: resp.Leechers,
+				})
 				bandwidthClaimerPool.AddOrUpdate(currentSession)
 			}
 		}

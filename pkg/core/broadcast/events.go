@@ -31,24 +31,24 @@ type TorrentAddedEvent struct {
 
 type TorrentAnnouncingEvent struct {
 	Infohash      torrent.InfoHash
-	TrackerUrl    string
+	TrackerUrl    url.URL
 	AnnounceEvent tracker.AnnounceEvent
 	Uploaded      int64
 }
 
 type TorrentAnnounceSuccessEvent struct {
 	Infohash      torrent.InfoHash
-	TrackerUrl    string
+	TrackerUrl    url.URL
 	AnnounceEvent tracker.AnnounceEvent
 	Datetime      time.Time
-	Seeder        int
-	Leechers      int
+	Seeder        int32
+	Leechers      int32
 	Interval      time.Duration
 }
 
 type TorrentAnnounceFailedEvent struct {
 	Infohash      torrent.InfoHash
-	TrackerUrl    string
+	TrackerUrl    url.URL
 	AnnounceEvent tracker.AnnounceEvent
 	Datetime      time.Time
 	Error         string
@@ -56,8 +56,8 @@ type TorrentAnnounceFailedEvent struct {
 
 type TorrentSwarmChangedEvent struct {
 	Infohash torrent.InfoHash
-	Seeder   int
-	Leechers int
+	Seeder   int32
+	Leechers int32
 }
 
 type TorrentRemovedEvent struct {
@@ -74,6 +74,6 @@ type GlobalBandwidthChangedEvent struct {
 }
 
 type BandwidthWeightHasChangedEvent struct {
-	TotalWeight    int64
-	TorrentWeights map[torrent.InfoHash]int64
+	TotalWeight    float64
+	TorrentWeights map[torrent.InfoHash]float64
 }

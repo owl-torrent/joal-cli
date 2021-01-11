@@ -1,49 +1,49 @@
 package broadcast
 
 func EmitSeedStart(event SeedStartedEvent) {
-	listeners.onSeedStart(event)
+	listeners.OnSeedStart(event)
 }
 
 func EmitSeedStop(event SeedStoppedEvent) {
-	listeners.onSeedStop(event)
+	listeners.OnSeedStop(event)
 }
 
 func EmitConfigChanged(event ConfigChangedEvent) {
-	listeners.onConfigChanged(event)
+	listeners.OnConfigChanged(event)
 }
 
 func EmitTorrentAdded(event TorrentAddedEvent) {
-	listeners.onTorrentAdded(event)
+	listeners.OnTorrentAdded(event)
 }
 
 func EmitTorrentAnnouncing(event TorrentAnnouncingEvent) {
-	listeners.onTorrentAnnouncing(event)
+	listeners.OnTorrentAnnouncing(event)
 }
 
 func EmitTorrentAnnounceSuccess(event TorrentAnnounceSuccessEvent) {
-	listeners.onTorrentAnnounceSuccess(event)
+	listeners.OnTorrentAnnounceSuccess(event)
 }
 
 func EmitTorrentAnnounceFailed(event TorrentAnnounceFailedEvent) {
-	listeners.onTorrentAnnounceFailed(event)
+	listeners.OnTorrentAnnounceFailed(event)
 }
 
 func EmitTorrentSwarmChanged(event TorrentSwarmChangedEvent) {
-	listeners.onTorrentSwarmChanged(event)
+	listeners.OnTorrentSwarmChanged(event)
 }
 
 func EmitTorrentRemoved(event TorrentRemovedEvent) {
-	listeners.onTorrentRemoved(event)
+	listeners.OnTorrentRemoved(event)
 }
 
 func EmitNoticeableError(event NoticeableErrorEvent) {
-	listeners.onNoticeableError(event)
+	listeners.OnNoticeableError(event)
 }
 
 func EmitGlobalBandwidthChanged(event GlobalBandwidthChangedEvent) {
-	listeners.onGlobalBandwidthChanged(event)
+	listeners.OnGlobalBandwidthChanged(event)
 }
 
 func EmitBandwidthWeightHasChanged(event BandwidthWeightHasChangedEvent) {
-	listeners.onBandwidthWeightHasChanged(event)
+	listeners.OnBandwidthWeightHasChanged(event)
 }

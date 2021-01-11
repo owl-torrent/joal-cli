@@ -1,12 +1,13 @@
 package bandwidth
 
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestRandomSpeedProvider_ShouldBuildFromConfig(t *testing.T) {
-	rsp := NewRandomSpeedProvider(&SpeedProviderConfig{
+	rsp := NewRandomSpeedProvider(&config.SpeedProviderConfig{
 		MinimumBytesPerSeconds: 10,
 		MaximumBytesPerSeconds: 100,
 	})

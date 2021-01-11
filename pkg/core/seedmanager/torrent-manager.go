@@ -3,6 +3,7 @@ package seedmanager
 import (
 	"context"
 	"github.com/anthonyraymond/joal-cli/pkg/core/bandwidth"
+	"github.com/anthonyraymond/joal-cli/pkg/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/anthonyraymond/joal-cli/pkg/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
@@ -69,6 +70,10 @@ func (t *torrentManager) StartSeeding() error {
 		t.isRunning = false
 		return errors.Wrap(err, "failed to load config")
 	}
+	broadcast.EmitConfigChanged(broadcast.ConfigChangedEvent{
+		NeedRestartToTakeEffect: false,
+		RuntimeConfig:           conf.RuntimeConfig,
+	})
 
 	client, err := emulatedclient.FromClientFile(filepath.Join(conf.ClientsDir, conf.RuntimeConfig.Client))
 	if err != nil {
@@ -91,6 +96,11 @@ func (t *torrentManager) StartSeeding() error {
 		dispatcher := bandwidth.NewDispatcher(conf.RuntimeConfig.BandwidthConfig.Dispatcher, claimerPool, bandwidth.NewRandomSpeedProvider(conf.RuntimeConfig.BandwidthConfig.Speed))
 		dispatcher.Start()
 		log.Info("torrent manager: started")
+		broadcast.EmitSeedStart(broadcast.SeedStartedEvent{
+			Client:  client.GetName(),
+			Version: client.GetVersion(),
+		})
+		defer broadcast.EmitSeedStop(broadcast.SeedStoppedEvent{})
 
 		for {
 			select {
@@ -103,6 +113,13 @@ func (t *torrentManager) StartSeeding() error {
 						log.Error("failed to parse torrent from file", zap.Error(err))
 						break
 					}
+					broadcast.EmitTorrentAdded(broadcast.TorrentAddedEvent{
+						Infohash:            t.InfoHash(),
+						Name:                t.Name(),
+						File:                t.File(),
+						TrackerAnnounceUrls: t.TrackerAnnounceUrls(),
+						Size:                t.Size(),
+					})
 					err = t.StartSeeding(client, claimerPool)
 					if err != nil {
 						log.Error("failed to start seeding", zap.Error(err))
@@ -128,6 +145,7 @@ func (t *torrentManager) StartSeeding() error {
 						ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 						defer cancel()
 						t.StopSeeding(ctx)
+						broadcast.EmitTorrentRemoved(broadcast.TorrentRemovedEvent{Infohash: t.InfoHash()})
 					}()
 				default:
 					// does not handle WRITE since the write may occur while the file is being written before CREATE
@@ -144,6 +162,7 @@ func (t *torrentManager) StartSeeding() error {
 					wg.Add(1)
 					go func(t seed.ITorrent) {
 						t.StopSeeding(stopRequest.ctx)
+						broadcast.EmitTorrentRemoved(broadcast.TorrentRemovedEvent{Infohash: t.InfoHash()})
 						wg.Done()
 					}(t)
 				}

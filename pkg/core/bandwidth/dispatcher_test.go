@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/nvn1729/congo"
 	"github.com/stretchr/testify/assert"
 	"strconv"
@@ -91,7 +92,7 @@ func (bc *dumbBandwidthClaimable) AddUploaded(bytes int64) {
 func (bc *dumbBandwidthClaimable) GetSwarm() ISwarm { return bc.swarm }
 
 func TestDispatcher_ShouldBuildFromConfig(t *testing.T) {
-	conf := &DispatcherConfig{
+	conf := &config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           10 * time.Minute,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Minute,
 	}
@@ -108,7 +109,7 @@ func TestDispatcher_ShouldBuildFromConfig(t *testing.T) {
 func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 	latch := congo.NewCountDownLatch(1)
 
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
 	}, &mockedWeightedPool{}, &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }})
@@ -124,7 +125,7 @@ func TestDispatcher_shouldRefreshSpeedProviderOnceOnStart(t *testing.T) {
 func TestDispatcher_shouldRefreshSpeedProviderOnTimer(t *testing.T) {
 	latch := congo.NewCountDownLatch(4)
 
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Millisecond,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
 	}, &mockedWeightedPool{}, &mockedRandomSpeedProvider{onRefresh: func() { _ = latch.CountDown() }})
@@ -156,7 +157,7 @@ func TestDispatcher_shouldDispatchSpeedToRegisteredClaimers(t *testing.T) {
 			}}, 152
 		},
 	}
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 10000000})
@@ -202,7 +203,7 @@ func TestDispatcher_shouldDispatchBasedOnWeight(t *testing.T) {
 			}}, 167.2
 		},
 	}
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 10000000})
@@ -246,7 +247,7 @@ func TestDispatcher_shouldDispatchBasedOnWeightFiftyFifty(t *testing.T) {
 			}}, 304
 		},
 	}
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 10000000})
@@ -287,7 +288,7 @@ func TestDispatcher_shouldNotDispatchIfNoWeight(t *testing.T) {
 			}}, 152
 		},
 	}
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 10000000})
@@ -308,7 +309,7 @@ func TestDispatcher_ShouldResetWeightPoolOnStop(t *testing.T) {
 			hasRemovedAll = true
 		},
 	}
-	dispatcher := NewDispatcher(&DispatcherConfig{
+	dispatcher := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 10000000})
@@ -374,7 +375,7 @@ func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
 		totalWeight += 100
 	}
 
-	d := NewDispatcher(&DispatcherConfig{
+	d := NewDispatcher(&config.DispatcherConfig{
 		GlobalBandwidthRefreshInterval:           1 * time.Hour,
 		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Millisecond,
 	}, pool, &mockedRandomSpeedProvider{bps: 100})

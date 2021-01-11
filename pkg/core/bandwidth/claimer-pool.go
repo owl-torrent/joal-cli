@@ -2,6 +2,7 @@ package bandwidth
 
 import (
 	"github.com/anacrolix/torrent"
+	"github.com/anthonyraymond/joal-cli/pkg/core/broadcast"
 	"sync"
 )
 
@@ -73,6 +74,8 @@ func (c *claimerPool) AddOrUpdate(claimer IBandwidthClaimable) {
 		weight:              weight,
 	}
 	c.totalWeight += weight
+
+	broadcastWeights(c)
 }
 
 func (c *claimerPool) RemoveFromPool(claimer IBandwidthClaimable) {
@@ -86,6 +89,7 @@ func (c *claimerPool) RemoveFromPool(claimer IBandwidthClaimable) {
 	}
 	c.totalWeight -= previousClaimerWeight.weight
 	delete(c.claimers, claimer.InfoHash())
+	broadcastWeights(c)
 }
 
 func calculateWeight(swarm ISwarm) float64 {
@@ -98,4 +102,15 @@ func calculateWeight(swarm ISwarm) float64 {
 	}
 
 	return leechersRatio * 100.0 * (float64(swarm.GetSeeders()) * leechersRatio) * (float64(swarm.GetLeechers()) / float64(swarm.GetSeeders()))
+}
+
+func broadcastWeights(pool *claimerPool) {
+	weightMap := make(map[torrent.InfoHash]float64, len(pool.claimers))
+	for infohash, weightedClaimer := range pool.claimers {
+		weightMap[infohash] = weightedClaimer.weight
+	}
+	broadcast.EmitBandwidthWeightHasChanged(broadcast.BandwidthWeightHasChangedEvent{
+		TotalWeight:    pool.totalWeight,
+		TorrentWeights: weightMap,
+	})
 }

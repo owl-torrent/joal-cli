@@ -3,6 +3,8 @@ package bandwidth
 import (
 	"fmt"
 	"github.com/anacrolix/torrent"
+	"github.com/anthonyraymond/joal-cli/pkg/core/broadcast"
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/utils/dataunit"
 	"go.uber.org/zap"
@@ -26,7 +28,7 @@ type IDispatcher interface {
 	Stop()
 }
 
-func NewDispatcher(conf *DispatcherConfig, pool IBandwidthWeightedClaimerPool, rsp iRandomSpeedProvider) IDispatcher {
+func NewDispatcher(conf *config.DispatcherConfig, pool IBandwidthWeightedClaimerPool, rsp iRandomSpeedProvider) IDispatcher {
 	return &dispatcher{
 		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
 		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,
@@ -64,6 +66,7 @@ func (d *dispatcher) Start() {
 		)
 
 		globalBandwidthRefreshTicker := time.NewTicker(d.globalBandwidthRefreshInterval)
+		broadcast.EmitGlobalBandwidthChanged(broadcast.GlobalBandwidthChangedEvent{AvailableBandwidth: d.randomSpeedProvider.GetBytesPerSeconds()})
 		timeToAddSeedToClaimers := time.NewTicker(d.intervalBetweenEachTorrentsSeedIncrement)
 		secondsBetweenLoops := d.intervalBetweenEachTorrentsSeedIncrement.Seconds()
 
@@ -71,6 +74,7 @@ func (d *dispatcher) Start() {
 			select {
 			case <-globalBandwidthRefreshTicker.C:
 				d.randomSpeedProvider.Refresh()
+				broadcast.EmitGlobalBandwidthChanged(broadcast.GlobalBandwidthChangedEvent{AvailableBandwidth: d.randomSpeedProvider.GetBytesPerSeconds()})
 				log.Info("bandwidth dispatcher: refreshed available bandwidth",
 					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
 				)

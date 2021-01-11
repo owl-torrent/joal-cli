@@ -16,7 +16,7 @@ type State struct {
 
 func (s State) InitialState() *State {
 	return &State{
-		Started:   false,
+		Started: false,
 	}
 }
 
@@ -41,8 +41,8 @@ type Torrent struct {
 	Name     string                      `json:"name"`
 	File     string                      `json:"file"`
 	Size     int64                       `json:"size"`
-	Seeders  int                         `json:"seeders"`
-	Leechers int                         `json:"leechers"`
+	Seeders  int32                       `json:"seeders"`
+	Leechers int32                       `json:"leechers"`
 	Uploaded int64                       `json:"uploaded"`
 	Trackers map[string]*TorrentTrackers `json:"trackers"`
 }
@@ -51,8 +51,8 @@ type TorrentTrackers struct {
 	Url             *url.URL          `json:"url"`
 	IsAnnouncing    bool              `json:"isAnnouncing"`
 	InUse           bool              `json:"inUse"`
-	Seeders         int               `json:"seeders"`
-	Leechers        int               `json:"leechers"`
+	Seeders         int32             `json:"seeders"`
+	Leechers        int32             `json:"leechers"`
 	Interval        int               `json:"interval"`
 	AnnounceHistory []*AnnounceResult `json:"announceHistory"`
 }
@@ -61,8 +61,8 @@ type AnnounceResult struct {
 	AnnounceEvent tracker.AnnounceEvent `json:"announceEvent"`
 	WasSuccessful bool                  `json:"wasSuccessful"`
 	Datetime      time.Time             `json:"datetime"`
-	Seeders       int                   `json:"seeders"`
-	Leechers      int                   `json:"leechers"`
+	Seeders       int32                 `json:"seeders"`
+	Leechers      int32                 `json:"leechers"`
 	Interval      int                   `json:"interval"`
 	Error         string                `json:"reason,omitempty"`
 }
