@@ -138,7 +138,7 @@ func (t *joalTorrent) TrackerAnnounceUrls() []*url.URL {
 	u, err := url.Parse(t.metaInfo.Announce)
 	if err == nil {
 		u.RawPath = ""
-		u.RawQuery = ""
+		u.Path = ""
 		u.ForceQuery = false
 		u.Fragment = ""
 		uniqueRegistry[u.String()] = true
@@ -155,10 +155,10 @@ func (t *joalTorrent) TrackerAnnounceUrls() []*url.URL {
 			continue
 		}
 		u.RawPath = ""
+		u.Path = ""
 		u.RawQuery = ""
 		u.ForceQuery = false
 		u.Fragment = ""
-		uniqueRegistry[u.String()] = true
 
 		if _, contains := uniqueRegistry[u.String()]; contains {
 			continue
