@@ -21,23 +21,23 @@ func (c WebConfig) Default() *WebConfig {
 }
 
 type HttpConfig struct {
-	Port                int           `yaml:"port"`
-	ReadTimeout         time.Duration `yaml:"readTimeout"`
-	ReadHeaderTimeout   time.Duration `yaml:"readHeaderTimeout"`
-	WriteTimeout        time.Duration `yaml:"writeTimeout"`
-	IdleTimeout         time.Duration `yaml:"idleTimeout"`
-	MaxHeaderBytes      int           `yaml:"maxHeaderBytes"`
-	WebUiPath           string        `yaml:"webUiPath"`
+	Port              int           `yaml:"port"`
+	ReadTimeout       time.Duration `yaml:"readTimeout"`
+	ReadHeaderTimeout time.Duration `yaml:"readHeaderTimeout"`
+	WriteTimeout      time.Duration `yaml:"writeTimeout"`
+	IdleTimeout       time.Duration `yaml:"idleTimeout"`
+	MaxHeaderBytes    int           `yaml:"maxHeaderBytes"`
+	WebUiPath         string        `yaml:"webUiPath"`
 }
 
 // Return a new HttpConfig with the default values filled in
 func (c HttpConfig) Default() *HttpConfig {
 	return &HttpConfig{
 		Port:              7041,
-		ReadTimeout:       0,
-		ReadHeaderTimeout: 0,
-		WriteTimeout:      0,
-		IdleTimeout:       0,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    0,
 		WebUiPath:         "/ui",
 	}
