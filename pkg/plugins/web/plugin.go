@@ -85,7 +85,6 @@ func (w *Plugin) Initialize(configFolder string) error {
 		WriteTimeout:      conf.Http.WriteTimeout,
 		IdleTimeout:       conf.Http.IdleTimeout,
 		MaxHeaderBytes:    conf.Http.MaxHeaderBytes,
-
 	}
 
 	// Start Http server
@@ -98,6 +97,11 @@ func (w *Plugin) Initialize(configFolder string) error {
 
 	// Create a client connected to our stomp server to be able to dispatch messages
 	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", conf.Http.Port, normalizeStompUrlPath(conf.Stomp.UrlPath)))
+	if err != nil {
+		w.enabled = false
+		shutdown(w, nil)
+		return errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
+	}
 	stompPublisher, err := createStompPublisher(negotiationEndpoint, conf.WebSocket, conf.Stomp)
 	if err != nil {
 		w.enabled = false

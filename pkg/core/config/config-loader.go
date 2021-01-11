@@ -34,14 +34,6 @@ func NewJoalConfigLoader(configDir string, client *http.Client) (IConfigLoader, 
 	}, nil
 }
 
-func getDefaultConfigFolder() (string, error) {
-	// Windows => %AppData%/joal
-	// Mac     => $HOME/Library/Application Support/joal
-	// Linux   => $XDG_CONFIG_HOME/joal or $HOME/.config/joal
-	dir, err := os.UserConfigDir()
-	return filepath.Join(dir, "joal", "core"), err
-}
-
 func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 	log := logs.GetLogger()
 	err := applyMigrations()

@@ -31,10 +31,10 @@ func NewWebSocketListener() (*websocketListener, error) {
 	return l, nil
 }
 
-func (w *websocketListener) HttpNegotiationHandler(conf *WebSocketConfig) func (writer http.ResponseWriter, request *http.Request) {
+func (w *websocketListener) HttpNegotiationHandler(conf *WebSocketConfig) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		w.lock.RLock()
-		if w.closed == true {
+		if w.closed {
 			w.lock.RUnlock()
 			http.Error(writer, "websocket listener is closed, negotiation endpoint not longer accept connections", 418)
 			return
@@ -66,7 +66,7 @@ func (w *websocketListener) HttpNegotiationHandler(conf *WebSocketConfig) func (
 
 func (w *websocketListener) Accept() (net.Conn, error) {
 	w.lock.RLock()
-	if w.closed == true {
+	if w.closed {
 		w.lock.RUnlock()
 		return nil, fmt.Errorf("listener is closed")
 	}
@@ -82,7 +82,7 @@ func (w *websocketListener) Accept() (net.Conn, error) {
 
 func (w *websocketListener) Close() error {
 	w.lock.Lock()
-	if w.closed == true {
+	if w.closed {
 		w.lock.Unlock()
 		return fmt.Errorf("already closed")
 	}
