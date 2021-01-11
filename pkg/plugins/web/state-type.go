@@ -14,6 +14,12 @@ type State struct {
 	Bandwidth *Bandwidth          `json:"bandwidth"`
 }
 
+func (s State) InitialState() *State {
+	return &State{
+		Started:   false,
+	}
+}
+
 type Client struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`

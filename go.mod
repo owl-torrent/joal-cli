@@ -9,7 +9,7 @@ require (
 	github.com/c4milo/unpackit v0.0.0-20170704181138-4ed373e9ef1c
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/go-playground/validator/v10 v10.4.1
-	github.com/go-stomp/stomp v2.1.0+incompatible
+	github.com/go-stomp/stomp v2.1.1-0.20210107172234-9c81a64d9859+incompatible
 	github.com/google/go-github/v32 v32.1.0
 	github.com/hooklift/assert v0.1.0 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
@@ -26,4 +26,5 @@ require (
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924 // indirect
 	golang.org/x/sys v0.0.0-20201223074533-0d417f636930 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
+	nhooyr.io/websocket v1.8.6
 )

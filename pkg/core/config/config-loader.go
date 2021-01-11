@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 const (
@@ -29,22 +28,9 @@ type joalConfigLoader struct {
 }
 
 func NewJoalConfigLoader(configDir string, client *http.Client) (IConfigLoader, error) {
-	configLocation := configDir
-
-	var err error
-	if strings.TrimSpace(configLocation) == "" {
-		configLocation, err = getDefaultConfigFolder()
-		if err != nil {
-			return nil, errors.Wrap(err, "config loader: failed to resolve default config folder")
-		}
-	}
-	configLocation, err = filepath.Abs(configLocation)
-	if err != nil {
-		return nil, errors.Wrapf(err, "config loader: failed to transform '%s' to an absolute path", configLocation)
-	}
 	return &joalConfigLoader{
-		clientDownloader: newClientDownloader(filepath.Join(configLocation, clientsFolder), client, newGithubClient(client)),
-		configLocation:   configLocation,
+		clientDownloader: newClientDownloader(filepath.Join(configDir, clientsFolder), client, newGithubClient(client)),
+		configLocation:   configDir,
 	}, nil
 }
 

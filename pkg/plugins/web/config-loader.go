@@ -2,19 +2,21 @@ package web
 
 import (
 	"fmt"
-	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
-const (
-	staticFilesDir = "web-resources"
-	webConfigFile  = "web.yml"
+var (
+	staticFilesDir = func(pluginRootDir string) string {
+		return filepath.Join(pluginRootDir, "web-resources")
+	}
+	webConfigFilePath = func(pluginRootDir string) string {
+		return filepath.Join(pluginRootDir, "web.yml")
+	}
 )
 
 type IConfigLoader interface {
@@ -24,38 +26,19 @@ type IConfigLoader interface {
 type webConfigLoader struct {
 	webuiDownloader iWebuiDownloader
 	configLocation  string
+	logger          *zap.Logger
 }
 
-func NewWebConfigLoader(configDir string, client *http.Client) (IConfigLoader, error) {
-	configLocation := configDir
-
-	var err error
-	if strings.TrimSpace(configLocation) == "" {
-		configLocation, err = getDefaultConfigFolder()
-		if err != nil {
-			return nil, errors.Wrap(err, "web config loader: failed to resolve default config folder")
-		}
-	}
-	configLocation, err = filepath.Abs(configLocation)
-	if err != nil {
-		return nil, errors.Wrapf(err, "web config loader: failed to transform '%s' to an absolute path", configLocation)
-	}
+func NewWebConfigLoader(configDir string, client *http.Client, logger *zap.Logger) (IConfigLoader, error) {
 	return &webConfigLoader{
-		webuiDownloader: newWebuiDownloader(filepath.Join(configLocation, staticFilesDir), client, newGithubClient(client)),
-		configLocation:  configLocation,
+		webuiDownloader: newWebuiDownloader(staticFilesDir(configDir), client, newGithubClient(client)),
+		configLocation:  configDir,
+		logger:          logger,
 	}, nil
 }
 
-func getDefaultConfigFolder() (string, error) {
-	// Windows => %AppData%/joal
-	// Mac     => $HOME/Library/Application Support/joal
-	// Linux   => $XDG_CONFIG_HOME/joal or $HOME/.config/joal
-	dir, err := os.UserConfigDir()
-	return filepath.Join(dir, "joal", "web"), err
-}
-
 func (l *webConfigLoader) LoadConfigAndInitIfNeeded() (*WebConfig, error) {
-	log := logs.GetLogger()
+	log := l.logger
 	err := applyMigrations()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migration step")
@@ -71,35 +54,35 @@ func (l *webConfigLoader) LoadConfigAndInitIfNeeded() (*WebConfig, error) {
 
 	if isInstalled, version, err := l.webuiDownloader.IsInstalled(); err != nil {
 	} else if !isInstalled {
-		log.Info("web config loader: client files are not installed, going to install them")
+		log.Info("plugin is not installed or outdated")
 		err = l.webuiDownloader.Install()
 		if err != nil {
 			return nil, err
 		}
 	} else if isInstalled {
-		log.Info("web config loader: client files are installed", zap.String("version", version.String()))
+		log.Info("plugin is already installed", zap.String("version", version.String()))
 	}
 
-	conf := readWebConfigOrDefault(filepath.Join(l.configLocation, webConfigFile))
+	conf := l.readWebConfigOrDefault(webConfigFilePath(l.configLocation))
 
-	log.Info("web config loader: config successfully loaded", zap.Any("config", conf))
+	log.Info("plugin config successfully loaded", zap.Any("config", conf))
 	return conf, nil
 }
 
-func readWebConfigOrDefault(filePath string) *WebConfig {
-	log := logs.GetLogger()
+func (l *webConfigLoader) readWebConfigOrDefault(filePath string) *WebConfig {
+	log := l.logger
 	webConfig := WebConfig{}.Default()
 
 	f, err := os.Open(filePath)
 	if err != nil {
-		log.Error(fmt.Sprintf("web config loader: failed to open web config file '%s', running with default config instead", filePath), zap.Error(err))
+		log.Error(fmt.Sprintf("failed to open plugin config file '%s', running with default config instead", filePath), zap.Error(err))
 		return webConfig
 	}
 	defer func() { _ = f.Close() }()
 
 	err = yaml.NewDecoder(f).Decode(webConfig)
 	if err != nil {
-		log.Error(fmt.Sprintf("web config loader: failed to parse web config file '%s', running with default config instead", filePath), zap.Error(err))
+		log.Error(fmt.Sprintf("failed to parse plugin config file '%s', running with default config instead", filePath), zap.Error(err))
 		return webConfig
 	}
 	return webConfig
@@ -109,9 +92,9 @@ func readWebConfigOrDefault(filePath string) *WebConfig {
 func hasInitialSetup(rootConfigFolder string) (bool, error) {
 	requiredPath := []string{
 		rootConfigFolder,
-		filepath.Join(rootConfigFolder, staticFilesDir),
-		filepath.Join(rootConfigFolder, staticFilesDir, "index.html"),
-		filepath.Join(rootConfigFolder, webConfigFile),
+		staticFilesDir(rootConfigFolder),
+		filepath.Join(staticFilesDir(rootConfigFolder), "index.html"),
+		webConfigFilePath(rootConfigFolder),
 	}
 
 	for _, dir := range requiredPath {
@@ -131,7 +114,7 @@ func hasInitialSetup(rootConfigFolder string) (bool, error) {
 func initialSetup(rootConfigFolder string) error {
 	requiredDirectories := []string{
 		rootConfigFolder,
-		filepath.Join(rootConfigFolder, staticFilesDir),
+		staticFilesDir(rootConfigFolder),
 	}
 
 	for _, dir := range requiredDirectories {
@@ -140,16 +123,17 @@ func initialSetup(rootConfigFolder string) error {
 		}
 	}
 
+	configFilePath := webConfigFilePath(rootConfigFolder)
 	// do not override config if already present
-	if _, err := os.Stat(filepath.Join(rootConfigFolder, webConfigFile)); err != nil {
-		f, err := os.OpenFile(filepath.Join(rootConfigFolder, webConfigFile), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if _, err := os.Stat(configFilePath); err != nil {
+		f, err := os.OpenFile(configFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open file '%s'", filepath.Join(rootConfigFolder, webConfigFile))
+			return errors.Wrapf(err, "failed to open file '%s'", filepath.Join(rootConfigFolder, configFilePath))
 		}
 		defer func() { _ = f.Close() }()
 
 		if err := yaml.NewEncoder(f).Encode(WebConfig{}.Default()); err != nil {
-			return errors.Wrapf(err, "failed to marshal WebConfig into '%s'", filepath.Join(rootConfigFolder, webConfigFile))
+			return errors.Wrapf(err, "failed to marshal WebConfig into '%s'", configFilePath)
 		}
 	}
 

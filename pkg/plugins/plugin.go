@@ -6,9 +6,8 @@ import (
 
 type IJoalPlugin interface {
 	Name() string
-	// name of the config folder in joal root
-	SubFolder() string
-	Enabled() bool
+	// decide if the plugin should be enabled (most of the time i will be based on program arguments)
+	ShouldEnable() bool
 	Initialize(joalRootFolder string) error
 	AfterCoreLoaded(coreBridge ICoreBridge)
 	Shutdown(ctx context.Context)
