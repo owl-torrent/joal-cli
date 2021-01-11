@@ -8,6 +8,7 @@ import (
 	"github.com/go-stomp/stomp"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"net/url"
 	"sync"
 )
 
@@ -99,8 +100,9 @@ func (l *appStateCoreListener) OnTorrentAdded(event broadcast.TorrentAddedEvent)
 		Trackers: map[string]*TorrentTrackers{},
 	}
 	for _, u := range event.TrackerAnnounceUrls {
-		t.Trackers[u.String()] = &TorrentTrackers{
-			Url:             u,
+		normalizedUrl := normalizeTrackerAnnounceUrl(u)
+		t.Trackers[normalizedUrl.String()] = &TorrentTrackers{
+			Url:             normalizedUrl,
 			IsAnnouncing:    false,
 			InUse:           false,
 			AnnounceHistory: []*AnnounceResult{},
@@ -126,7 +128,7 @@ func (l *appStateCoreListener) OnTorrentAnnouncing(event broadcast.TorrentAnnoun
 
 	l.state.Torrents[event.Infohash.String()].Uploaded = event.Uploaded
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[normalizeTrackerAnnounceUrl(event.TrackerUrl).String()]
 	tr.InUse = true
 	tr.IsAnnouncing = true
 
@@ -145,15 +147,19 @@ func (l *appStateCoreListener) OnTorrentAnnounceSuccess(event broadcast.TorrentA
 		return
 	}
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[normalizeTrackerAnnounceUrl(event.TrackerUrl).String()]
 	tr.IsAnnouncing = false
 	tr.Interval = int(event.Interval.Seconds())
 	tr.Seeders = event.Seeder
 	tr.Leechers = event.Leechers
 
-	history := make([]*AnnounceResult, announceHistoryMaxLength)
+	newLength := announceHistoryMaxLength
+	if len(tr.AnnounceHistory) < newLength {
+		newLength = len(tr.AnnounceHistory) + 1
+	}
+	history := make([]*AnnounceResult, newLength)
 	history[0] = &AnnounceResult{
-		AnnounceEvent: event.AnnounceEvent,
+		AnnounceEvent: event.AnnounceEvent.String(),
 		WasSuccessful: true,
 		Datetime:      event.Datetime,
 		Seeders:       event.Seeder,
@@ -185,15 +191,19 @@ func (l *appStateCoreListener) OnTorrentAnnounceFailed(event broadcast.TorrentAn
 		return
 	}
 
-	tr := l.state.Torrents[event.Infohash.String()].Trackers[event.TrackerUrl.String()]
+	tr := l.state.Torrents[event.Infohash.String()].Trackers[normalizeTrackerAnnounceUrl(event.TrackerUrl).String()]
 	tr.IsAnnouncing = false
 	tr.Interval = -1
 	tr.Seeders = 0
 	tr.Leechers = 0
 
-	history := make([]*AnnounceResult, announceHistoryMaxLength)
+	newLength := announceHistoryMaxLength
+	if len(tr.AnnounceHistory) < newLength {
+		newLength = len(tr.AnnounceHistory) + 1
+	}
+	history := make([]*AnnounceResult, newLength)
 	history[0] = &AnnounceResult{
-		AnnounceEvent: event.AnnounceEvent,
+		AnnounceEvent: event.AnnounceEvent.String(),
 		WasSuccessful: false,
 		Datetime:      event.Datetime,
 		Error:         event.Error,
@@ -304,7 +314,7 @@ func (l *appStateCoreListener) OnBandwidthWeightHasChanged(event broadcast.Bandw
 	for infohash, weight := range event.TorrentWeights {
 		newBandwidthMap[infohash.String()] = &TorrentBandwidth{
 			Infohash:           infohash.String(),
-			PercentOfBandwidth: float32(event.TotalWeight) / float32(weight),
+			PercentOfBandwidth: float32(weight) / float32(event.TotalWeight),
 		}
 	}
 
@@ -319,7 +329,7 @@ func (l *appStateCoreListener) OnBandwidthWeightHasChanged(event broadcast.Bandw
 func (l *appStateCoreListener) hasTorrent(infohash torrent.InfoHash) bool {
 	_, exists := l.state.Torrents[infohash.String()]
 
-	return !exists
+	return exists
 }
 
 func sendToStompTopic(stompPublisher *stomp.Conn, destination string, content interface{}) error {
@@ -333,4 +343,12 @@ func sendToStompTopic(stompPublisher *stomp.Conn, destination string, content in
 		return errors.Wrapf(err, "failed to send a stomp message to the local server for topic %s", destination)
 	}
 	return nil
+}
+
+func normalizeTrackerAnnounceUrl(u url.URL) *url.URL {
+	return &url.URL{
+		Scheme:     u.Scheme,
+		Host:       u.Host,
+		ForceQuery: false,
+	}
 }

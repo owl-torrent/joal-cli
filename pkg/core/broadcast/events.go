@@ -25,7 +25,7 @@ type TorrentAddedEvent struct {
 	Infohash            torrent.InfoHash
 	Name                string
 	File                string
-	TrackerAnnounceUrls []*url.URL
+	TrackerAnnounceUrls []url.URL
 	Size                int64
 }
 

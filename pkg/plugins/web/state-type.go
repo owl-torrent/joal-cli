@@ -1,7 +1,6 @@
 package web
 
 import (
-	"github.com/anacrolix/torrent/tracker"
 	"net/url"
 	"time"
 )
@@ -58,13 +57,13 @@ type TorrentTrackers struct {
 }
 
 type AnnounceResult struct {
-	AnnounceEvent tracker.AnnounceEvent `json:"announceEvent"`
-	WasSuccessful bool                  `json:"wasSuccessful"`
-	Datetime      time.Time             `json:"datetime"`
-	Seeders       int32                 `json:"seeders"`
-	Leechers      int32                 `json:"leechers"`
-	Interval      int                   `json:"interval"`
-	Error         string                `json:"reason,omitempty"`
+	AnnounceEvent string    `json:"announceEvent"`
+	WasSuccessful bool      `json:"wasSuccessful"`
+	Datetime      time.Time `json:"datetime"`
+	Seeders       int32     `json:"seeders"`
+	Leechers      int32     `json:"leechers"`
+	Interval      int       `json:"interval"`
+	Error         string    `json:"reason,omitempty"`
 }
 
 type Bandwidth struct {

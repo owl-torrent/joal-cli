@@ -29,7 +29,7 @@ type ITorrent interface {
 	InfoHash() torrent.InfoHash
 	Name() string
 	File() string
-	TrackerAnnounceUrls() []*url.URL
+	TrackerAnnounceUrls() []url.URL
 	Size() int64
 	StartSeeding(client emulatedclient.IEmulatedClient, bandwidthClaimerPool bandwidth.IBandwidthClaimerPool) error
 	StopSeeding(ctx context.Context)
@@ -132,18 +132,13 @@ func (t *joalTorrent) Name() string {
 func (t *joalTorrent) File() string {
 	return t.path
 }
-func (t *joalTorrent) TrackerAnnounceUrls() []*url.URL {
+func (t *joalTorrent) TrackerAnnounceUrls() []url.URL {
 	uniqueRegistry := map[string]bool{}
-	var urls []*url.URL
+	var urls []url.URL
 	u, err := url.Parse(t.metaInfo.Announce)
 	if err == nil {
-		u.RawPath = ""
-		u.Path = ""
-		u.ForceQuery = false
-		u.Fragment = ""
 		uniqueRegistry[u.String()] = true
-
-		urls = append(urls, u)
+		urls = append(urls, *u)
 	}
 
 	for a := range t.metaInfo.AnnounceList.DistinctValues() {
@@ -154,17 +149,12 @@ func (t *joalTorrent) TrackerAnnounceUrls() []*url.URL {
 		if err != nil {
 			continue
 		}
-		u.RawPath = ""
-		u.Path = ""
-		u.RawQuery = ""
-		u.ForceQuery = false
-		u.Fragment = ""
 
 		if _, contains := uniqueRegistry[u.String()]; contains {
 			continue
 		}
 		uniqueRegistry[u.String()] = true
-		urls = append(urls, u)
+		urls = append(urls, *u)
 	}
 
 	return urls
