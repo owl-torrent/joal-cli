@@ -95,7 +95,7 @@ func (c *EmulatedClient) GetName() string {
 }
 
 func (c *EmulatedClient) GetVersion() string {
-	return c.Name
+	return c.Version
 }
 
 func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
