@@ -21,25 +21,29 @@ func (c WebConfig) Default() *WebConfig {
 }
 
 type HttpConfig struct {
-	Port              int           `yaml:"port"`
-	ReadTimeout       time.Duration `yaml:"readTimeout"`
-	ReadHeaderTimeout time.Duration `yaml:"readHeaderTimeout"`
-	WriteTimeout      time.Duration `yaml:"writeTimeout"`
-	IdleTimeout       time.Duration `yaml:"idleTimeout"`
-	MaxHeaderBytes    int           `yaml:"maxHeaderBytes"`
-	WebUiPath         string        `yaml:"webUiPath"`
+	Port                     int           `yaml:"port"`
+	ReadTimeout              time.Duration `yaml:"readTimeout"`
+	ReadHeaderTimeout        time.Duration `yaml:"readHeaderTimeout"`
+	WriteTimeout             time.Duration `yaml:"writeTimeout"`
+	IdleTimeout              time.Duration `yaml:"idleTimeout"`
+	MaxHeaderBytes           int           `yaml:"maxHeaderBytes"`
+	WebUiUrl                 string        `yaml:"webUiUrl"`
+	HttpApiUrl               string        `yaml:"httpApiUrl"`
+	WsNegotiationEndpointUrl string        `yaml:"wsNegotiationEndpointUrl"`
 }
 
 // Return a new HttpConfig with the default values filled in
 func (c HttpConfig) Default() *HttpConfig {
 	return &HttpConfig{
-		Port:              7041,
-		ReadTimeout:       15 * time.Second,
-		ReadHeaderTimeout: 15 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    0,
-		WebUiPath:         "/ui",
+		Port:                     7041,
+		ReadTimeout:              15 * time.Second,
+		ReadHeaderTimeout:        15 * time.Second,
+		WriteTimeout:             15 * time.Second,
+		IdleTimeout:              60 * time.Second,
+		MaxHeaderBytes:           0,
+		WebUiUrl:                 "/ui",
+		HttpApiUrl:               "/api",
+		WsNegotiationEndpointUrl: "/ws",
 	}
 }
 
@@ -61,10 +65,9 @@ func (c WebSocketConfig) Default() *WebSocketConfig {
 }
 
 type StompConfig struct {
-	Login     string `yaml:"login"`
-	Password  string `yaml:"password"`
-	UrlPath   string `yaml:"urlPath"`
-	HeartBeat time.Duration
+	Login     string        `yaml:"login"`
+	Password  string        `yaml:"password"`
+	HeartBeat time.Duration `yaml:"heartBeat"`
 }
 
 func (c *StompConfig) Authenticate(login, passcode string) bool {
@@ -79,7 +82,6 @@ func (c StompConfig) Default() *StompConfig {
 	return &StompConfig{
 		Login:     "",
 		Password:  "",
-		UrlPath:   "/ws",
 		HeartBeat: 15 * time.Second,
 	}
 }

@@ -31,7 +31,7 @@ func NewWebSocketListener() (*websocketListener, error) {
 	return l, nil
 }
 
-func (w *websocketListener) HttpNegotiationHandler(conf *WebSocketConfig) func(writer http.ResponseWriter, request *http.Request) {
+func (w *websocketListener) HttpNegotiationHandleFunc(conf *WebSocketConfig) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		w.lock.RLock()
 		if w.closed {

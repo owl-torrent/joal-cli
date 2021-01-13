@@ -8,6 +8,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/plugins"
 	"github.com/go-stomp/stomp"
 	stompServer "github.com/go-stomp/stomp/server"
+	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net"
@@ -16,7 +17,6 @@ import (
 	"nhooyr.io/websocket"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -59,6 +59,10 @@ func (w *Plugin) Initialize(configFolder string) error {
 		w.enabled = false
 		return err
 	}
+	w.coreListener = &appStateCoreListener{
+		state: State{}.InitialState(),
+		lock:  &sync.Mutex{},
+	}
 
 	// Create a listener for the websocket server
 	//  The listener is a faked one, if a client comes to the http websocket negotiation endpoint
@@ -74,23 +78,16 @@ func (w *Plugin) Initialize(configFolder string) error {
 	// Start the stomp server, so it's ready to accept connection as soon as the HTTP server is up
 	startStompServer(conf.Stomp, w.wsListener, log)
 
-	httpHandler := http.NewServeMux()
+	router := mux.NewRouter()
 	// Register web ui static files endpoint
-	httpHandler.Handle(conf.Http.WebUiPath, http.StripPrefix(conf.Http.WebUiPath, http.FileServer(http.Dir(staticFilesDir(configFolder)))))
+	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, staticFilesDir(configFolder))) // TODO: replace with a SPA handler from mux documentation
+	// Register HTTP API
+	registerApiRoutes(router.PathPrefix(conf.Http.HttpApiUrl).Subrouter(), func() plugins.ICoreBridge { return w.coreBridge }, func() *State { return w.coreListener.state })
 	// Register the websocket negotiation endpoint
-	httpHandler.HandleFunc(normalizeStompUrlPath(conf.Stomp.UrlPath), wsListener.HttpNegotiationHandler(conf.WebSocket))
-
-	w.httpServer = &http.Server{
-		Handler:           httpHandler,
-		ReadTimeout:       conf.Http.ReadTimeout,
-		ReadHeaderTimeout: conf.Http.ReadHeaderTimeout,
-		WriteTimeout:      conf.Http.WriteTimeout,
-		IdleTimeout:       conf.Http.IdleTimeout,
-		MaxHeaderBytes:    conf.Http.MaxHeaderBytes,
-	}
+	router.HandleFunc(conf.Http.WsNegotiationEndpointUrl, wsListener.HttpNegotiationHandleFunc(conf.WebSocket))
 
 	// Start Http server
-	err = startHttpServer(w.httpServer, conf.Http, log)
+	w.httpServer, err = startHttpServer(router, conf.Http, log)
 	if err != nil {
 		w.enabled = false
 		shutdown(w, nil)
@@ -98,13 +95,7 @@ func (w *Plugin) Initialize(configFolder string) error {
 	}
 
 	// Create a client connected to our stomp server to be able to dispatch messages
-	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", conf.Http.Port, normalizeStompUrlPath(conf.Stomp.UrlPath)))
-	if err != nil {
-		w.enabled = false
-		shutdown(w, nil)
-		return errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
-	}
-	stompPublisher, err := createStompPublisher(negotiationEndpoint, conf.WebSocket, conf.Stomp)
+	stompPublisher, err := createStompPublisher(conf.Http, conf.WebSocket, conf.Stomp)
 	if err != nil {
 		w.enabled = false
 		shutdown(w, nil)
@@ -112,13 +103,8 @@ func (w *Plugin) Initialize(configFolder string) error {
 	}
 
 	w.enabled = true
-	w.stompServer = wsListener
 	w.stompPublisher = stompPublisher
-	w.coreListener = &appStateCoreListener{
-		state:          State{}.InitialState(),
-		lock:           &sync.Mutex{},
-		stompPublisher: stompPublisher,
-	}
+	w.coreListener.stompPublisher = stompPublisher
 	w.unregisterListener = broadcast.RegisterListener(w.coreListener)
 
 	return nil
@@ -165,23 +151,21 @@ func shutdown(w *Plugin, ctx context.Context) {
 	}
 }
 
-func normalizeStompUrlPath(path string) string {
-	path = strings.TrimSpace(path)
-	if len(path) == 0 {
-		return "/ws"
-	}
-	if path[0] != '/' {
-		return fmt.Sprintf("/%s", path)
-	}
-	return path
-}
-
-func startHttpServer(server *http.Server, config *HttpConfig, log *zap.Logger) error {
+func startHttpServer(httpHandler http.Handler, config *HttpConfig, log *zap.Logger) (*http.Server, error) {
 	// Create a listener for the HTTP server
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
-		return errors.Wrapf(err, "failed to start listenet on port %d", config.Port)
+		return nil, errors.Wrapf(err, "failed to start listenet on port %d", config.Port)
 	}
+	server := &http.Server{
+		Handler:           httpHandler,
+		ReadTimeout:       config.ReadTimeout,
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
+		WriteTimeout:      config.WriteTimeout,
+		IdleTimeout:       config.IdleTimeout,
+		MaxHeaderBytes:    config.MaxHeaderBytes,
+	}
+
 	// Starts the Http server
 	go func() {
 		if err := server.Serve(listener); err != nil {
@@ -190,7 +174,7 @@ func startHttpServer(server *http.Server, config *HttpConfig, log *zap.Logger) e
 			}
 		}
 	}()
-	return nil
+	return server, nil
 }
 
 func startStompServer(config *StompConfig, wsListener net.Listener, log *zap.Logger) {
@@ -205,8 +189,13 @@ func startStompServer(config *StompConfig, wsListener net.Listener, log *zap.Log
 	}()
 }
 
-func createStompPublisher(negotiationEndpointUrl *url.URL, wsConfig *WebSocketConfig, stompConfig *StompConfig) (*stomp.Conn, error) {
-	c, _, err := websocket.Dial(context.Background(), negotiationEndpointUrl.String(), &websocket.DialOptions{
+func createStompPublisher(httpConf *HttpConfig, wsConfig *WebSocketConfig, stompConfig *StompConfig) (*stomp.Conn, error) {
+	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", httpConf.Port, httpConf.WsNegotiationEndpointUrl))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
+	}
+
+	c, _, err := websocket.Dial(context.Background(), negotiationEndpoint.String(), &websocket.DialOptions{
 		Subprotocols:         wsConfig.AcceptedSubProtocols,
 		CompressionMode:      0,
 		CompressionThreshold: 0,
@@ -218,7 +207,7 @@ func createStompPublisher(negotiationEndpointUrl *url.URL, wsConfig *WebSocketCo
 	conn, err := stomp.Connect(
 		websocket.NetConn(context.Background(), c, websocket.MessageText),
 		stomp.ConnOpt.Login(stompConfig.Login, stompConfig.Password),
-		stomp.ConnOpt.Host(negotiationEndpointUrl.Host),
+		stomp.ConnOpt.Host(negotiationEndpoint.Host), // TODO: this may need an adaptation
 		stomp.ConnOpt.HeartBeat(stompConfig.HeartBeat, stompConfig.HeartBeat),
 		stomp.ConnOpt.UseStomp,
 	)
@@ -227,4 +216,8 @@ func createStompPublisher(negotiationEndpointUrl *url.URL, wsConfig *WebSocketCo
 		return nil, errors.Wrap(err, "failed to start stomp publisher")
 	}
 	return conn, nil
+}
+
+func webUiStaticFilesHandler(webUiUrl string, staticFilesPath string) http.Handler {
+	return http.StripPrefix(webUiUrl, http.FileServer(http.Dir(staticFilesPath)))
 }
