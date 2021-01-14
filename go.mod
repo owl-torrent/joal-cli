@@ -9,7 +9,7 @@ require (
 	github.com/c4milo/unpackit v0.0.0-20170704181138-4ed373e9ef1c
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/go-playground/validator/v10 v10.4.1
-	github.com/go-stomp/stomp v2.1.1-0.20210107172234-9c81a64d9859+incompatible
+	github.com/go-stomp/stomp v2.1.2+incompatible
 	github.com/google/go-github/v32 v32.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/hooklift/assert v0.1.0 // indirect
