@@ -45,11 +45,11 @@ func (w *Plugin) ShouldEnable() bool {
 	return true
 }
 
-func (w *Plugin) Initialize(configFolder string) error {
+func (w *Plugin) Initialize(configFolder string, client *http.Client) error {
 	log := logs.GetLogger().With(zap.String("plugin", w.Name()))
 
 	configFolder = filepath.Join(configFolder, "web")
-	configLoader, err := NewWebConfigLoader(configFolder, &http.Client{}, log)
+	configLoader, err := NewWebConfigLoader(configFolder, client, log)
 	if err != nil {
 		w.enabled = false
 		return err
@@ -80,7 +80,7 @@ func (w *Plugin) Initialize(configFolder string) error {
 
 	router := mux.NewRouter()
 	// Register web ui static files endpoint
-	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, staticFilesDir(configFolder))) // TODO: replace with a SPA handler from mux documentation
+	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, staticFilesDir(configFolder))) // TODO: replace with a SPA handler from gorilla/mux documentation
 	// Register HTTP API
 	registerApiRoutes(router.PathPrefix(conf.Http.HttpApiUrl).Subrouter(), func() plugins.ICoreBridge { return w.coreBridge }, func() *State { return w.coreListener.state })
 	// Register the websocket negotiation endpoint

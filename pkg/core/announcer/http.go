@@ -68,7 +68,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		zap.Reflect("headers", req.Header),
 		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 	)
-
+	// TODO: make use of http proxy from AppConfig
 	resp, err := (&http.Client{
 		Timeout: time.Second * 15,
 		Transport: &http.Transport{

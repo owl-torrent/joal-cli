@@ -9,6 +9,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/pkg/plugins/web"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,9 +28,8 @@ var availablePlugins = []plugins.IJoalPlugin{
 
 const configRootFolder = `D:\temp\trash\joaltest`
 
-func main() {
-	defer logs.GetLogger().Sync()
-	configLocation := configRootFolder // TODO: remove me
+func getConfigRootFolder() string {
+	configLocation := configRootFolder // TODO: remove me and get from os.args
 	var err error
 	if strings.TrimSpace(configLocation) == "" {
 		configLocation, err = getDefaultConfigFolder()
@@ -40,6 +40,47 @@ func main() {
 	configLocation, err = filepath.Abs(configLocation)
 	if err != nil {
 		panic(errors.Wrapf(err, "failed to transform '%s' to an absolute path", configLocation))
+	}
+	return configLocation
+}
+
+func bootstrapAndGetConfig(configLocation string) (*AppConfig, error) {
+	err := BootstrapApp(configLocation)
+	if err != nil {
+		panic(err)
+	}
+	return ParseConfigOverDefault(configLocation)
+}
+
+func main() {
+	defer logs.GetLogger().Sync()
+
+	configLocation := getConfigRootFolder()
+
+	appConfig, err := bootstrapAndGetConfig(configLocation)
+	if err != nil {
+		panic(err)
+	}
+
+	err = logs.ReplaceLogger(appConfig.Log)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create an Http Client (almost similar to http.DefaultClient, but we apply our proxy configuration)
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			Proxy: appConfig.Proxy.Proxy(),
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
 	}
 
 	log := logs.GetLogger()
@@ -54,16 +95,13 @@ func main() {
 
 	log.Info("plugins list has been initialized", zap.Any("enabled-plugins", pluginListToListOfName(enabledPlugins)))
 
-	//TODO: remove me
-	logs.SetLevel(zap.DebugLevel)
-
 	for _, p := range enabledPlugins {
-		if err := p.Initialize(filepath.Join(configLocation, "plugins")); err != nil {
+		if err := p.Initialize(filepath.Join(configLocation, "plugins"), httpClient); err != nil {
 			logs.GetLogger().Error("failed to initialize plugin, this plugin will stay off for the rest of the execution", zap.String("plugin", p.Name()), zap.Error(err))
 		}
 	}
 
-	coreConfigLoader, err := config.NewJoalConfigLoader(filepath.Join(configLocation, "core"), &http.Client{})
+	coreConfigLoader, err := config.NewJoalConfigLoader(filepath.Join(configLocation, "core"), httpClient)
 	if err != nil {
 		panic(err)
 	}

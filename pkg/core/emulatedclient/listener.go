@@ -69,6 +69,7 @@ var publicIpProviders = []string{
 // may be an ipv4 or ipv6
 func getPublicIp() (net.IP, error) {
 	for _, providerUri := range publicIpProviders {
+		// TODO: make use of http proxy from AppConfig
 		client := &http.Client{Timeout: 10 * time.Second}
 		req, err := http.NewRequest("GET", providerUri, nil)
 		if err != nil {
