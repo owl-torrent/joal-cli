@@ -36,7 +36,7 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() plugins.ICor
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		r.Context()
+
 		err := bridge.StopSeeding(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -44,5 +44,54 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() plugins.ICor
 		}
 	}).Methods(http.MethodPost)
 
-	// TODO: generate the config json object with subrouter.Walk
+	subrouter.HandleFunc("/configuration", func(w http.ResponseWriter, r *http.Request) {
+		bridge := getBridgeOrNil()
+		if bridge == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		conf, err := bridge.GetCoreConfig()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(conf)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}).Methods(http.MethodGet)
+
+	subrouter.HandleFunc("/configuration", func(w http.ResponseWriter, r *http.Request) {
+		bridge := getBridgeOrNil()
+		if bridge == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		var userConf *plugins.RuntimeConfig
+		err := json.NewDecoder(r.Body).Decode(userConf)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		conf, err := bridge.UpdateCoreConfig(userConf)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(conf)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}).Methods(http.MethodPut)
+
 }

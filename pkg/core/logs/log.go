@@ -5,34 +5,43 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type LogConfig struct {
+	level            zapcore.Level
+	OutputPaths      []string
+	ErrorOutputPaths []string
+}
+
 var log *zap.Logger
-var logLevel zap.AtomicLevel
+var logLevel = zap.NewAtomicLevelAt(zap.InfoLevel)
 
 func init() {
-	logLevel = zap.NewAtomicLevel()
-
-	config := zap.Config{
-		Level:       logLevel,
-		Development: true,
-		Encoding:    "console",
-		EncoderConfig: zapcore.EncoderConfig{
-			TimeKey:  "ts",
-			LevelKey: "level",
-			NameKey:  "logger",
-			//CallerKey:      "caller",
-			MessageKey:     "msg",
-			StacktraceKey:  "stacktrace",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    zapcore.CapitalLevelEncoder,
-			EncodeTime:     zapcore.ISO8601TimeEncoder,
-			EncodeDuration: zapcore.StringDurationEncoder,
-			//EncodeCaller:   zapcore.ShortCallerEncoder,
-		},
-		OutputPaths:      []string{"stdout"},
-		ErrorOutputPaths: []string{"stderr"},
+	conf := zapcore.EncoderConfig{
+		TimeKey:  "ts",
+		LevelKey: "level",
+		NameKey:  "logger",
+		//CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
+		//EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	log, _ = config.Build()
+	ws, _, err := zap.Open("stdout")
+	if err != nil {
+		panic(err)
+	}
+
+	log = zap.New(
+		zapcore.NewCore(
+			zapcore.NewConsoleEncoder(conf),
+			ws,
+			logLevel,
+		),
+		zap.Development(),
+	)
 }
 
 func GetLogger() *zap.Logger {

@@ -11,7 +11,6 @@ import (
 	"github.com/anthonyraymond/watcher"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"net/http"
 	"path/filepath"
 	"sync"
 	"time"
@@ -36,17 +35,13 @@ type torrentManager struct {
 	stopping     chan *stoppingRequest
 }
 
-func NewTorrentManager(configDir string) (ITorrentManager, error) {
-	loader, err := config.NewJoalConfigLoader(configDir, &http.Client{})
-	if err != nil {
-		return nil, err
-	}
+func NewTorrentManager(configLoader config.IConfigLoader) ITorrentManager {
 	return &torrentManager{
 		lock:         &sync.Mutex{},
 		isRunning:    false,
-		configLoader: loader,
+		configLoader: configLoader,
 		stopping:     make(chan *stoppingRequest),
-	}, nil
+	}
 }
 
 type stoppingRequest struct {
@@ -63,8 +58,7 @@ func (t *torrentManager) StartSeeding() error {
 	t.isRunning = true
 
 	log := logs.GetLogger()
-	// Now that i used it, i feel like the configLoader should not init the config folder structure. It should be another part of the program that handles that.
-	// Also the config loader should have been given to the TorrentManager as constructor argument and not build in constructor
+	// TODO: Now that i used it, i feel like the configLoader should not init the config folder structure. It should be another part of the program that handles that.
 	conf, err := t.configLoader.LoadConfigAndInitIfNeeded()
 	if err != nil {
 		t.isRunning = false

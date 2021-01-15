@@ -20,6 +20,7 @@ const (
 
 type IConfigLoader interface {
 	LoadConfigAndInitIfNeeded() (*JoalConfig, error)
+	UpdateConfig(config *RuntimeConfig) (*RuntimeConfig, error)
 }
 
 type joalConfigLoader struct {
@@ -70,6 +71,19 @@ func (l *joalConfigLoader) LoadConfigAndInitIfNeeded() (*JoalConfig, error) {
 	}
 	log.Info("config loader: config successfully loaded", zap.Any("config", conf))
 	return conf, nil
+}
+
+func (l *joalConfigLoader) UpdateConfig(newConf *RuntimeConfig) (*RuntimeConfig, error) {
+	f, err := os.OpenFile(filepath.Join(l.configLocation, runtimeConfigFile), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open config file")
+	}
+	err = yaml.NewEncoder(f).Encode(newConf)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to write new config")
+	}
+
+	return newConf, nil
 }
 
 func readRuntimeConfigOrDefault(filePath string) *RuntimeConfig {

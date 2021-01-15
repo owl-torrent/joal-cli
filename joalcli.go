@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"github.com/anthonyraymond/joal-cli/pkg/core/config"
 	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
 	"github.com/anthonyraymond/joal-cli/pkg/core/seedmanager"
 	"github.com/anthonyraymond/joal-cli/pkg/plugins"
 	"github.com/anthonyraymond/joal-cli/pkg/plugins/web"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -26,7 +28,8 @@ var availablePlugins = []plugins.IJoalPlugin{
 const configRootFolder = `D:\temp\trash\joaltest`
 
 func main() {
-	configLocation := configRootFolder
+	defer logs.GetLogger().Sync()
+	configLocation := configRootFolder // TODO: remove me
 	var err error
 	if strings.TrimSpace(configLocation) == "" {
 		configLocation, err = getDefaultConfigFolder()
@@ -39,10 +42,8 @@ func main() {
 		panic(errors.Wrapf(err, "failed to transform '%s' to an absolute path", configLocation))
 	}
 
-
 	log := logs.GetLogger()
 	var enabledPlugins []plugins.IJoalPlugin
-
 
 	log.Info("evaluate plugins list", zap.Any("available-plugins", pluginListToListOfName(availablePlugins)))
 	for _, p := range availablePlugins {
@@ -53,7 +54,6 @@ func main() {
 
 	log.Info("plugins list has been initialized", zap.Any("enabled-plugins", pluginListToListOfName(enabledPlugins)))
 
-
 	//TODO: remove me
 	logs.SetLevel(zap.DebugLevel)
 
@@ -63,12 +63,13 @@ func main() {
 		}
 	}
 
-	manager, err := seedmanager.NewTorrentManager(filepath.Join(configLocation, "core"))
+	coreConfigLoader, err := config.NewJoalConfigLoader(filepath.Join(configLocation, "core"), &http.Client{})
 	if err != nil {
 		panic(err)
 	}
+	manager := seedmanager.NewTorrentManager(coreConfigLoader)
 
-	coreBridge := plugins.NewCoreBridge(manager)
+	coreBridge := plugins.NewCoreBridge(manager, coreConfigLoader)
 	for _, p := range enabledPlugins {
 		p.AfterCoreLoaded(coreBridge)
 	}
