@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
+	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"io"

@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/pkg/core/config"
-	"github.com/anthonyraymond/joal-cli/pkg/core/logs"
-	"github.com/anthonyraymond/joal-cli/pkg/core/seedmanager"
-	"github.com/anthonyraymond/joal-cli/pkg/plugins"
-	"github.com/anthonyraymond/joal-cli/pkg/plugins/web"
+	"github.com/anthonyraymond/joal-cli/internal/core/config"
+	"github.com/anthonyraymond/joal-cli/internal/core/logs"
+	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
+	"github.com/anthonyraymond/joal-cli/internal/plugins"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/web"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net"
