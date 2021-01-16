@@ -53,7 +53,7 @@ func bootstrapAndGetConfig(configLocation string) (*AppConfig, error) {
 }
 
 func main() {
-	defer logs.GetLogger().Sync()
+	defer func() { _ = logs.GetLogger().Sync() }()
 
 	configLocation := getConfigRootFolder()
 

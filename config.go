@@ -1,10 +1,9 @@
 package main
 
 import (
+	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v3"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,26 +28,23 @@ func BootstrapApp(configDir string) error {
 }
 
 func ParseConfigOverDefault(configDir string) (*AppConfig, error) {
-	configFile := configFileName(configDir)
-
-	f, err := os.Open(configFile)
+	conf, err := configloader.NewConfigLoader(configFileName(configDir), func() interface{} {
+		return AppConfig{}.Default()
+	}).ParseOverDefault()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open config file '%s'", configFile)
+		return nil, err
+	}
+	c, ok := conf.(*AppConfig)
+	if !ok {
+		panic("fuck")
 	}
 
-	c := AppConfig{}.Default()
-	decoder := yaml.NewDecoder(f)
-	decoder.KnownFields(true)
-	err = decoder.Decode(c)
-	if err != nil && err != io.EOF {
-		return nil, errors.Wrapf(err, "failed to parse config file '%s'", configFile)
-	}
 	return c, nil
 }
 
 type AppConfig struct {
 	Log   *logs.LogConfig `yaml:"log"`
-	Proxy *ProxyConf      `yaml:"proxy"`
+	Proxy ProxyConf       `yaml:"proxy"`
 }
 
 func (ac AppConfig) Default() *AppConfig {
@@ -62,8 +58,8 @@ type ProxyConf struct {
 	Url string `yaml:"url"`
 }
 
-func (pc ProxyConf) Default() *ProxyConf {
-	return &ProxyConf{
+func (pc ProxyConf) Default() ProxyConf {
+	return ProxyConf{
 		Url: "",
 	}
 }
