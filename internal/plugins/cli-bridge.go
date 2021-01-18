@@ -1,8 +1,9 @@
 package plugins
 
+import "C"
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/internal/core/config"
+	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 )
 
@@ -28,10 +29,10 @@ type RuntimeConfig struct {
 
 type coreBridge struct {
 	manager      seedmanager.ITorrentManager
-	configLoader config.IConfigLoader
+	configLoader *core.CoreConfigLoader
 }
 
-func NewCoreBridge(manager seedmanager.ITorrentManager, loader config.IConfigLoader) ICoreBridge {
+func NewCoreBridge(manager seedmanager.ITorrentManager, loader *core.CoreConfigLoader) ICoreBridge {
 	return &coreBridge{
 		manager:      manager,
 		configLoader: loader,
@@ -49,7 +50,7 @@ func (b *coreBridge) StopSeeding(ctx context.Context) error {
 }
 
 func (b *coreBridge) GetCoreConfig() (*Config, error) {
-	conf, err := b.configLoader.LoadConfigAndInitIfNeeded()
+	conf, err := b.configLoader.ReadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (b *coreBridge) GetCoreConfig() (*Config, error) {
 }
 
 func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
-	conf, err := b.configLoader.LoadConfigAndInitIfNeeded()
+	conf, err := b.configLoader.ReadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
 	conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds = newConf.MinimumBytesPerSeconds
 	conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds = newConf.MaximumBytesPerSeconds
 
-	savedConf, err := b.configLoader.UpdateConfig(conf.RuntimeConfig)
+	err = b.configLoader.SaveConfigToFile(conf.RuntimeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -81,9 +82,9 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
 	return &Config{
 		NeedRestartToTakeEffect: true, // TODO: this should come back from the configloader and not being a fixed value
 		RuntimeConfig: &RuntimeConfig{
-			MinimumBytesPerSeconds: savedConf.BandwidthConfig.Speed.MinimumBytesPerSeconds,
-			MaximumBytesPerSeconds: savedConf.BandwidthConfig.Speed.MaximumBytesPerSeconds,
-			Client:                 savedConf.Client,
+			MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
+			MaximumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
+			Client:                 conf.RuntimeConfig.Client,
 		},
 	}, nil
 }

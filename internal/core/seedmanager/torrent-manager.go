@@ -2,9 +2,10 @@ package seedmanager
 
 import (
 	"context"
+	"fmt"
+	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/bandwidth"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
-	"github.com/anthonyraymond/joal-cli/internal/core/config"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/seed"
@@ -31,11 +32,11 @@ type ITorrentManager interface {
 type torrentManager struct {
 	lock         *sync.Mutex
 	isRunning    bool
-	configLoader config.IConfigLoader
+	configLoader *core.CoreConfigLoader
 	stopping     chan *stoppingRequest
 }
 
-func NewTorrentManager(configLoader config.IConfigLoader) ITorrentManager {
+func NewTorrentManager(configLoader *core.CoreConfigLoader) ITorrentManager {
 	return &torrentManager{
 		lock:         &sync.Mutex{},
 		isRunning:    false,
@@ -59,7 +60,7 @@ func (t *torrentManager) StartSeeding() error {
 
 	log := logs.GetLogger()
 	// TODO: Now that i used it, i feel like the configLoader should not init the config folder structure. It should be another part of the program that handles that.
-	conf, err := t.configLoader.LoadConfigAndInitIfNeeded()
+	conf, err := t.configLoader.ReadConfig()
 	if err != nil {
 		t.isRunning = false
 		return errors.Wrap(err, "failed to load config")
@@ -69,10 +70,13 @@ func (t *torrentManager) StartSeeding() error {
 		RuntimeConfig:           conf.RuntimeConfig,
 	})
 
+	if conf.RuntimeConfig.Client == "" {
+		return fmt.Errorf("core config does not contains a client file, please take a look at the documentation")
+	}
 	client, err := emulatedclient.FromClientFile(filepath.Join(conf.ClientsDir, conf.RuntimeConfig.Client))
 	if err != nil {
 		t.isRunning = false
-		return errors.Wrap(err, "failed to load client")
+		return errors.Wrap(err, "failed to load client file")
 	}
 	err = client.StartListener()
 	if err != nil {

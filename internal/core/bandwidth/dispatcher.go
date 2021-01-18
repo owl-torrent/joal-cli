@@ -3,8 +3,8 @@ package bandwidth
 import (
 	"fmt"
 	"github.com/anacrolix/torrent"
+	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
-	"github.com/anthonyraymond/joal-cli/internal/core/config"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/dataunit"
 	"go.uber.org/zap"
@@ -28,7 +28,7 @@ type IDispatcher interface {
 	Stop()
 }
 
-func NewDispatcher(conf *config.DispatcherConfig, pool IBandwidthWeightedClaimerPool, rsp iRandomSpeedProvider) IDispatcher {
+func NewDispatcher(conf *core.DispatcherConfig, pool IBandwidthWeightedClaimerPool, rsp iRandomSpeedProvider) IDispatcher {
 	return &dispatcher{
 		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
 		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,

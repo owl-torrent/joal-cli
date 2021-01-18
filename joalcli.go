@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/internal/core/config"
+	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 	"github.com/anthonyraymond/joal-cli/internal/plugins"
@@ -44,20 +44,12 @@ func getConfigRootFolder() string {
 	return configLocation
 }
 
-func bootstrapAndGetConfig(configLocation string) (*AppConfig, error) {
-	err := BootstrapApp(configLocation)
-	if err != nil {
-		panic(err)
-	}
-	return ParseConfigOverDefault(configLocation)
-}
-
 func main() {
 	defer func() { _ = logs.GetLogger().Sync() }()
 
 	configLocation := getConfigRootFolder()
 
-	appConfig, err := bootstrapAndGetConfig(configLocation)
+	appConfig, err := BootstrapApp(configLocation)
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +93,7 @@ func main() {
 		}
 	}
 
-	coreConfigLoader, err := config.NewJoalConfigLoader(filepath.Join(configLocation, "core"), httpClient)
+	coreConfigLoader, err := core.Bootstrap(filepath.Join(configLocation, "core"), httpClient)
 	if err != nil {
 		panic(err)
 	}

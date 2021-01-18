@@ -12,34 +12,30 @@ import (
 )
 
 var (
-	configFileName = func(rootConfigDir string) string {
+	configFileFromRoot = func(rootConfigDir string) string {
 		return filepath.Join(rootConfigDir, "config.yml")
 	}
 )
 
-func BootstrapApp(configDir string) error {
+func BootstrapApp(configDir string) (*AppConfig, error) {
 	// Create the configuration file if missing
-	f, err := os.OpenFile(configFileName(configDir), os.O_CREATE, 0755)
+	f, err := os.OpenFile(configFileFromRoot(configDir), os.O_CREATE, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create '%s' file", configFileName(configDir))
+		return nil, errors.Wrapf(err, "failed to create '%s' file", configFileFromRoot(configDir))
 	}
-	defer func() { _ = f.Close() }()
-	return nil
+	_ = f.Close()
+
+	return readConfig(configDir)
 }
 
-func ParseConfigOverDefault(configDir string) (*AppConfig, error) {
-	conf, err := configloader.NewConfigLoader(configFileName(configDir), func() interface{} {
-		return AppConfig{}.Default()
-	}).ParseOverDefault()
+func readConfig(configDir string) (*AppConfig, error) {
+	conf := AppConfig{}.Default()
+	err := configloader.ParseIntoDefault(configFileFromRoot(configDir), conf)
 	if err != nil {
 		return nil, err
 	}
-	c, ok := conf.(*AppConfig)
-	if !ok {
-		panic("fuck")
-	}
 
-	return c, nil
+	return conf, nil
 }
 
 type AppConfig struct {

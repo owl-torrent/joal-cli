@@ -3,7 +3,7 @@ package broadcast
 import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/core/config"
+	"github.com/anthonyraymond/joal-cli/internal/core"
 	"net/url"
 	"time"
 )
@@ -18,7 +18,7 @@ type SeedStoppedEvent struct {
 
 type ConfigChangedEvent struct {
 	NeedRestartToTakeEffect bool
-	RuntimeConfig           *config.RuntimeConfig
+	RuntimeConfig           *core.RuntimeConfig
 }
 
 type TorrentAddedEvent struct {
