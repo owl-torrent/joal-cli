@@ -55,6 +55,9 @@ func main() {
 	}
 
 	coreConfigLoader, err := core.Bootstrap(filepath.Join(configLocation, "core"), httpClient)
+	if err != nil {
+		panic(err)
+	}
 
 	pluginManager := plugins.NewPluginManager(configLocation, types.NewCoreBridge(coreConfigLoader))
 	pluginManager.BootstrapPlugins(httpClient)

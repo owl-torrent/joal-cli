@@ -22,7 +22,6 @@ import (
 )
 
 type plugin struct {
-	enabled            bool
 	configLoader       *webConfigLoader
 	staticFilesDir     string
 	coreBridge         types.ICoreBridge
