@@ -1,6 +1,9 @@
 package core
 
 import (
+	"github.com/pkg/errors"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -9,6 +12,29 @@ type JoalConfig struct {
 	ArchivedTorrentsDir string
 	ClientsDir          string
 	RuntimeConfig       *RuntimeConfig
+}
+
+func (c *JoalConfig) ListClientFiles() ([]string, error) {
+	var clients []string
+
+	err := filepath.Walk(c.ClientsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "error at file '%s'", path)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".yml" {
+			return nil
+		}
+		clients = append(clients, filepath.Base(path))
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error while walking though dir '%s'", c.ClientsDir)
+	}
+
+	return clients, nil
 }
 
 type RuntimeConfig struct {
@@ -20,7 +46,7 @@ type RuntimeConfig struct {
 func (c RuntimeConfig) Default() *RuntimeConfig {
 	return &RuntimeConfig{
 		BandwidthConfig: BandwidthConfig{}.Default(),
-		Client:          "",
+		Client:          "qbittorrent-3.3.1.yml",
 	}
 }
 

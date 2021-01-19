@@ -18,6 +18,10 @@ var (
 )
 
 func BootstrapApp(configDir string) (*AppConfig, error) {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to create folder '%s'", configDir)
+	}
+
 	// Create the configuration file if missing
 	f, err := os.OpenFile(configFileFromRoot(configDir), os.O_CREATE, 0755)
 	if err != nil {

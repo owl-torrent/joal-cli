@@ -1,8 +1,9 @@
-package plugins
+package types
 
 import "C"
 import (
 	"context"
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 )
@@ -32,24 +33,36 @@ type coreBridge struct {
 	configLoader *core.CoreConfigLoader
 }
 
-func NewCoreBridge(manager seedmanager.ITorrentManager, loader *core.CoreConfigLoader) ICoreBridge {
+func NewCoreBridge(loader *core.CoreConfigLoader) ICoreBridge {
 	return &coreBridge{
-		manager:      manager,
 		configLoader: loader,
 	}
 }
 
+func (b *coreBridge) SetTorrentManager(manager seedmanager.ITorrentManager) {
+	b.manager = manager
+}
+
 func (b *coreBridge) StartSeeding() error {
+	if b.manager == nil {
+		return fmt.Errorf("torrent manager is not available yet")
+	}
 	return b.manager.StartSeeding()
 }
 
 func (b *coreBridge) StopSeeding(ctx context.Context) error {
+	if b.manager == nil {
+		return fmt.Errorf("torrent manager is not available yet")
+	}
 	b.manager.StopSeeding(ctx)
 
 	return ctx.Err()
 }
 
 func (b *coreBridge) GetCoreConfig() (*Config, error) {
+	if b.manager == nil {
+		return nil, fmt.Errorf("torrent manager is not available yet")
+	}
 	conf, err := b.configLoader.ReadConfig()
 	if err != nil {
 		return nil, err
@@ -66,6 +79,9 @@ func (b *coreBridge) GetCoreConfig() (*Config, error) {
 }
 
 func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
+	if b.manager == nil {
+		return nil, fmt.Errorf("torrent manager is not available yet")
+	}
 	conf, err := b.configLoader.ReadConfig()
 	if err != nil {
 		return nil, err
@@ -90,11 +106,17 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
 }
 
 func (b *coreBridge) AddTorrent(file []byte) error {
+	if b.manager == nil {
+		return fmt.Errorf("torrent manager is not available yet")
+	}
 	// TODO: implement
 	panic("implement me")
 }
 
 func (b *coreBridge) RemoveTorrent(infohash string) error {
+	if b.manager == nil {
+		return fmt.Errorf("torrent manager is not available yet")
+	}
 	// TODO: implement
 	panic("implement me")
 }

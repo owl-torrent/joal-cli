@@ -49,8 +49,6 @@ func Bootstrap(coreRootDir string, client *http.Client) (*CoreConfigLoader, erro
 		return nil, errors.Wrap(err, "failed to bootstrap core")
 	}
 
-	// TODO: if config.client is empty, or client file does not exists, it should select the latest available qbitorrent and save config
-
 	return configLoader, nil
 }
 

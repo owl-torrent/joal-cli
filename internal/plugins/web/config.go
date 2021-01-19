@@ -5,22 +5,22 @@ import (
 	"time"
 )
 
-type WebConfig struct {
-	Http      *HttpConfig      `yaml:"http"`
-	WebSocket *WebSocketConfig `yaml:"webSocket"`
-	Stomp     *StompConfig     `yaml:"stomp"`
+type webConfig struct {
+	Http      *httpConfig      `yaml:"http"`
+	WebSocket *webSocketConfig `yaml:"webSocket"`
+	Stomp     *stompConfig     `yaml:"stomp"`
 }
 
-// Return a new WebConfig with the default values filled in
-func (c WebConfig) Default() *WebConfig {
-	return &WebConfig{
-		Http:      HttpConfig{}.Default(),
-		WebSocket: WebSocketConfig{}.Default(),
-		Stomp:     StompConfig{}.Default(),
+// Return a new webConfig with the default values filled in
+func (c webConfig) Default() *webConfig {
+	return &webConfig{
+		Http:      httpConfig{}.Default(),
+		WebSocket: webSocketConfig{}.Default(),
+		Stomp:     stompConfig{}.Default(),
 	}
 }
 
-type HttpConfig struct {
+type httpConfig struct {
 	Port                     int           `yaml:"port"`
 	ReadTimeout              time.Duration `yaml:"readTimeout"`
 	ReadHeaderTimeout        time.Duration `yaml:"readHeaderTimeout"`
@@ -33,8 +33,8 @@ type HttpConfig struct {
 }
 
 // Return a new HttpConfig with the default values filled in
-func (c HttpConfig) Default() *HttpConfig {
-	return &HttpConfig{
+func (c httpConfig) Default() *httpConfig {
+	return &httpConfig{
 		Port:                     7041,
 		ReadTimeout:              15 * time.Second,
 		ReadHeaderTimeout:        15 * time.Second,
@@ -47,16 +47,16 @@ func (c HttpConfig) Default() *HttpConfig {
 	}
 }
 
-type WebSocketConfig struct {
+type webSocketConfig struct {
 	AcceptedSubProtocols []string `yaml:"acceptedSubProtocols"`
 	InsecureSkipVerify   bool     `yaml:"insecureSkipVerify"`
 	OriginPatterns       []string `yaml:"originPatterns"`
 	MaxReadLimit         int32    `yaml:"maxReadLimit"`
 }
 
-// Return a new HttpConfig with the default values filled in
-func (c WebSocketConfig) Default() *WebSocketConfig {
-	return &WebSocketConfig{
+// Return a new webSocketConfig with the default values filled in
+func (c webSocketConfig) Default() *webSocketConfig {
+	return &webSocketConfig{
 		AcceptedSubProtocols: []string{"v12.stomp", "v11.stomp"},
 		InsecureSkipVerify:   true,
 		OriginPatterns:       nil,
@@ -64,22 +64,22 @@ func (c WebSocketConfig) Default() *WebSocketConfig {
 	}
 }
 
-type StompConfig struct {
+type stompConfig struct {
 	Login     string        `yaml:"login"`
 	Password  string        `yaml:"password"`
 	HeartBeat time.Duration `yaml:"heartBeat"`
 }
 
-func (c *StompConfig) Authenticate(login, passcode string) bool {
+func (c *stompConfig) Authenticate(login, passcode string) bool {
 	if c.Login == "" || c.Password == "" {
 		return true
 	}
 	return c.Login == login && c.Password == passcode
 }
 
-// Return a new StompConfig with the default values filled in
-func (c StompConfig) Default() *StompConfig {
-	return &StompConfig{
+// Return a new stompConfig with the default values filled in
+func (c stompConfig) Default() *stompConfig {
+	return &stompConfig{
 		Login:     "",
 		Password:  "",
 		HeartBeat: 15 * time.Second,

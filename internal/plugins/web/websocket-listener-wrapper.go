@@ -21,7 +21,7 @@ type websocketListener struct {
 	lock     *sync.RWMutex
 }
 
-func NewWebSocketListener() (*websocketListener, error) {
+func newWebSocketListener() (*websocketListener, error) {
 	l := &websocketListener{
 		connChan: make(chan net.Conn),
 		closed:   false,
@@ -31,7 +31,7 @@ func NewWebSocketListener() (*websocketListener, error) {
 	return l, nil
 }
 
-func (w *websocketListener) HttpNegotiationHandleFunc(conf *WebSocketConfig) func(writer http.ResponseWriter, request *http.Request) {
+func (w *websocketListener) HttpNegotiationHandleFunc(conf *webSocketConfig) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		w.lock.RLock()
 		if w.closed {

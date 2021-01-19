@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/anthonyraymond/joal-cli/internal/plugins"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
 	"github.com/go-stomp/stomp"
 	stompServer "github.com/go-stomp/stomp/server"
 	"github.com/gorilla/mux"
@@ -21,9 +21,11 @@ import (
 	"time"
 )
 
-type Plugin struct {
+type plugin struct {
 	enabled            bool
-	coreBridge         plugins.ICoreBridge
+	configLoader       *webConfigLoader
+	staticFilesDir     string
+	coreBridge         types.ICoreBridge
 	stompServer        net.Listener
 	stompPublisher     *stomp.Conn
 	coreListener       *appStateCoreListener
@@ -32,11 +34,11 @@ type Plugin struct {
 	unregisterListener func()
 }
 
-func (w *Plugin) Name() string {
+func (w *plugin) Name() string {
 	return "Web UI"
 }
 
-func (w *Plugin) ShouldEnable() bool {
+func ShouldEnablePlugin() bool {
 	for _, arg := range os.Args {
 		if arg == "--no-webui" {
 			return false
@@ -45,31 +47,47 @@ func (w *Plugin) ShouldEnable() bool {
 	return true
 }
 
-func (w *Plugin) Initialize(configFolder string, client *http.Client) error {
+func BootStrap(pluginsRootDir string, coreBridge types.ICoreBridge, client *http.Client) (types.IJoalPlugin, error) {
+	configRoot := filepath.Join(pluginsRootDir, "web")
+
+	p := &plugin{
+		configLoader:       newWebConfigLoader(configRoot),
+		staticFilesDir:     staticFilesDirFromRoot(configRoot),
+		coreBridge:         coreBridge,
+		stompServer:        nil,
+		stompPublisher:     nil,
+		coreListener:       nil,
+		httpServer:         nil,
+		wsListener:         nil,
+		unregisterListener: nil,
+	}
+
+	log := logs.GetLogger().With(zap.String("plugin", p.Name()))
+
+	err := bootstrap(configRoot, client, log)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to bootstrap web plugin")
+	}
+	return p, nil
+}
+
+func (w *plugin) Start() error {
 	log := logs.GetLogger().With(zap.String("plugin", w.Name()))
 
-	configFolder = filepath.Join(configFolder, "web")
-	configLoader, err := NewWebConfigLoader(configFolder, client, log)
+	conf, err := w.configLoader.ReadConfig()
 	if err != nil {
-		w.enabled = false
-		return err
-	}
-	conf, err := configLoader.LoadConfigAndInitIfNeeded()
-	if err != nil {
-		w.enabled = false
 		return err
 	}
 	w.coreListener = &appStateCoreListener{
-		state: State{}.InitialState(),
+		state: state{}.initialState(),
 		lock:  &sync.Mutex{},
 	}
 
 	// Create a listener for the websocket server
 	//  The listener is a faked one, if a client comes to the http websocket negotiation endpoint
 	//  he will be upgraded then be available to the wsListener#Accept() (just like a real net.Listener)
-	wsListener, err := NewWebSocketListener()
+	wsListener, err := newWebSocketListener()
 	if err != nil {
-		w.enabled = false
 		shutdown(w, nil)
 		return errors.Wrap(err, "failed to create web stomp listener")
 	}
@@ -80,16 +98,15 @@ func (w *Plugin) Initialize(configFolder string, client *http.Client) error {
 
 	router := mux.NewRouter()
 	// Register web ui static files endpoint
-	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, staticFilesDir(configFolder))) // TODO: replace with a SPA handler from gorilla/mux documentation
+	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, w.staticFilesDir)) // TODO: replace with a SPA handler from gorilla/mux documentation
 	// Register HTTP API
-	registerApiRoutes(router.PathPrefix(conf.Http.HttpApiUrl).Subrouter(), func() plugins.ICoreBridge { return w.coreBridge }, func() *State { return w.coreListener.state })
+	registerApiRoutes(router.PathPrefix(conf.Http.HttpApiUrl).Subrouter(), func() types.ICoreBridge { return w.coreBridge }, func() *state { return w.coreListener.state })
 	// Register the websocket negotiation endpoint
 	router.HandleFunc(conf.Http.WsNegotiationEndpointUrl, wsListener.HttpNegotiationHandleFunc(conf.WebSocket))
 
 	// Start Http server
 	w.httpServer, err = startHttpServer(router, conf.Http, log)
 	if err != nil {
-		w.enabled = false
 		shutdown(w, nil)
 		return err
 	}
@@ -97,12 +114,10 @@ func (w *Plugin) Initialize(configFolder string, client *http.Client) error {
 	// Create a client connected to our stomp server to be able to dispatch messages
 	stompPublisher, err := createStompPublisher(conf.Http, conf.WebSocket, conf.Stomp)
 	if err != nil {
-		w.enabled = false
 		shutdown(w, nil)
 		return errors.Wrap(err, "failed to create the stomp publisher")
 	}
 
-	w.enabled = true
 	w.stompPublisher = stompPublisher
 	w.coreListener.stompPublisher = stompPublisher
 	w.unregisterListener = broadcast.RegisterListener(w.coreListener)
@@ -110,14 +125,11 @@ func (w *Plugin) Initialize(configFolder string, client *http.Client) error {
 	return nil
 }
 
-func (w *Plugin) AfterCoreLoaded(coreBridge plugins.ICoreBridge) {
+func (w *plugin) AfterCoreLoaded(coreBridge types.ICoreBridge) {
 	w.coreBridge = coreBridge
 }
 
-func (w *Plugin) Shutdown(ctx context.Context) {
-	if !w.enabled {
-		return
-	}
+func (w *plugin) Shutdown(ctx context.Context) {
 	log := logs.GetLogger().With(zap.String("plugin", w.Name()))
 
 	log.Info("Shutting down plugin")
@@ -125,7 +137,7 @@ func (w *Plugin) Shutdown(ctx context.Context) {
 }
 
 // a lock free and nil safe version of Shutdown()
-func shutdown(w *Plugin, ctx context.Context) {
+func shutdown(w *plugin, ctx context.Context) {
 	if ctx == nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -151,7 +163,7 @@ func shutdown(w *Plugin, ctx context.Context) {
 	}
 }
 
-func startHttpServer(httpHandler http.Handler, config *HttpConfig, log *zap.Logger) (*http.Server, error) {
+func startHttpServer(httpHandler http.Handler, config *httpConfig, log *zap.Logger) (*http.Server, error) {
 	// Create a listener for the HTTP server
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
@@ -177,7 +189,7 @@ func startHttpServer(httpHandler http.Handler, config *HttpConfig, log *zap.Logg
 	return server, nil
 }
 
-func startStompServer(config *StompConfig, wsListener net.Listener, log *zap.Logger) {
+func startStompServer(config *stompConfig, wsListener net.Listener, log *zap.Logger) {
 	go func() {
 		err := (&stompServer.Server{
 			Authenticator: config,
@@ -189,7 +201,7 @@ func startStompServer(config *StompConfig, wsListener net.Listener, log *zap.Log
 	}()
 }
 
-func createStompPublisher(httpConf *HttpConfig, wsConfig *WebSocketConfig, stompConfig *StompConfig) (*stomp.Conn, error) {
+func createStompPublisher(httpConf *httpConfig, wsConfig *webSocketConfig, stompConfig *stompConfig) (*stomp.Conn, error) {
 	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", httpConf.Port, httpConf.WsNegotiationEndpointUrl))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
@@ -207,7 +219,7 @@ func createStompPublisher(httpConf *HttpConfig, wsConfig *WebSocketConfig, stomp
 	conn, err := stomp.Connect(
 		websocket.NetConn(context.Background(), c, websocket.MessageText),
 		stomp.ConnOpt.Login(stompConfig.Login, stompConfig.Password),
-		stomp.ConnOpt.Host(negotiationEndpoint.Host), // TODO: this may need an adaptation
+		stomp.ConnOpt.Host(negotiationEndpoint.Host), // FIXME: this may need an adaptation
 		stomp.ConnOpt.HeartBeat(stompConfig.HeartBeat, stompConfig.HeartBeat),
 		stomp.ConnOpt.UseStomp,
 	)

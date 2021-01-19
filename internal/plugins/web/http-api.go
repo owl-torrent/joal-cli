@@ -2,12 +2,12 @@ package web
 
 import (
 	"encoding/json"
-	"github.com/anthonyraymond/joal-cli/internal/plugins"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
 	"github.com/gorilla/mux"
 	"net/http"
 )
 
-func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() plugins.ICoreBridge, getState func() *State) {
+func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreBridge, getState func() *state) {
 	subrouter.HandleFunc("/state", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		err := json.NewEncoder(w).Encode(getState())
@@ -72,7 +72,7 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() plugins.ICor
 			return
 		}
 
-		var userConf *plugins.RuntimeConfig
+		var userConf *types.RuntimeConfig
 		err := json.NewDecoder(r.Body).Decode(userConf)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

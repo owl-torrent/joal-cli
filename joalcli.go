@@ -6,9 +6,8 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 	"github.com/anthonyraymond/joal-cli/internal/plugins"
-	"github.com/anthonyraymond/joal-cli/internal/plugins/web"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"net"
 	"net/http"
 	"os"
@@ -22,27 +21,7 @@ import (
 // torrent base library : https://github.com/anacrolix/torrent
 // especially for bencode and tracker subpackages
 
-var availablePlugins = []plugins.IJoalPlugin{
-	&web.Plugin{},
-}
-
 const configRootFolder = `D:\temp\trash\joaltest`
-
-func getConfigRootFolder() string {
-	configLocation := configRootFolder // TODO: remove me and get from os.args
-	var err error
-	if strings.TrimSpace(configLocation) == "" {
-		configLocation, err = getDefaultConfigFolder()
-		if err != nil {
-			panic(errors.Wrap(err, "failed to resolve default config folder"))
-		}
-	}
-	configLocation, err = filepath.Abs(configLocation)
-	if err != nil {
-		panic(errors.Wrapf(err, "failed to transform '%s' to an absolute path", configLocation))
-	}
-	return configLocation
-}
 
 func main() {
 	defer func() { _ = logs.GetLogger().Sync() }()
@@ -75,35 +54,13 @@ func main() {
 		},
 	}
 
-	log := logs.GetLogger()
-	var enabledPlugins []plugins.IJoalPlugin
-
-	log.Info("evaluate plugins list", zap.Any("available-plugins", pluginListToListOfName(availablePlugins)))
-	for _, p := range availablePlugins {
-		if p.ShouldEnable() {
-			enabledPlugins = append(enabledPlugins, p)
-		}
-	}
-
-	log.Info("plugins list has been initialized", zap.Any("enabled-plugins", pluginListToListOfName(enabledPlugins)))
-
-	for _, p := range enabledPlugins {
-		if err := p.Initialize(filepath.Join(configLocation, "plugins"), httpClient); err != nil {
-			logs.GetLogger().Error("failed to initialize plugin, this plugin will stay off for the rest of the execution", zap.String("plugin", p.Name()), zap.Error(err))
-		}
-	}
-
 	coreConfigLoader, err := core.Bootstrap(filepath.Join(configLocation, "core"), httpClient)
-	if err != nil {
-		panic(err)
-	}
+
+	pluginManager := plugins.NewPluginManager(configLocation, types.NewCoreBridge(coreConfigLoader))
+	pluginManager.BootstrapPlugins(httpClient)
+	pluginManager.StartPlugins()
+
 	manager := seedmanager.NewTorrentManager(coreConfigLoader)
-
-	coreBridge := plugins.NewCoreBridge(manager, coreConfigLoader)
-	for _, p := range enabledPlugins {
-		p.AfterCoreLoaded(coreBridge)
-	}
-
 	err = manager.StartSeeding()
 	if err != nil {
 		panic(err)
@@ -119,17 +76,7 @@ func main() {
 
 	ctxPlugin, cancelPlugin := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelPlugin()
-	for _, p := range enabledPlugins {
-		p.Shutdown(ctxPlugin)
-	}
-}
-
-func pluginListToListOfName(pluginList []plugins.IJoalPlugin) []string {
-	var names []string
-	for _, p := range pluginList {
-		names = append(names, p.Name())
-	}
-	return names
+	pluginManager.ShutdownPlugins(ctxPlugin)
 }
 
 func getDefaultConfigFolder() (string, error) {
@@ -138,4 +85,20 @@ func getDefaultConfigFolder() (string, error) {
 	// Linux   => $XDG_CONFIG_HOME/joal or $HOME/.config/joal
 	dir, err := os.UserConfigDir()
 	return filepath.Join(dir, "joal"), err
+}
+
+func getConfigRootFolder() string {
+	configLocation := configRootFolder // TODO: remove me and get from os.args
+	var err error
+	if strings.TrimSpace(configLocation) == "" {
+		configLocation, err = getDefaultConfigFolder()
+		if err != nil {
+			panic(errors.Wrap(err, "failed to resolve default config folder"))
+		}
+	}
+	configLocation, err = filepath.Abs(configLocation)
+	if err != nil {
+		panic(errors.Wrapf(err, "failed to transform '%s' to an absolute path", configLocation))
+	}
+	return configLocation
 }

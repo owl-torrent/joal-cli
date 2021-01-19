@@ -15,7 +15,7 @@ import (
 const announceHistoryMaxLength = 5
 
 type appStateCoreListener struct {
-	state          *State
+	state          *state
 	lock           *sync.Mutex
 	stompPublisher *stomp.Conn
 }
@@ -26,14 +26,14 @@ func (l *appStateCoreListener) OnSeedStart(event broadcast.SeedStartedEvent) {
 	defer l.lock.Unlock()
 
 	l.state.Started = true
-	l.state.Client = &Client{
+	l.state.Client = &clientState{
 		Name:    event.Client,
 		Version: event.Version,
 	}
 
 	payload := make(map[string]interface{}, 2)
 	payload["started"] = l.state.Started
-	payload["client"] = l.state.Client
+	payload["clientState"] = l.state.Client
 
 	err := sendToStompTopic(l.stompPublisher, "/seed/started", payload)
 	if err != nil {
@@ -46,7 +46,7 @@ func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.state = &State{
+	l.state = &state{
 		Started:   false,
 		Client:    nil,
 		Config:    nil,
@@ -68,9 +68,9 @@ func (l *appStateCoreListener) OnConfigChanged(event broadcast.ConfigChangedEven
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.state.Config = &Config{
+	l.state.Config = &configState{
 		NeedRestartToTakeEffect: event.NeedRestartToTakeEffect,
-		RuntimeConfig: &RuntimeConfig{
+		RuntimeConfig: &runtimeConfigState{
 			MinimumBytesPerSeconds: event.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
 			MaximumBytesPerSeconds: event.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
 			Client:                 event.RuntimeConfig.Client,
@@ -89,23 +89,23 @@ func (l *appStateCoreListener) OnTorrentAdded(event broadcast.TorrentAddedEvent)
 	defer l.lock.Unlock()
 
 	if l.state.Torrents == nil {
-		l.state.Torrents = map[string]*Torrent{}
+		l.state.Torrents = map[string]*torrentState{}
 	}
-	t := &Torrent{
+	t := &torrentState{
 		Infohash: event.Infohash.String(),
 		Name:     event.Name,
 		File:     event.File,
 		Size:     event.Size,
 		Uploaded: 0,
-		Trackers: map[string]*TorrentTrackers{},
+		Trackers: map[string]*torrentTrackersState{},
 	}
 	for _, u := range event.TrackerAnnounceUrls {
 		normalizedUrl := normalizeTrackerAnnounceUrl(u)
-		t.Trackers[normalizedUrl.String()] = &TorrentTrackers{
+		t.Trackers[normalizedUrl.String()] = &torrentTrackersState{
 			Url:             normalizedUrl,
 			IsAnnouncing:    false,
 			InUse:           false,
-			AnnounceHistory: []*AnnounceResult{},
+			AnnounceHistory: []*announceResultState{},
 		}
 	}
 
@@ -157,8 +157,8 @@ func (l *appStateCoreListener) OnTorrentAnnounceSuccess(event broadcast.TorrentA
 	if len(tr.AnnounceHistory) < newLength {
 		newLength = len(tr.AnnounceHistory) + 1
 	}
-	history := make([]*AnnounceResult, newLength)
-	history[0] = &AnnounceResult{
+	history := make([]*announceResultState, newLength)
+	history[0] = &announceResultState{
 		AnnounceEvent: event.AnnounceEvent.String(),
 		WasSuccessful: true,
 		Datetime:      event.Datetime,
@@ -201,8 +201,8 @@ func (l *appStateCoreListener) OnTorrentAnnounceFailed(event broadcast.TorrentAn
 	if len(tr.AnnounceHistory) < newLength {
 		newLength = len(tr.AnnounceHistory) + 1
 	}
-	history := make([]*AnnounceResult, newLength)
-	history[0] = &AnnounceResult{
+	history := make([]*announceResultState, newLength)
+	history[0] = &announceResultState{
 		AnnounceEvent: event.AnnounceEvent.String(),
 		WasSuccessful: false,
 		Datetime:      event.Datetime,
@@ -284,8 +284,8 @@ func (l *appStateCoreListener) OnGlobalBandwidthChanged(event broadcast.GlobalBa
 	defer l.lock.Unlock()
 
 	if l.state.Bandwidth == nil {
-		l.state.Bandwidth = &Bandwidth{
-			Torrents: map[string]*TorrentBandwidth{},
+		l.state.Bandwidth = &bandwidthState{
+			Torrents: map[string]*torrentBandwidthState{},
 		}
 	}
 
@@ -306,13 +306,13 @@ func (l *appStateCoreListener) OnBandwidthWeightHasChanged(event broadcast.Bandw
 	defer l.lock.Unlock()
 
 	if l.state.Bandwidth == nil {
-		l.state.Bandwidth = &Bandwidth{}
+		l.state.Bandwidth = &bandwidthState{}
 	}
 
-	newBandwidthMap := make(map[string]*TorrentBandwidth, len(event.TorrentWeights))
+	newBandwidthMap := make(map[string]*torrentBandwidthState, len(event.TorrentWeights))
 
 	for infohash, weight := range event.TorrentWeights {
-		newBandwidthMap[infohash.String()] = &TorrentBandwidth{
+		newBandwidthMap[infohash.String()] = &torrentBandwidthState{
 			Infohash:           infohash.String(),
 			PercentOfBandwidth: float32(weight) / float32(event.TotalWeight),
 		}

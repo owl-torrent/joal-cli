@@ -1,46 +1,74 @@
 package plugins
 
-/*
 import (
 	"context"
-	"github.com/anthonyraymond/joal-cli/pkg/core/config"
-	"github.com/anthonyraymond/joal-cli/pkg/plugins/web"
+	"github.com/anthonyraymond/joal-cli/internal/core/logs"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
+	"github.com/anthonyraymond/joal-cli/internal/plugins/web"
+	"go.uber.org/zap"
+	"net/http"
+	"path/filepath"
+	"sync"
 )
 
-var allAvailablePlugins = []IJoalPlugin{
-	&web.Plugin{},
-}
-
 type IPluginManager interface {
-	InitializePlugins(ICoreBridge, config.IConfigLoader)
+	BootstrapPlugins(httpClient *http.Client)
+	StartPlugins()
 	ShutdownPlugins(context.Context)
 }
 
 type pluginManager struct {
-	enabledPlugins []IJoalPlugin
+	pluginsRootDir string
+	bridge         types.ICoreBridge
+	enabledPlugins []types.IJoalPlugin
+	lock           *sync.Mutex
 }
 
-func newPluginManager() IPluginManager {
+func NewPluginManager(appRootDir string, coreBridge types.ICoreBridge) IPluginManager {
+
 	pm := &pluginManager{
-		enabledPlugins: []IJoalPlugin{},
+		pluginsRootDir: filepath.Join(appRootDir, "plugins"),
+		bridge:         coreBridge,
+		enabledPlugins: []types.IJoalPlugin{},
+		lock:           &sync.Mutex{},
 	}
 
-	for _, p := range allAvailablePlugins {
-		if p.ShouldEnable() {
-			pm.enabledPlugins = append(pm.enabledPlugins, p)
-		}
-	}
 	return pm
 }
 
-func (p *pluginManager) InitializePlugins(bridge ICoreBridge, loader config.IConfigLoader) {
-	for _, p := range p.enabledPlugins {
-		p.I
+func (pm *pluginManager) BootstrapPlugins(httpClient *http.Client) {
+	log := logs.GetLogger()
+
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
+
+	if web.ShouldEnablePlugin() {
+		p, err := web.BootStrap(pm.pluginsRootDir, pm.bridge, httpClient)
+		if err != nil {
+			log.Warn("Web plugin has failed to bootstrap, it will stay disabled")
+		} else {
+			pm.enabledPlugins = append(pm.enabledPlugins, p)
+			log.Debug("plugin enabled", zap.String("plugin", p.Name()))
+		}
 	}
 }
 
-func (p *pluginManager) ShutdownPlugins(ctx context.Context) {
-	panic("implement me")
+func (pm *pluginManager) StartPlugins() {
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
+	log := logs.GetLogger()
+	for _, plugin := range pm.enabledPlugins {
+		err := plugin.Start()
+		if err != nil {
+			log.Error("plugin has failed to start", zap.String("plugin", plugin.Name()), zap.Error(err))
+		}
+	}
 }
 
-*/
+func (pm *pluginManager) ShutdownPlugins(ctx context.Context) {
+	pm.lock.Lock()
+	defer pm.lock.Unlock()
+
+	// TODO: implement me
+	panic("implement me")
+}
