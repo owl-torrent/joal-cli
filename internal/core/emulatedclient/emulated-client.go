@@ -12,6 +12,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 )
@@ -37,15 +38,15 @@ type EmulatedClient struct {
 	Listener            *Listener                        `yaml:"listener" validate:"required"`
 }
 
-func FromClientFile(path string) (IEmulatedClient, error) {
+func FromClientFile(path string, proxyFunc func(*http.Request) (*url.URL, error)) (IEmulatedClient, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	return FromReader(file)
+	return FromReader(file, proxyFunc)
 }
 
-func FromReader(reader io.Reader) (IEmulatedClient, error) {
+func FromReader(reader io.Reader, proxyFunc func(*http.Request) (*url.URL, error)) (IEmulatedClient, error) {
 	client := EmulatedClient{}
 	err := yaml.NewDecoder(reader).Decode(&client)
 	if err != nil {
@@ -59,7 +60,7 @@ func FromReader(reader io.Reader) (IEmulatedClient, error) {
 		return nil, err
 	}
 
-	err = client.AfterPropertiesSet()
+	err = client.AfterPropertiesSet(proxyFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func FromReader(reader io.Reader) (IEmulatedClient, error) {
 	return &client, nil
 }
 
-func (c *EmulatedClient) AfterPropertiesSet() error {
+func (c *EmulatedClient) AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error {
 	err := c.KeyGenerator.AfterPropertiesSet()
 	if err != nil {
 		return err
@@ -78,7 +79,7 @@ func (c *EmulatedClient) AfterPropertiesSet() error {
 		return err
 	}
 
-	err = c.Announcer.AfterPropertiesSet()
+	err = c.Announcer.AfterPropertiesSet(proxyFunc)
 	if err != nil {
 		return err
 	}

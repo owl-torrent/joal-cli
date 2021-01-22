@@ -6,6 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
+	"net/http"
 	"net/url"
 	"testing"
 )
@@ -29,12 +30,23 @@ announcer:
 	*/
 }
 
-type validAbleAnnouncer struct {
+type validAbleHttpAnnouncer struct {
 	Field string `validate:"required"`
 }
 
-func (a *validAbleAnnouncer) AfterPropertiesSet() error { return nil }
-func (a *validAbleAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (AnnounceResponse, error) {
+func (a *validAbleHttpAnnouncer) AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error {
+	return nil
+}
+func (a *validAbleHttpAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (AnnounceResponse, error) {
+	return AnnounceResponse{}, nil
+}
+
+type validAbleUdpAnnouncer struct {
+	Field string `validate:"required"`
+}
+
+func (a *validAbleUdpAnnouncer) AfterPropertiesSet() error { return nil }
+func (a *validAbleUdpAnnouncer) Announce(url.URL, AnnounceRequest, context.Context) (AnnounceResponse, error) {
 	return AnnounceResponse{}, nil
 }
 
@@ -50,11 +62,11 @@ func TestAnnouncer_ShouldValidate(t *testing.T) {
 		failingTag       string
 		errorDescription testutils.ErrorDescription
 	}{
-		{name: "shouldFailWithInvalidNestedFieldHttp", args: args{Announcer: Announcer{Http: &validAbleAnnouncer{}, Udp: &validAbleAnnouncer{Field: "ok"}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "Announcer.Http.Field", ErrorTag: "required"}},
-		{name: "shouldFailWithInvalidNestedFieldUdp", args: args{Announcer: Announcer{Http: &validAbleAnnouncer{"ok"}, Udp: &validAbleAnnouncer{}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "Announcer.Udp.Field", ErrorTag: "required"}},
+		{name: "shouldFailWithInvalidNestedFieldHttp", args: args{Announcer: Announcer{Http: &validAbleHttpAnnouncer{}, Udp: &validAbleUdpAnnouncer{Field: "ok"}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "Announcer.Http.Field", ErrorTag: "required"}},
+		{name: "shouldFailWithInvalidNestedFieldUdp", args: args{Announcer: Announcer{Http: &validAbleHttpAnnouncer{"ok"}, Udp: &validAbleUdpAnnouncer{}}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "Announcer.Udp.Field", ErrorTag: "required"}},
 		{name: "shouldFailWithNoUdpOrHttp", args: args{Announcer: Announcer{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "Announcer.Http", ErrorTag: "required_without_all"}},
-		{name: "shouldNotFailWithOnlyHttp", args: args{Announcer: Announcer{Http: &validAbleAnnouncer{Field: "ok"}}}, wantErr: false},
-		{name: "shouldNotFailWithOnlyUdp", args: args{Announcer: Announcer{Udp: &validAbleAnnouncer{Field: "ok"}}}, wantErr: false},
+		{name: "shouldNotFailWithOnlyHttp", args: args{Announcer: Announcer{Http: &validAbleHttpAnnouncer{Field: "ok"}}}, wantErr: false},
+		{name: "shouldNotFailWithOnlyUdp", args: args{Announcer: Announcer{Udp: &validAbleUdpAnnouncer{Field: "ok"}}}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,18 +84,33 @@ func TestAnnouncer_ShouldValidate(t *testing.T) {
 	}
 }
 
-type fakeSubAnnouncer struct {
+type fakeSubHttpAnnouncer struct {
 	announce func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
 }
 
-func (f *fakeSubAnnouncer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+func (f *fakeSubHttpAnnouncer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
 	if f.announce != nil {
 		return f.announce(u, announceRequest, ctx)
 	}
 	return AnnounceResponse{}, nil
 }
 
-func (f *fakeSubAnnouncer) AfterPropertiesSet() error {
+func (f *fakeSubHttpAnnouncer) AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error {
+	return nil
+}
+
+type fakeSubUdpAnnouncer struct {
+	announce func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error)
+}
+
+func (f *fakeSubUdpAnnouncer) Announce(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+	if f.announce != nil {
+		return f.announce(u, announceRequest, ctx)
+	}
+	return AnnounceResponse{}, nil
+}
+
+func (f *fakeSubUdpAnnouncer) AfterPropertiesSet() error {
 	return nil
 }
 
@@ -91,14 +118,14 @@ func TestAnnouncer_SelectAnnouncerBasedOnUrlScheme(t *testing.T) {
 	announceDone := 0
 
 	announcer := &Announcer{
-		Http: &fakeSubAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+		Http: &fakeSubHttpAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
 			announceDone++
 			if u.Scheme != "http" && u.Scheme != "https" {
 				t.Fatal("non http scheme url passed to http announcer")
 			}
 			return AnnounceResponse{}, nil
 		}},
-		Udp: &fakeSubAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
+		Udp: &fakeSubUdpAnnouncer{announce: func(u url.URL, announceRequest AnnounceRequest, ctx context.Context) (AnnounceResponse, error) {
 			announceDone++
 			if u.Scheme != "udp" && u.Scheme != "udp4" && u.Scheme != "udp6" {
 				t.Fatal("non udp scheme url passed to udp announcer")
@@ -118,7 +145,7 @@ func TestAnnouncer_SelectAnnouncerBasedOnUrlScheme(t *testing.T) {
 
 func TestAnnouncer_AnnounceHttpWithNilHttpAnnouncer(t *testing.T) {
 	announcer := &Announcer{
-		Udp: &fakeSubAnnouncer{},
+		Udp: &fakeSubUdpAnnouncer{},
 	}
 
 	_, err := announcer.Announce(*testutils.MustParseUrl("http://localhost.fr"), AnnounceRequest{}, context.Background())
@@ -131,7 +158,7 @@ func TestAnnouncer_AnnounceHttpWithNilHttpAnnouncer(t *testing.T) {
 
 func TestAnnouncer_AnnounceUdpWithNilUdpAnnouncer(t *testing.T) {
 	announcer := &Announcer{
-		Http: &fakeSubAnnouncer{},
+		Http: &fakeSubHttpAnnouncer{},
 	}
 
 	_, err := announcer.Announce(*testutils.MustParseUrl("udp://localhost.fr"), AnnounceRequest{}, context.Background())
@@ -144,8 +171,8 @@ func TestAnnouncer_AnnounceUdpWithNilUdpAnnouncer(t *testing.T) {
 
 func TestAnnouncer_AnnounceUnknownScheme(t *testing.T) {
 	announcer := &Announcer{
-		Http: &fakeSubAnnouncer{},
-		Udp:  &fakeSubAnnouncer{},
+		Http: &fakeSubHttpAnnouncer{},
+		Udp:  &fakeSubUdpAnnouncer{},
 	}
 
 	_, err := announcer.Announce(*testutils.MustParseUrl("belozic://localhost.fr"), AnnounceRequest{}, context.Background())

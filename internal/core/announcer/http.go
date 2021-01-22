@@ -21,7 +21,7 @@ import (
 
 type IHttpAnnouncer interface {
 	iAnnouncer
-	AfterPropertiesSet() error
+	AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error
 }
 
 type HttpAnnouncer struct {
@@ -29,14 +29,28 @@ type HttpAnnouncer struct {
 	Query          string                `yaml:"query" validate:"required"`
 	RequestHeaders []HttpRequestHeader   `yaml:"requestHeaders" validate:"dive"`
 	queryTemplate  *template.Template    `yaml:"-"`
+	httpClient     *http.Client          `yaml:"-"`
 }
 
-func (a *HttpAnnouncer) AfterPropertiesSet() error {
+func (a *HttpAnnouncer) AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error {
 	var err error
 
 	a.queryTemplate, err = template.New("httpQueryTemplate").Funcs(TemplateFunctions(&a.UrlEncoder)).Parse(a.Query)
 	if err != nil {
 		return err
+	}
+
+	a.httpClient = &http.Client{
+		Timeout: time.Second * 15,
+		Transport: &http.Transport{
+			Proxy:              proxyFunc,
+			DisableCompression: true, // Disable auto send of Accept-Encoding gzip header. Since the lib dont add the header on it's own we'll have to handle the gzip decompression on our own
+			DialContext: (&net.Dialer{
+				Timeout: 15 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout: 15 * time.Second,
+			//DisableKeepAlives:   true, // see https://github.com/anacrolix/torrent/commit/04ff050ecd5f5beab9b20a0f4170fda1e71062a4
+		},
 	}
 	return nil
 }
@@ -68,18 +82,8 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		zap.Reflect("headers", req.Header),
 		zap.ByteString("infohash", announceRequest.InfoHash[:]),
 	)
-	// TODO: make use of http proxy from AppConfig
-	resp, err := (&http.Client{
-		Timeout: time.Second * 15,
-		Transport: &http.Transport{
-			DisableCompression: true, // Disable auto send of Accept-Encoding gzip header. Since the lib dont add the header on it's own we'll have to handle the gzip decompression on our own
-			DialContext: (&net.Dialer{
-				Timeout: 15 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout: 15 * time.Second,
-			//DisableKeepAlives:   true, // see https://github.com/anacrolix/torrent/commit/04ff050ecd5f5beab9b20a0f4170fda1e71062a4
-		},
-	}).Do(req)
+
+	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		return AnnounceResponse{}, err
 	}

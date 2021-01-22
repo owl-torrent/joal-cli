@@ -64,7 +64,7 @@ func main() {
 	pluginManager.StartPlugins()
 
 	manager := seedmanager.NewTorrentManager(coreConfigLoader)
-	err = manager.StartSeeding()
+	err = manager.StartSeeding(appConfig.Proxy.Proxy())
 	if err != nil {
 		panic(err)
 	}

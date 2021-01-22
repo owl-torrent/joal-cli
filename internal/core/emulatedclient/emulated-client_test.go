@@ -26,7 +26,7 @@ func TestEmulatedClient_Unmarshall(t *testing.T) {
 		t.Fatalf("failed to unmarshall EmulatedClient: %v", err)
 	}
 
-	err = client.AfterPropertiesSet()
+	err = client.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatalf("failed to validate EmulatedClient: %v", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -60,9 +61,9 @@ func (a *Announcer) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-func (a *Announcer) AfterPropertiesSet() error {
+func (a *Announcer) AfterPropertiesSet(proxyFunc func(*http.Request) (*url.URL, error)) error {
 	if a.Http != nil {
-		if err := a.Http.AfterPropertiesSet(); err != nil {
+		if err := a.Http.AfterPropertiesSet(proxyFunc); err != nil {
 			return err
 		}
 	}

@@ -47,7 +47,7 @@ func (b *coreBridge) StartSeeding() error {
 	if b.manager == nil {
 		return fmt.Errorf("torrent manager is not available yet")
 	}
-	return b.manager.StartSeeding()
+	return b.manager.StartSeeding(nil)
 }
 
 func (b *coreBridge) StopSeeding(ctx context.Context) error {

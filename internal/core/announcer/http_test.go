@@ -150,7 +150,7 @@ func TestHttpAnnouncer_AnnounceShouldAnnounce(t *testing.T) {
 		Query:          "info_hash={{urlEncode (byteArray20ToString .InfoHash)}}",
 		RequestHeaders: []HttpRequestHeader{},
 	}
-	err := announcer.AfterPropertiesSet()
+	err := announcer.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestHttpAnnouncer_AnnounceShouldUnderstandAndDecodeGzip(t *testing.T) {
 		Query:          "info_hash={{urlEncode (byteArray20ToString .InfoHash)}}",
 		RequestHeaders: []HttpRequestHeader{{"Accept-Encoding", "gzip"}},
 	}
-	err := announcer.AfterPropertiesSet()
+	err := announcer.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestHttpAnnouncer_Announce_ShouldNotPrefixWithAmpersandIfQueryHasNoValues(t
 		Query:          "info_hash=a",
 		RequestHeaders: []HttpRequestHeader{},
 	}
-	err := announcer.AfterPropertiesSet()
+	err := announcer.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestHttpAnnouncer_Announce_ShouldPrefixWithAmpersandQueryHasValues(t *testi
 		Query:          "info_hash=a",
 		RequestHeaders: []HttpRequestHeader{},
 	}
-	err := announcer.AfterPropertiesSet()
+	err := announcer.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ func TestHttpAnnouncer_Announce_ShouldSendHttpHeaders(t *testing.T) {
 		Query:          "info_hash=a",
 		RequestHeaders: headers,
 	}
-	err := announcer.AfterPropertiesSet()
+	err := announcer.AfterPropertiesSet(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

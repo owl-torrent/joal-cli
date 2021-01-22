@@ -12,6 +12,8 @@ import (
 	"github.com/anthonyraymond/watcher"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"net/http"
+	"net/url"
 	"path/filepath"
 	"sync"
 	"time"
@@ -22,7 +24,7 @@ import (
 // gere les mouvement dans les dossiers
 
 type ITorrentManager interface {
-	StartSeeding() error
+	StartSeeding(proxyFunc func(*http.Request) (*url.URL, error)) error
 	StopSeeding(ctx context.Context)
 	/*UpdateCoreConfig(config *config.RuntimeConfig) (*config.RuntimeConfig, error)
 	RemoveTorrent(infohash torrent.InfoHash) error
@@ -50,7 +52,7 @@ type stoppingRequest struct {
 	doneStopping chan struct{}
 }
 
-func (t *torrentManager) StartSeeding() error {
+func (t *torrentManager) StartSeeding(proxyFunc func(*http.Request) (*url.URL, error)) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.isRunning {
@@ -73,7 +75,7 @@ func (t *torrentManager) StartSeeding() error {
 	if conf.RuntimeConfig.Client == "" {
 		return fmt.Errorf("core config does not contains a client file, please take a look at the documentation")
 	}
-	client, err := emulatedclient.FromClientFile(filepath.Join(conf.ClientsDir, conf.RuntimeConfig.Client))
+	client, err := emulatedclient.FromClientFile(filepath.Join(conf.ClientsDir, conf.RuntimeConfig.Client), proxyFunc)
 	if err != nil {
 		t.isRunning = false
 		return errors.Wrap(err, "failed to load client file")
