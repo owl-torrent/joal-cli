@@ -34,6 +34,9 @@ func (a *KeyGenerator) UnmarshalYAML(value *yaml.Node) error {
 		Name      string                  `yaml:"type"`
 		Algorithm *algorithm.KeyAlgorithm `yaml:"algorithm"`
 	}{}
+	if a.Algorithm != nil {
+		unmarshalStruct.Algorithm = a.Algorithm.(*algorithm.KeyAlgorithm)
+	}
 	err := value.Decode(&unmarshalStruct)
 	if err != nil {
 		return err

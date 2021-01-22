@@ -47,16 +47,23 @@ type Announcer struct {
 
 func (a *Announcer) UnmarshalYAML(value *yaml.Node) error {
 	announcer := &struct {
-		Http HttpAnnouncer `yaml:"http"`
-		// TODO: Udp UdpAnnouncer `yaml:"udp"`
+		Http *HttpAnnouncer `yaml:"http"`
+		// TODO: Udp *UdpAnnouncer `yaml:"udp"`
 	}{}
-	err := value.Decode(&announcer)
+	if a.Http != nil {
+		announcer.Http = a.Http.(*HttpAnnouncer)
+	}
+	// TODO: add UDP
+	/*if a.Udp != nil {
+		announcer.Udp = a.Udp.(*UdpAnnouncer)
+	}*/
+	err := value.Decode(announcer)
 	if err != nil {
 		return err
 	}
 
-	(*a).Http = &announcer.Http
-	//TODO: (*a).Udp = &udp
+	(*a).Http = announcer.Http
+	//TODO: (*a).Udp = announcer.udp
 
 	return nil
 }

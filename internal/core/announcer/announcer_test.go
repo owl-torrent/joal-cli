@@ -2,6 +2,7 @@ package announcer
 
 import (
 	"context"
+	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/casing"
 	"github.com/anthonyraymond/joal-cli/internal/utils/testutils"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
@@ -13,8 +14,8 @@ import (
 
 func TestAnnouncer_ShouldUnmarshal(t *testing.T) {
 	yamlString := `---
-announcer:
-  http:
+http:
+  query: dd
 `
 	// TODO: add UDP
 	announcer := &Announcer{}
@@ -28,6 +29,43 @@ announcer:
 	assert.NotNil(t, announcer.Udp)
 	assert.IsType(t, &UdpAnnouncer{}, announcer.Udp)
 	*/
+}
+
+func TestAnnouncer_ShouldUnmarshalAndBeOverrideable(t *testing.T) {
+	yamlString := `---
+http:
+  urlEncoder:
+    encodedHexCase: upper
+  query: dd
+`
+	// TODO: add UDP
+	announcer := &Announcer{}
+	err := yaml.Unmarshal([]byte(yamlString), announcer)
+	if err != nil {
+		t.Fatalf("Failed to unmarshall: %+v", err)
+	}
+	assert.NotNil(t, announcer.Http)
+	assert.IsType(t, &HttpAnnouncer{}, announcer.Http)
+	assert.Equal(t, announcer.Http.(*HttpAnnouncer).Query, "dd")
+	assert.Equal(t, announcer.Http.(*HttpAnnouncer).UrlEncoder.EncodedHexCase, casing.Upper)
+	/* TODO: Add UDP
+	assert.NotNil(t, announcer.Udp)
+	assert.IsType(t, &UdpAnnouncer{}, announcer.Udp)
+	*/
+
+	yamlString = `---
+http:
+  query: changingTheQueryShouldNotResetOtherFields
+`
+	// unmarshall in the same struct to override some fields but not all
+	err = yaml.Unmarshal([]byte(yamlString), announcer)
+	if err != nil {
+		t.Fatalf("Failed to unmarshall override: %+v", err)
+	}
+	assert.Equal(t, announcer.Http.(*HttpAnnouncer).Query, "changingTheQueryShouldNotResetOtherFields")
+	assert.Equal(t, announcer.Http.(*HttpAnnouncer).UrlEncoder.EncodedHexCase, casing.Upper) // should not have changed
+
+	//TODO: Add UDP
 }
 
 type validAbleHttpAnnouncer struct {
