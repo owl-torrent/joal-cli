@@ -21,7 +21,7 @@ type IEmulatedClient interface {
 	GetName() string
 	GetVersion() string
 	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
-	StartListener() error
+	StartListener(proxyFunc func(*http.Request) (*url.URL, error)) error
 	StopListener(ctx context.Context)
 	CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
 }
@@ -122,8 +122,8 @@ func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torre
 	return c.Announcer.Announce(u, announceRequest, ctx)
 }
 
-func (c *EmulatedClient) StartListener() error {
-	return c.Listener.Start()
+func (c *EmulatedClient) StartListener(proxyFunc func(*http.Request) (*url.URL, error)) error {
+	return c.Listener.Start(proxyFunc)
 }
 
 func (c *EmulatedClient) StopListener(ctx context.Context) {

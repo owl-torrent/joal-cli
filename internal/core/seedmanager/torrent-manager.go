@@ -80,7 +80,7 @@ func (t *torrentManager) StartSeeding(proxyFunc func(*http.Request) (*url.URL, e
 		t.isRunning = false
 		return errors.Wrap(err, "failed to load client file")
 	}
-	err = client.StartListener()
+	err = client.StartListener(proxyFunc)
 	if err != nil {
 		t.isRunning = false
 		return errors.Wrap(err, "failed to start listener")

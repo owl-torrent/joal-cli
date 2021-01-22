@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"reflect"
 	"sort"
@@ -90,7 +91,7 @@ func (c *fakeEmulatedClient) Announce(ctx context.Context, u url.URL, infoHash t
 	return announcer.AnnounceResponse{}, nil
 }
 
-func (c *fakeEmulatedClient) StartListener() error {
+func (c *fakeEmulatedClient) StartListener(_ func(*http.Request) (*url.URL, error)) error {
 	if c.startListener != nil {
 		return c.startListener()
 	}

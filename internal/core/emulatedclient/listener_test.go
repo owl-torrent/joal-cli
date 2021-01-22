@@ -69,7 +69,7 @@ func TestListener_Start(t *testing.T) {
 
 	publicIpProviders = []string{s.URL}
 
-	err := listener.Start()
+	err := listener.Start(nil)
 	if err != nil {
 		t.Fatalf("failed to get public ip: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestListener_getPublicIpShouldFallbackThroughUrl(t *testing.T) {
 
 	publicIpProviders = []string{failingServ.URL, s.URL}
 
-	err := listener.Start()
+	err := listener.Start(nil)
 	if err != nil {
 		t.Fatalf("failed to get public ip: %v", err)
 	}

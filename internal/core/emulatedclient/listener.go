@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -27,9 +28,9 @@ func (l *Listener) AfterPropertiesSet() error {
 }
 
 // Blocking call until the listener is ready and public ip is retrieved.
-func (l *Listener) Start() error {
+func (l *Listener) Start(proxyFunc func(*http.Request) (*url.URL, error)) error {
 	log := logs.GetLogger()
-	ip, err := getPublicIp()
+	ip, err := getPublicIp(proxyFunc)
 	if err != nil {
 		return err
 	}
@@ -67,10 +68,21 @@ var publicIpProviders = []string{
 }
 
 // may be an ipv4 or ipv6
-func getPublicIp() (net.IP, error) {
+func getPublicIp(proxyFunc func(*http.Request) (*url.URL, error)) (net.IP, error) {
 	for _, providerUri := range publicIpProviders {
-		// TODO: make use of http proxy from AppConfig
-		client := &http.Client{Timeout: 10 * time.Second}
+		client := &http.Client{
+			Transport: &http.Transport{
+				Proxy: proxyFunc,
+				DialContext: (&net.Dialer{
+					Timeout: 10 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout:   10 * time.Second,
+				DisableKeepAlives:     true, // no need to jeep connection opened
+				IdleConnTimeout:       10 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		}
 		req, err := http.NewRequest("GET", providerUri, nil)
 		if err != nil {
 			// TODO: log error
