@@ -69,6 +69,14 @@ func (pm *pluginManager) ShutdownPlugins(ctx context.Context) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 
-	// TODO: implement me
-	panic("implement me")
+	wg := &sync.WaitGroup{}
+	for _, plugin := range pm.enabledPlugins {
+		wg.Add(1)
+		go func(plugin types.IJoalPlugin) {
+			defer wg.Done()
+			plugin.Shutdown(ctx)
+		}(plugin)
+	}
+
+	wg.Wait()
 }
