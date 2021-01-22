@@ -61,7 +61,6 @@ func (t *torrentManager) StartSeeding(proxyFunc func(*http.Request) (*url.URL, e
 	t.isRunning = true
 
 	log := logs.GetLogger()
-	// TODO: Now that i used it, i feel like the configLoader should not init the config folder structure. It should be another part of the program that handles that.
 	conf, err := t.configLoader.ReadConfig()
 	if err != nil {
 		t.isRunning = false
