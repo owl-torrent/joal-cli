@@ -4,17 +4,23 @@ import "C"
 import (
 	"context"
 	"fmt"
+	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
+	"github.com/pkg/errors"
+	"io"
+	"os"
+	"path/filepath"
 )
 
 type ICoreBridge interface {
 	StartSeeding() error
 	StopSeeding(ctx context.Context) error
-	GetCoreConfig() (*Config, error)
-	UpdateCoreConfig(config *RuntimeConfig) (*Config, error)
-	RemoveTorrent(infohash string) error
-	AddTorrent(file []byte) error
+	GetCoreConfig() (*RuntimeConfig, error)
+	UpdateCoreConfig(config *RuntimeConfig) (*RuntimeConfig, error)
+	AddTorrent(filename string, r io.Reader) error
+	RemoveTorrent(infohash torrent.InfoHash) error
 }
 
 type Config struct {
@@ -59,7 +65,7 @@ func (b *coreBridge) StopSeeding(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (b *coreBridge) GetCoreConfig() (*Config, error) {
+func (b *coreBridge) GetCoreConfig() (*RuntimeConfig, error) {
 	if b.manager == nil {
 		return nil, fmt.Errorf("torrent manager is not available yet")
 	}
@@ -68,17 +74,14 @@ func (b *coreBridge) GetCoreConfig() (*Config, error) {
 		return nil, err
 	}
 
-	return &Config{
-		NeedRestartToTakeEffect: true, // TODO: this should come back from the configloader and not being a fixed value
-		RuntimeConfig: &RuntimeConfig{
-			MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
-			MaximumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
-			Client:                 conf.RuntimeConfig.Client,
-		},
+	return &RuntimeConfig{
+		MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
+		MaximumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
+		Client:                 conf.RuntimeConfig.Client,
 	}, nil
 }
 
-func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
+func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*RuntimeConfig, error) {
 	if b.manager == nil {
 		return nil, fmt.Errorf("torrent manager is not available yet")
 	}
@@ -95,28 +98,45 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*Config, error) {
 		return nil, err
 	}
 
-	return &Config{
-		NeedRestartToTakeEffect: true, // TODO: this should come back from the configloader and not being a fixed value
-		RuntimeConfig: &RuntimeConfig{
-			MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
-			MaximumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
-			Client:                 conf.RuntimeConfig.Client,
-		},
+	return &RuntimeConfig{
+		MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,
+		MaximumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MaximumBytesPerSeconds,
+		Client:                 conf.RuntimeConfig.Client,
 	}, nil
 }
 
-func (b *coreBridge) AddTorrent(file []byte) error {
-	if b.manager == nil {
-		return fmt.Errorf("torrent manager is not available yet")
+func (b *coreBridge) AddTorrent(filename string, r io.Reader) error {
+	meta, err := metainfo.Load(r)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse torrent file")
 	}
-	// TODO: implement
-	panic("implement me")
+
+	config, err := b.configLoader.ReadConfig()
+	if err != nil {
+		return errors.Wrap(err, "failed to read config file")
+	}
+	if filepath.Ext(filename) != ".torrent" {
+		filename += ".torrent"
+	}
+
+	filename = filepath.Join(config.TorrentsDir, filename)
+	w, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open file '%s' for writing", filename)
+	}
+
+	err = meta.Write(w)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write to file '%s'", filename)
+	}
+
+	return nil
 }
 
-func (b *coreBridge) RemoveTorrent(infohash string) error {
+func (b *coreBridge) RemoveTorrent(infohash torrent.InfoHash) error {
 	if b.manager == nil {
 		return fmt.Errorf("torrent manager is not available yet")
 	}
-	// TODO: implement
-	panic("implement me")
+
+	return b.manager.RemoveTorrent(infohash)
 }

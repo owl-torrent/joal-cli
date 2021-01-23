@@ -3,6 +3,7 @@ package seedmanager
 import (
 	"context"
 	"fmt"
+	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/bandwidth"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
@@ -14,28 +15,24 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
 )
 
-// prend un objet JoalConfig (une struct qui contient la liste des fichiers clients (et leurs path), la liste des torrents, la liste des torrents archivés, la runtime config etc...
-
-// gere les mouvement dans les dossiers
-
 type ITorrentManager interface {
 	StartSeeding(proxyFunc func(*http.Request) (*url.URL, error)) error
 	StopSeeding(ctx context.Context)
-	/*UpdateCoreConfig(config *config.RuntimeConfig) (*config.RuntimeConfig, error)
-	RemoveTorrent(infohash torrent.InfoHash) error
-	AddTorrent(file []byte) error*/
+	RemoveTorrent(infoHash torrent.InfoHash) error
 }
 
 type torrentManager struct {
-	lock         *sync.Mutex
-	isRunning    bool
-	configLoader *core.CoreConfigLoader
-	stopping     chan *stoppingRequest
+	lock                 *sync.Mutex
+	isRunning            bool
+	configLoader         *core.CoreConfigLoader
+	moveTorrentToArchive func(infoHash torrent.InfoHash) error
+	stopping             chan *stoppingRequest
 }
 
 func NewTorrentManager(configLoader *core.CoreConfigLoader) ITorrentManager {
@@ -89,6 +86,19 @@ func (t *torrentManager) StartSeeding(proxyFunc func(*http.Request) (*url.URL, e
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter())
 	_ = torrentFileWatcher.Add(conf.TorrentsDir)
+
+	t.moveTorrentToArchive = func(infoHash torrent.InfoHash) error {
+		for torrentPath, t := range torrents {
+			if t.InfoHash().String() == infoHash.String() {
+				err := os.Rename(torrentPath, filepath.Join(conf.ArchivedTorrentsDir, filepath.Base(torrentPath)))
+				if err != nil {
+					return errors.Wrap(err, "faield to move file to archived folder")
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("torrent was not found in seeding list")
+	}
 
 	go func() {
 		claimerPool := bandwidth.NewWeightedClaimerPool()
@@ -168,6 +178,7 @@ func (t *torrentManager) StartSeeding(proxyFunc func(*http.Request) (*url.URL, e
 
 				client.StopListener(stopRequest.ctx)
 				dispatcher.Stop()
+				t.moveTorrentToArchive = nil
 
 				doneAnnouncingStop := make(chan struct{})
 				go func() {
@@ -221,4 +232,14 @@ func (t *torrentManager) StopSeeding(ctx context.Context) {
 
 	<-stopRequest.doneStopping
 	log.Info("torrent manager: stopped")
+}
+
+func (t *torrentManager) RemoveTorrent(infoHash torrent.InfoHash) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	if t.moveTorrentToArchive != nil {
+		return t.moveTorrentToArchive(infoHash)
+	}
+	return nil
 }
