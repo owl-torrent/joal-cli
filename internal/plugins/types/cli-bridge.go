@@ -10,6 +10,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 	"github.com/pkg/errors"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -21,6 +22,7 @@ type ICoreBridge interface {
 	UpdateCoreConfig(config *RuntimeConfig) (*RuntimeConfig, error)
 	AddTorrent(filename string, r io.Reader) error
 	RemoveTorrent(infohash torrent.InfoHash) error
+	ListClientFiles() ([]string, error)
 }
 
 type Config struct {
@@ -139,4 +141,29 @@ func (b *coreBridge) RemoveTorrent(infohash torrent.InfoHash) error {
 	}
 
 	return b.manager.RemoveTorrent(infohash)
+}
+
+func (b *coreBridge) ListClientFiles() ([]string, error) {
+	config, err := b.configLoader.ReadConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read config file")
+	}
+
+	files, err := ioutil.ReadDir(config.ClientsDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list '%s' directory", config.ClientsDir)
+	}
+
+	var clients []string
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		ext := filepath.Ext(file.Name())
+		if ext != "yml" && ext != "yaml" {
+			continue
+		}
+		clients = append(clients, file.Name())
+	}
+	return clients, nil
 }

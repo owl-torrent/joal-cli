@@ -78,7 +78,7 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreB
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		conf, err := bridge.UpdateCoreConfig(userConf)
 		if err != nil {
@@ -94,4 +94,46 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreB
 		}
 	}).Methods(http.MethodPut)
 
+	subrouter.HandleFunc("/torrent", func(w http.ResponseWriter, r *http.Request) {
+		bridge := getBridgeOrNil()
+		if bridge == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		// TODO: implement
+		w.WriteHeader(http.StatusTeapot)
+	}).Methods(http.MethodPost)
+
+	subrouter.HandleFunc("/torrent", func(w http.ResponseWriter, r *http.Request) {
+		bridge := getBridgeOrNil()
+		if bridge == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		// TODO: implement
+		w.WriteHeader(http.StatusTeapot)
+	}).Methods(http.MethodDelete)
+
+	subrouter.HandleFunc("/clients/all", func(w http.ResponseWriter, r *http.Request) {
+		bridge := getBridgeOrNil()
+		if bridge == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		clients, err := bridge.ListClientFiles()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(clients)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}).Methods(http.MethodGet)
 }
