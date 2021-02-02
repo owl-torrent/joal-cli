@@ -222,7 +222,7 @@ Endpoint to upload a torrent
 | file  | the .torrent file |
 
 #### Return
-`HTTP 200`
+`HTTP 201`
 
 --- 
 
@@ -238,7 +238,7 @@ Endpoint to remove a torrent
 | infohash  | torrent infohash (base64 encoded) |
 
 #### Return
-`HTTP 200`
+`HTTP 204`
 
 
 ---

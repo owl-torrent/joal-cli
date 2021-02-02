@@ -2,9 +2,11 @@ package web
 
 import (
 	"encoding/json"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
 	"github.com/gorilla/mux"
 	"net/http"
+	"path/filepath"
 )
 
 func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreBridge, getState func() *state) {
@@ -101,8 +103,30 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreB
 			return
 		}
 
-		// TODO: implement
-		w.WriteHeader(http.StatusTeapot)
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer func() { _ = file.Close() }()
+		if header == nil || len(header.Filename) == 0 {
+			http.Error(w, "filename is required in multipart 'Content-Disposition' header", http.StatusBadRequest)
+			return
+		}
+		filename := filepath.Base(filepath.Clean(header.Filename))
+		if filepath.Base(filename) == "." || filepath.Base(filename) == ".." || filepath.Base(filename) == "/" || filepath.Dir(filename) != "." {
+			// try to upload a file with a weird file name
+			http.Error(w, "", http.StatusBadRequest)
+			return
+		}
+
+		err = bridge.AddTorrent(filename, file)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
 	}).Methods(http.MethodPost)
 
 	subrouter.HandleFunc("/torrent", func(w http.ResponseWriter, r *http.Request) {
@@ -112,8 +136,24 @@ func registerApiRoutes(subrouter *mux.Router, getBridgeOrNil func() types.ICoreB
 			return
 		}
 
-		// TODO: implement
-		w.WriteHeader(http.StatusTeapot)
+		param := r.URL.Query().Get("infohash")
+		if param == "" {
+			http.Error(w, "'infohash' query param is required", http.StatusBadRequest)
+			return
+		}
+		infohash := metainfo.Hash{}
+		err := infohash.FromHexString(param)
+		if err != nil {
+			http.Error(w, "failed to parse infohash", http.StatusBadRequest)
+			return
+		}
+
+		err = bridge.RemoveTorrent(infohash)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}).Methods(http.MethodDelete)
 
 	subrouter.HandleFunc("/clients/all", func(w http.ResponseWriter, r *http.Request) {
