@@ -7,6 +7,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/core"
+	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
 	"github.com/pkg/errors"
 	"io"
@@ -99,6 +100,10 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*RuntimeConfig, e
 	if err != nil {
 		return nil, err
 	}
+	broadcast.EmitConfigChanged(broadcast.ConfigChangedEvent{
+		NeedRestartToTakeEffect: true,
+		RuntimeConfig:           conf.RuntimeConfig,
+	})
 
 	return &RuntimeConfig{
 		MinimumBytesPerSeconds: conf.RuntimeConfig.BandwidthConfig.Speed.MinimumBytesPerSeconds,

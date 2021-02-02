@@ -2,7 +2,6 @@ package core
 
 import (
 	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
-	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/pkg/errors"
 )
 
@@ -39,15 +38,10 @@ func (l *CoreConfigLoader) ReadConfig() (*JoalConfig, error) {
 
 // the boolean is true if joal needs to be restarted in order for the config to apply
 func (l *CoreConfigLoader) SaveConfigToFile(newConf *RuntimeConfig) error {
-
 	err := configloader.SaveToFile(l.configFilePath, newConf)
 	if err != nil {
 		return errors.Wrap(err, "failed to save RuntimeConfig")
 	}
 
-	broadcast.EmitConfigChanged(broadcast.ConfigChangedEvent{
-		NeedRestartToTakeEffect: true,
-		RuntimeConfig:           newConf,
-	})
 	return nil
 }
