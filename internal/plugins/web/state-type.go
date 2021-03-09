@@ -6,7 +6,7 @@ import (
 )
 
 type state struct {
-	Started   bool                     `json:"started"`
+	Global    *globalState             `json:"global"`
 	Client    *clientState             `json:"client"`
 	Config    *configState             `json:"config"`
 	Torrents  map[string]*torrentState `json:"torrents"`
@@ -15,8 +15,14 @@ type state struct {
 
 func (s state) initialState() *state {
 	return &state{
-		Started: false,
+		Global: &globalState{
+			Started: false,
+		},
 	}
+}
+
+type globalState struct {
+	Started bool `json:"started"`
 }
 
 type clientState struct {

@@ -10,7 +10,9 @@ Endpoint to get the current state of the application
 `HTTP 200`
 ```json
 {
-  "started": "true",
+  "global": {
+    "started": "true"
+  },
   "client": {
     "name": "qBittorrent",
     "version": "4.1.0"
@@ -246,9 +248,12 @@ Endpoint to remove a torrent
 # Events from Server to JOAL-ui
 
 ### Seed has started
+
 ```json
 {
-  "started": "true",
+  "global": {
+    "started": "true"
+  },
   "client": {
     "name": "qBittorrent",
     "version": "4.1.0"
@@ -259,7 +264,7 @@ Endpoint to remove a torrent
 ### Seed has stopped
 ```json
 {
-  "started": "stopped"
+  "started": "false"
 }
 ```
 

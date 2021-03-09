@@ -25,14 +25,14 @@ func (l *appStateCoreListener) OnSeedStart(event broadcast.SeedStartedEvent) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.state.Started = true
+	l.state.Global = &globalState{Started: true}
 	l.state.Client = &clientState{
 		Name:    event.Client,
 		Version: event.Version,
 	}
 
 	payload := make(map[string]interface{}, 2)
-	payload["started"] = l.state.Started
+	payload["global"] = l.state.Global
 	payload["clientState"] = l.state.Client
 
 	err := sendToStompTopic(l.stompPublisher, "/seed/started", payload)
@@ -47,17 +47,13 @@ func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 	defer l.lock.Unlock()
 
 	l.state = &state{
-		Started:   false,
 		Client:    nil,
 		Config:    nil,
 		Torrents:  nil,
 		Bandwidth: nil,
 	}
 
-	payload := make(map[string]interface{}, 2)
-	payload["started"] = l.state.Started
-
-	err := sendToStompTopic(l.stompPublisher, "/seed/stopped", payload)
+	err := sendToStompTopic(l.stompPublisher, "/seed/stopped", l.state.Global)
 	if err != nil {
 		log.Error("Failed to send onSeedStop stomp message", zap.Error(err))
 	}
