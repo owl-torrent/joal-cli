@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -22,6 +24,7 @@ func (c webConfig) Default() *webConfig {
 
 type httpConfig struct {
 	Port                     int           `yaml:"port"`
+	SecretPathPrefix         string        `yaml:"secretPathPrefix"`
 	ReadTimeout              time.Duration `yaml:"readTimeout"`
 	ReadHeaderTimeout        time.Duration `yaml:"readHeaderTimeout"`
 	WriteTimeout             time.Duration `yaml:"writeTimeout"`
@@ -36,6 +39,7 @@ type httpConfig struct {
 func (c httpConfig) Default() *httpConfig {
 	return &httpConfig{
 		Port:                     7041,
+		SecretPathPrefix:         "/secret-path-prefix",
 		ReadTimeout:              15 * time.Second,
 		ReadHeaderTimeout:        15 * time.Second,
 		WriteTimeout:             15 * time.Second,
@@ -45,6 +49,16 @@ func (c httpConfig) Default() *httpConfig {
 		HttpApiUrl:               "/api",
 		WsNegotiationEndpointUrl: "/ws",
 	}
+}
+
+func (c *httpConfig) withSecretPathPrefix(path string) string {
+	if c.SecretPathPrefix == "" {
+		return path
+	}
+	if strings.HasPrefix(c.SecretPathPrefix, "/") {
+		return fmt.Sprintf("%s%s", c.SecretPathPrefix, path)
+	}
+	return fmt.Sprintf("/%s%s", c.SecretPathPrefix, path)
 }
 
 type webSocketConfig struct {

@@ -5,7 +5,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/go-stomp/stomp"
+	"github.com/go-stomp/stomp/v3"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/url"
@@ -233,7 +233,7 @@ func (l *appStateCoreListener) OnTorrentSwarmChanged(event broadcast.TorrentSwar
 	t.Seeders = event.Seeder
 	t.Leechers = event.Leechers
 
-	err := sendToStompTopic(l.stompPublisher, "/torrent/changed", t)
+	err := sendToStompTopic(l.stompPublisher, "/torrents/changed", t)
 	if err != nil {
 		log.Error("Failed to send onTorrentSwarmChanged stomp message", zap.Error(err))
 	}
@@ -253,7 +253,7 @@ func (l *appStateCoreListener) OnTorrentRemoved(event broadcast.TorrentRemovedEv
 	payload := map[string]string{}
 	payload["infohash"] = event.Infohash.String()
 
-	err := sendToStompTopic(l.stompPublisher, "/torrent/removed", payload)
+	err := sendToStompTopic(l.stompPublisher, "/torrents/removed", payload)
 	if err != nil {
 		log.Error("Failed to send onTorrentRemoved stomp message", zap.Error(err))
 	}

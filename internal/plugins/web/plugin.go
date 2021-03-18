@@ -6,8 +6,8 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
-	"github.com/go-stomp/stomp"
-	stompServer "github.com/go-stomp/stomp/server"
+	"github.com/go-stomp/stomp/v3"
+	stompServer "github.com/go-stomp/stomp/v3/server"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -97,11 +97,11 @@ func (w *plugin) Start() error {
 
 	router := mux.NewRouter()
 	// Register web ui static files endpoint
-	router.Handle(conf.Http.WebUiUrl, webUiStaticFilesHandler(conf.Http.WebUiUrl, w.staticFilesDir)) // TODO: replace with a SPA handler from gorilla/mux documentation
+	router.Handle(conf.Http.withSecretPathPrefix(conf.Http.WebUiUrl), webUiStaticFilesHandler(conf.Http.WebUiUrl, w.staticFilesDir)) // TODO: replace with a SPA handler from gorilla/mux documentation
 	// Register HTTP API
-	registerApiRoutes(router.PathPrefix(conf.Http.HttpApiUrl).Subrouter(), func() types.ICoreBridge { return w.coreBridge }, func() *state { return w.coreListener.state })
+	registerApiRoutes(router.PathPrefix(conf.Http.withSecretPathPrefix(conf.Http.HttpApiUrl)).Subrouter(), func() types.ICoreBridge { return w.coreBridge }, func() *state { return w.coreListener.state })
 	// Register the websocket negotiation endpoint
-	router.HandleFunc(conf.Http.WsNegotiationEndpointUrl, wsListener.HttpNegotiationHandleFunc(conf.WebSocket))
+	router.HandleFunc(conf.Http.withSecretPathPrefix(conf.Http.WsNegotiationEndpointUrl), wsListener.HttpNegotiationHandleFunc(conf.WebSocket))
 
 	// Start Http server
 	w.httpServer, err = startHttpServer(router, conf.Http, log)
@@ -201,7 +201,7 @@ func startStompServer(config *stompConfig, wsListener net.Listener, log *zap.Log
 }
 
 func createStompPublisher(httpConf *httpConfig, wsConfig *webSocketConfig, stompConfig *stompConfig) (*stomp.Conn, error) {
-	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", httpConf.Port, httpConf.WsNegotiationEndpointUrl))
+	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", httpConf.Port, httpConf.withSecretPathPrefix(httpConf.WsNegotiationEndpointUrl)))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
 	}

@@ -155,12 +155,9 @@ Endpoint to get the current app configuration
 `HTTP 200`
 ```json
 {
-  "needRestartToTakeEffect": false,
-  "runtimeConfig": {
-    "minimumBytesPerSeconds": 50,
-    "maximumBytesPerSeconds": 250,
-    "client": "qBittorrent-4.1.0"
-  }
+"minimumBytesPerSeconds": 50,
+"maximumBytesPerSeconds": 250,
+"client": "qBittorrent-4.1.0"
 }
 ```
 
@@ -185,7 +182,9 @@ Endpoint to stop change update the app configuration
 `HTTP 200`
 ```json
 {
-  "needRestartToTakeEffect": true
+  "minimumBytesPerSeconds": 50,
+  "maximumBytesPerSeconds": 250,
+  "client": "qBittorrent-4.1.0"
 }
 ```
 
