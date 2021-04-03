@@ -19,6 +19,7 @@ require (
 	github.com/nvn1729/congo v0.0.0-20180622025223-f8763bd071bc
 	github.com/pion/rtp v1.6.2 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/ulikunitz/xz v0.5.8 // indirect
 	go.uber.org/multierr v1.6.0 // indirect

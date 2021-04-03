@@ -10,6 +10,7 @@ import (
 	stompServer "github.com/go-stomp/stomp/v3/server"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"net"
 	"net/http"
@@ -103,8 +104,14 @@ func (w *plugin) Start() error {
 	// Register the websocket negotiation endpoint
 	router.HandleFunc(conf.Http.withSecretPathPrefix(conf.Http.WsNegotiationEndpointUrl), wsListener.HttpNegotiationHandleFunc(conf.WebSocket))
 
+	// TODO: move cors somewhere else (maybe in startHttpServer), and move params in config
+	handler := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{http.MethodOptions, http.MethodGet, http.MethodPost, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodConnect, http.MethodHead, http.MethodTrace},
+		Debug:          false,
+	}).Handler(router)
 	// Start Http server
-	w.httpServer, err = startHttpServer(router, conf.Http, log)
+	w.httpServer, err = startHttpServer(handler, conf.Http, log)
 	if err != nil {
 		shutdown(w, nil)
 		return err

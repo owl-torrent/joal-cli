@@ -42,14 +42,11 @@ type coreBridge struct {
 	configLoader *core.CoreConfigLoader
 }
 
-func NewCoreBridge(loader *core.CoreConfigLoader) ICoreBridge {
+func NewCoreBridge(loader *core.CoreConfigLoader, manager seedmanager.ITorrentManager) ICoreBridge {
 	return &coreBridge{
+		manager:      manager,
 		configLoader: loader,
 	}
-}
-
-func (b *coreBridge) SetTorrentManager(manager seedmanager.ITorrentManager) {
-	b.manager = manager
 }
 
 func (b *coreBridge) StartSeeding() error {

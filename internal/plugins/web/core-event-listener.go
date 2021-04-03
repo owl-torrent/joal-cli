@@ -47,6 +47,7 @@ func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 	defer l.lock.Unlock()
 
 	l.state = &state{
+		Global:    &globalState{Started: false},
 		Client:    nil,
 		Config:    nil,
 		Torrents:  nil,

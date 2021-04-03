@@ -59,11 +59,12 @@ func main() {
 		panic(err)
 	}
 
-	pluginManager := plugins.NewPluginManager(configLocation, types.NewCoreBridge(coreConfigLoader))
+	manager := seedmanager.NewTorrentManager(coreConfigLoader)
+	bridge := types.NewCoreBridge(coreConfigLoader, manager)
+	pluginManager := plugins.NewPluginManager(configLocation, bridge)
 	pluginManager.BootstrapPlugins(httpClient)
 	pluginManager.StartPlugins()
 
-	manager := seedmanager.NewTorrentManager(coreConfigLoader)
 	err = manager.StartSeeding(appConfig.Proxy.Proxy())
 	if err != nil {
 		panic(err)
