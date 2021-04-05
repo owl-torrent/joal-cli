@@ -7,7 +7,6 @@ import (
 
 type state struct {
 	Global    *globalState             `json:"global"`
-	Client    *clientState             `json:"client"`
 	Config    *configState             `json:"config"`
 	Torrents  map[string]*torrentState `json:"torrents"`
 	Bandwidth *bandwidthState          `json:"bandwidth"`
@@ -21,13 +20,14 @@ func (s state) initialState() *state {
 	}
 }
 
-type globalState struct {
-	Started bool `json:"started"`
-}
-
 type clientState struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+}
+
+type globalState struct {
+	Started bool         `json:"started"`
+	Client  *clientState `json:"client"`
 }
 
 type configState struct {
@@ -73,7 +73,7 @@ type announceResultState struct {
 }
 
 type bandwidthState struct {
-	CurrentBandwidth int64                             `json:"current_bandwidth"`
+	CurrentBandwidth int64                             `json:"currentBandwidth"`
 	Torrents         map[string]*torrentBandwidthState `json:"torrents"`
 }
 

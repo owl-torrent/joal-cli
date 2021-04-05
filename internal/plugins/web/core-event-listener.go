@@ -20,22 +20,45 @@ type appStateCoreListener struct {
 	stompPublisher *stomp.Conn
 }
 
+type stompPayload struct {
+	Type    stompType   `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+type stompType string
+
+const StompMessageDestination = "/joal-core-events"
+
+const StompTypePrefix = "@STOMP_API"
+const (
+	SeedStartedStompType                  stompType = StompTypePrefix + "/SEED/STOPPED"
+	SeedStopStompType                               = StompTypePrefix + "/SEED/STOPPED"
+	ConfigChangedStompType                          = StompTypePrefix + "/CONFIG/CHANGED"
+	TorrentAddedStompType                           = StompTypePrefix + "/TORRENT/ADDED"
+	TorrentChangedStompType                         = StompTypePrefix + "/TORRENT/CHANGED"
+	TorrentRemovedStompType                         = StompTypePrefix + "/TORRENT/REMOVED"
+	BandwidthRangeChangedStompType                  = StompTypePrefix + "/BANDWIDTH/RANGE_CHANGED"
+	BandwidthDistributionChangedStompType           = StompTypePrefix + "/BANDWIDTH/DISTRIBUTION_CHANGED"
+	ErrorUnexpectedStompType                        = StompTypePrefix + "/UNEXPECTED_ERROR"
+)
+
 func (l *appStateCoreListener) OnSeedStart(event broadcast.SeedStartedEvent) {
 	log := logs.GetLogger()
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	l.state.Global = &globalState{Started: true}
-	l.state.Client = &clientState{
-		Name:    event.Client,
-		Version: event.Version,
+	l.state.Global = &globalState{
+		Started: true,
+		Client: &clientState{
+			Name:    event.Client,
+			Version: event.Version,
+		},
 	}
 
-	payload := make(map[string]interface{}, 2)
-	payload["global"] = l.state.Global
-	payload["clientState"] = l.state.Client
-
-	err := sendToStompTopic(l.stompPublisher, "/seed/started", payload)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    SeedStartedStompType,
+		Payload: l.state.Global,
+	})
 	if err != nil {
 		log.Error("Failed to send onSeedStart stomp message", zap.Error(err))
 	}
@@ -48,13 +71,15 @@ func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 
 	l.state = &state{
 		Global:    &globalState{Started: false},
-		Client:    nil,
 		Config:    nil,
 		Torrents:  nil,
 		Bandwidth: nil,
 	}
 
-	err := sendToStompTopic(l.stompPublisher, "/seed/stopped", l.state.Global)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    SeedStopStompType,
+		Payload: l.state.Global,
+	})
 	if err != nil {
 		log.Error("Failed to send onSeedStop stomp message", zap.Error(err))
 	}
@@ -74,7 +99,10 @@ func (l *appStateCoreListener) OnConfigChanged(event broadcast.ConfigChangedEven
 		},
 	}
 
-	err := sendToStompTopic(l.stompPublisher, "/config/changed", l.state.Config)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    ConfigChangedStompType,
+		Payload: l.state.Config,
+	})
 	if err != nil {
 		log.Error("Failed to send onConfigChanged stomp message", zap.Error(err))
 	}
@@ -108,7 +136,10 @@ func (l *appStateCoreListener) OnTorrentAdded(event broadcast.TorrentAddedEvent)
 
 	l.state.Torrents[event.Infohash.String()] = t
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/new", t)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentAddedStompType,
+		Payload: t,
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentAdded stomp message", zap.Error(err))
 	}
@@ -129,7 +160,10 @@ func (l *appStateCoreListener) OnTorrentAnnouncing(event broadcast.TorrentAnnoun
 	tr.InUse = true
 	tr.IsAnnouncing = true
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/changed", l.state.Torrents[event.Infohash.String()])
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentChangedStompType,
+		Payload: l.state.Torrents[event.Infohash.String()],
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentAnnouncing stomp message", zap.Error(err))
 	}
@@ -173,7 +207,10 @@ func (l *appStateCoreListener) OnTorrentAnnounceSuccess(event broadcast.TorrentA
 
 	tr.AnnounceHistory = history
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/changed", l.state.Torrents[event.Infohash.String()])
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentChangedStompType,
+		Payload: l.state.Torrents[event.Infohash.String()],
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentAnnounceSuccess stomp message", zap.Error(err))
 	}
@@ -215,7 +252,10 @@ func (l *appStateCoreListener) OnTorrentAnnounceFailed(event broadcast.TorrentAn
 
 	tr.AnnounceHistory = history
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/changed", l.state.Torrents[event.Infohash.String()])
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentChangedStompType,
+		Payload: l.state.Torrents[event.Infohash.String()],
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentAnnounceFailed stomp message", zap.Error(err))
 	}
@@ -234,7 +274,10 @@ func (l *appStateCoreListener) OnTorrentSwarmChanged(event broadcast.TorrentSwar
 	t.Seeders = event.Seeder
 	t.Leechers = event.Leechers
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/changed", t)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentChangedStompType,
+		Payload: l.state.Torrents[event.Infohash.String()],
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentSwarmChanged stomp message", zap.Error(err))
 	}
@@ -254,24 +297,12 @@ func (l *appStateCoreListener) OnTorrentRemoved(event broadcast.TorrentRemovedEv
 	payload := map[string]string{}
 	payload["infohash"] = event.Infohash.String()
 
-	err := sendToStompTopic(l.stompPublisher, "/torrents/removed", payload)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    TorrentRemovedStompType,
+		Payload: payload,
+	})
 	if err != nil {
 		log.Error("Failed to send onTorrentRemoved stomp message", zap.Error(err))
-	}
-}
-
-func (l *appStateCoreListener) OnNoticeableError(event broadcast.NoticeableErrorEvent) {
-	log := logs.GetLogger()
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	payload := map[string]interface{}{}
-	payload["error"] = event.Error
-	payload["datetime"] = event.Datetime
-
-	err := sendToStompTopic(l.stompPublisher, "/error", payload)
-	if err != nil {
-		log.Error("Failed to send onNoticeableError stomp message", zap.Error(err))
 	}
 }
 
@@ -291,7 +322,10 @@ func (l *appStateCoreListener) OnGlobalBandwidthChanged(event broadcast.GlobalBa
 	payload := map[string]interface{}{}
 	payload["currentBandwidth"] = l.state.Bandwidth.CurrentBandwidth
 
-	err := sendToStompTopic(l.stompPublisher, "/bandwidth/global-speed/changed", payload)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    BandwidthRangeChangedStompType,
+		Payload: payload,
+	})
 	if err != nil {
 		log.Error("Failed to send onGlobalBandwidthChanged stomp message", zap.Error(err))
 	}
@@ -317,9 +351,30 @@ func (l *appStateCoreListener) OnBandwidthWeightHasChanged(event broadcast.Bandw
 
 	l.state.Bandwidth.Torrents = newBandwidthMap
 
-	err := sendToStompTopic(l.stompPublisher, "/bandwidth/weights", l.state.Bandwidth.Torrents)
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    BandwidthDistributionChangedStompType,
+		Payload: l.state.Bandwidth.Torrents,
+	})
 	if err != nil {
 		log.Error("Failed to send onBandwidthWeightHasChanged stomp message", zap.Error(err))
+	}
+}
+
+func (l *appStateCoreListener) OnNoticeableError(event broadcast.NoticeableErrorEvent) {
+	log := logs.GetLogger()
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	payload := map[string]interface{}{}
+	payload["error"] = event.Error
+	payload["datetime"] = event.Datetime
+
+	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
+		Type:    ErrorUnexpectedStompType,
+		Payload: payload,
+	})
+	if err != nil {
+		log.Error("Failed to send onNoticeableError stomp message", zap.Error(err))
 	}
 }
 
@@ -329,7 +384,7 @@ func (l *appStateCoreListener) hasTorrent(infohash torrent.InfoHash) bool {
 	return exists
 }
 
-func sendToStompTopic(stompPublisher *stomp.Conn, destination string, content interface{}) error {
+func sendToStompTopic(stompPublisher *stomp.Conn, destination string, content *stompPayload) error {
 	body, err := json.Marshal(content)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal stomp payload as json")
