@@ -31,7 +31,7 @@ const StompMessageDestination = "/joal-core-events"
 
 const StompTypePrefix = "@STOMP_API"
 const (
-	SeedStartedStompType                  stompType = StompTypePrefix + "/SEED/STOPPED"
+	SeedStartedStompType                  stompType = StompTypePrefix + "/SEED/STARTED"
 	SeedStopStompType                               = StompTypePrefix + "/SEED/STOPPED"
 	ConfigChangedStompType                          = StompTypePrefix + "/CONFIG/CHANGED"
 	TorrentAddedStompType                           = StompTypePrefix + "/TORRENT/ADDED"
@@ -77,8 +77,7 @@ func (l *appStateCoreListener) OnSeedStop(_ broadcast.SeedStoppedEvent) {
 	}
 
 	err := sendToStompTopic(l.stompPublisher, StompMessageDestination, &stompPayload{
-		Type:    SeedStopStompType,
-		Payload: l.state.Global,
+		Type: SeedStopStompType,
 	})
 	if err != nil {
 		log.Error("Failed to send onSeedStop stomp message", zap.Error(err))
