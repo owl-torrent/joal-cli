@@ -63,7 +63,7 @@ func Test_OrchestratorShouldFilterEmptyUrl(t *testing.T) {
 	o, err := NewOrchestrator(&TorrentInfo{
 		Announce: "http://localhost:8000/announce",
 		AnnounceList: metainfo.AnnounceList{
-			{"", " ", "http://localhost:8080"},
+			{"", "http://localhost:6052", " ", "http://localhost:8080"},
 			{"", " ", "http://localhost:9090"},
 		},
 	}, config)
@@ -73,11 +73,12 @@ func Test_OrchestratorShouldFilterEmptyUrl(t *testing.T) {
 
 	orchestrator := o.(*AllOrchestrator)
 
-	assert.Len(t, orchestrator.tiers, 2)
-	assert.Len(t, orchestrator.tiers[0].(*AllTrackersTierAnnouncer).trackers, 1)
-	assert.Equal(t, orchestrator.tiers[0].(*AllTrackersTierAnnouncer).trackers[0].(*trackerAnnouncer).url.String(), "http://localhost:8080")
-	assert.Len(t, orchestrator.tiers[1].(*AllTrackersTierAnnouncer).trackers, 1)
-	assert.Equal(t, orchestrator.tiers[1].(*AllTrackersTierAnnouncer).trackers[0].(*trackerAnnouncer).url.String(), "http://localhost:9090")
+	assert.Len(t, orchestrator.Tiers, 2)
+	assert.Len(t, orchestrator.Tiers[0].(*AllTrackersTierAnnouncer).Trackers, 2)
+	assert.Equal(t, orchestrator.Tiers[0].(*AllTrackersTierAnnouncer).Trackers[0].(*trackerAnnouncer).Url.String(), "http://localhost:6052")
+	assert.Equal(t, orchestrator.Tiers[0].(*AllTrackersTierAnnouncer).Trackers[1].(*trackerAnnouncer).Url.String(), "http://localhost:8080")
+	assert.Len(t, orchestrator.Tiers[1].(*AllTrackersTierAnnouncer).Trackers, 1)
+	assert.Equal(t, orchestrator.Tiers[1].(*AllTrackersTierAnnouncer).Trackers[0].(*trackerAnnouncer).Url.String(), "http://localhost:9090")
 }
 
 func Test_FallbackOrchestrator_ShouldNotBuildWithEmptyTierList(t *testing.T) {

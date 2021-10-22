@@ -54,7 +54,6 @@ type slimInfo struct {
 	Length      int64
 	Private     *bool
 	Source      string
-	Files       []metainfo.FileInfo
 }
 
 type stoppingRequest struct {
@@ -112,7 +111,6 @@ func FromFile(filePath string) (ITorrent, error) {
 			Length:      info.Length,
 			Private:     info.Private,
 			Source:      info.Source,
-			Files:       info.Files,
 		},
 		infoHash:  infoHash,
 		isRunning: false,

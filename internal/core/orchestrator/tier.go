@@ -12,7 +12,6 @@ import (
 
 type AllTrackersTierAnnouncer struct {
 	trackers          []ITrackerAnnouncer
-	state             chan tierState
 	stoppingTier      chan chan struct{}
 	loopInProgress    bool
 	lock              *sync.RWMutex
@@ -28,10 +27,7 @@ func newAllTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnouncer,
 		return nil, fmt.Errorf("a tier can not have an empty tracker list")
 	}
 	t := &AllTrackersTierAnnouncer{
-		trackers:          trackers,
-		state:             make(chan tierState),
 		stoppingTier:      make(chan chan struct{}),
-		loopInProgress:    false,
 		lock:              &sync.RWMutex{},
 		lastKnownInterval: defaultTrackersInterval,
 	}
@@ -152,7 +148,6 @@ func (t *AllTrackersTierAnnouncer) stopAnnounceLoop() {
 type FallbackTrackersTierAnnouncer struct {
 	allTrackers       []ITrackerAnnouncer
 	tracker           *linkedTrackerList
-	state             chan tierState
 	stoppingTier      chan chan struct{}
 	loopInProgress    bool
 	lock              *sync.RWMutex
@@ -170,9 +165,7 @@ func newFallbackTrackersTierAnnouncer(trackers ...ITrackerAnnouncer) (ITierAnnou
 	t := &FallbackTrackersTierAnnouncer{
 		allTrackers:       trackers,
 		tracker:           list,
-		state:             make(chan tierState),
 		stoppingTier:      make(chan chan struct{}),
-		loopInProgress:    false,
 		lock:              &sync.RWMutex{},
 		lastKnownInterval: defaultTrackersInterval,
 	}
@@ -212,10 +205,6 @@ func (t *FallbackTrackersTierAnnouncer) announceOnce(ctx context.Context, announ
 	}
 
 	return DEAD
-}
-
-func (t FallbackTrackersTierAnnouncer) States() <-chan tierState {
-	return t.state
 }
 
 func (t *FallbackTrackersTierAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan tierState, error) {

@@ -22,10 +22,9 @@ type trackerAnnouncer struct {
 
 func newTracker(url url.URL) ITrackerAnnouncer {
 	return &trackerAnnouncer{
-		url:            url,
-		stoppingLoop:   make(chan chan struct{}),
-		loopInProgress: false,
-		lock:           &sync.RWMutex{},
+		url:          url,
+		stoppingLoop: make(chan chan struct{}),
+		lock:         &sync.RWMutex{},
 	}
 }
 
@@ -39,7 +38,8 @@ func (t trackerAnnouncer) announceOnce(ctx context.Context, announce AnnouncingF
 		}
 	}
 	return trackerAnnounceResult{
-		Err:       nil,
+		Seeders:   res.Seeders,
+		Leechers:  res.Leechers,
 		Interval:  res.Interval * time.Second,
 		Completed: time.Now(),
 	}
@@ -95,7 +95,8 @@ func (t *trackerAnnouncer) startAnnounceLoop(announce AnnouncingFunction, firstE
 						return
 					}
 					announceDone <- trackerAnnounceResult{
-						Err:       nil,
+						Seeders:   res.Seeders,
+						Leechers:  res.Leechers,
 						Interval:  res.Interval,
 						Completed: time.Now(),
 					}

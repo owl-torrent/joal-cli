@@ -19,10 +19,13 @@ type AnnouncingFunction = func(ctx context.Context, u url.URL, event tracker.Ann
 
 type trackerAnnounceResult struct {
 	Err       error
+	Seeders   int32
+	Leechers  int32
 	Interval  time.Duration
 	Completed time.Time
 }
 
+// TODO: le trackerAnnouncer doit garder les historiques des announces, et on doit avoir une propriété pojoCopy() qui copie l'announcer (le isActive peut être deduit de loopInProgress)
 type ITrackerAnnouncer interface {
 	announceOnce(ctx context.Context, announce AnnouncingFunction, event tracker.AnnounceEvent) trackerAnnounceResult
 	startAnnounceLoop(announce AnnouncingFunction, firstEvent tracker.AnnounceEvent) (<-chan trackerAnnounceResult, error)
@@ -39,13 +42,6 @@ type ITierAnnouncer interface {
 type IOrchestrator interface {
 	Start(announce AnnouncingFunction)
 	Stop(context context.Context, announce AnnouncingFunction)
-}
-
-type FallbackOrchestrator struct {
-	tier           *linkedTierList
-	stopping       chan chan struct{}
-	loopInProgress bool
-	lock           *sync.RWMutex
 }
 
 type IConfig interface {
@@ -139,6 +135,13 @@ func createOrchestratorForAnnounceList(announceList [][]string, announceToAllTie
 	return o, nil
 }
 
+type FallbackOrchestrator struct {
+	tier           *linkedTierList
+	stopping       chan chan struct{}
+	loopInProgress bool
+	lock           *sync.RWMutex
+}
+
 func newFallBackOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 	if len(tiers) == 0 {
 		return nil, fmt.Errorf("tiers list can not be empty")
@@ -148,10 +151,9 @@ func newFallBackOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 		return nil, err
 	}
 	return &FallbackOrchestrator{
-		tier:           list,
-		stopping:       make(chan chan struct{}),
-		loopInProgress: false,
-		lock:           &sync.RWMutex{},
+		tier:     list,
+		stopping: make(chan chan struct{}),
+		lock:     &sync.RWMutex{},
 	}, nil
 }
 
@@ -227,13 +229,7 @@ func (o *FallbackOrchestrator) Stop(ctx context.Context, annFunc AnnouncingFunct
 
 	stopAnnounceCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	waitChan := make(chan struct{})
-	go func(tier ITierAnnouncer) {
-		defer close(waitChan)
-		tier.announceOnce(stopAnnounceCtx, annFunc, tracker.Stopped)
-	}(o.tier)
-
-	<-waitChan
+	o.tier.announceOnce(stopAnnounceCtx, annFunc, tracker.Stopped)
 }
 
 type AllOrchestrator struct {
@@ -248,10 +244,9 @@ func newAllOrchestrator(tiers ...ITierAnnouncer) (IOrchestrator, error) {
 		return nil, fmt.Errorf("tiers list can not be empty")
 	}
 	return &AllOrchestrator{
-		tiers:          tiers,
-		stopping:       make(chan chan struct{}),
-		loopInProgress: false,
-		lock:           &sync.RWMutex{},
+		tiers:    tiers,
+		stopping: make(chan chan struct{}),
+		lock:     &sync.RWMutex{},
 	}, nil
 }
 
