@@ -24,18 +24,22 @@ type IEmulatedClient interface {
 	StartListener(proxyFunc func(*http.Request) (*url.URL, error)) error
 	StopListener(ctx context.Context)
 	CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
+	GetAnnounceCapabilities() AnnounceCapabilities
+	SupportsHttpAnnounce() bool
+	SupportsUdpAnnounce() bool
 }
 
 type EmulatedClient struct {
-	Name                string                           `yaml:"name" validate:"required"`
-	Version             string                           `yaml:"version" validate:"required"`
-	KeyGenerator        *keygenerator.KeyGenerator       `yaml:"keyGenerator" validate:"required"`
-	PeerIdGenerator     *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
-	NumWant             int32                            `yaml:"numwant" validate:"min=1"`
-	NumWantOnStop       int32                            `yaml:"numwantOnStop"`
-	OrchestratorFactory *orchestratorFactory             `yaml:"announceOrchestrator" validate:"required"`
-	Announcer           *announcer.Announcer             `yaml:"announcer" validate:"required"`
-	Listener            *Listener                        `yaml:"listener" validate:"required"`
+	Name                 string                           `yaml:"name" validate:"required"`
+	Version              string                           `yaml:"version" validate:"required"`
+	KeyGenerator         *keygenerator.KeyGenerator       `yaml:"keyGenerator" validate:"required"`
+	PeerIdGenerator      *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
+	NumWant              int32                            `yaml:"numwant" validate:"min=1"`
+	NumWantOnStop        int32                            `yaml:"numwantOnStop"`
+	OrchestratorFactory  *orchestratorFactory             `yaml:"announceOrchestrator" validate:"required"`
+	AnnounceCapabilities AnnounceCapabilities             `yaml:"announceCapabilities" validate:"required"`
+	Announcer            *announcer.Announcer             `yaml:"announcer" validate:"required"`
+	Listener             *Listener                        `yaml:"listener" validate:"required"`
 }
 
 func FromClientFile(path string, proxyFunc func(*http.Request) (*url.URL, error)) (IEmulatedClient, error) {
@@ -132,4 +136,16 @@ func (c *EmulatedClient) StopListener(ctx context.Context) {
 
 func (c *EmulatedClient) CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
 	return c.OrchestratorFactory.createOrchestrator(info)
+}
+
+func (c *EmulatedClient) GetAnnounceCapabilities() AnnounceCapabilities {
+	return c.AnnounceCapabilities
+}
+
+func (c *EmulatedClient) SupportsHttpAnnounce() bool {
+	return c.Announcer.Http != nil
+}
+
+func (c *EmulatedClient) SupportsUdpAnnounce() bool {
+	return c.Announcer.Udp != nil
 }

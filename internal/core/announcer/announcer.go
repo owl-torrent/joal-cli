@@ -30,6 +30,7 @@ type AnnounceRequest struct {
 } // 82 bytes
 
 type AnnounceResponse struct {
+	Url      url.URL
 	Interval time.Duration // Minimum seconds the local peer should wait before next announce.
 	Leechers int32
 	Seeders  int32

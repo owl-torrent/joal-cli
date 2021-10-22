@@ -4,13 +4,14 @@ import (
 	"context"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anthonyraymond/joal-cli/internal/core/announcer"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"math/rand"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,6 +26,7 @@ type torrentImpl struct {
 	infoHash  torrent.InfoHash
 	stats     Stats
 	peers     Peers
+	trackers  []Tracker
 	metaInfo  *slimMetaInfo
 	info      *slimInfo
 	isRunning bool
@@ -32,7 +34,7 @@ type torrentImpl struct {
 	lock      *sync.Mutex
 }
 
-func FromFile(filePath string) (Torrent, error) {
+func FromFile(filePath string, supportAnnounceList bool) (Torrent, error) {
 	log := logs.GetLogger().With(zap.String("torrent", filepath.Base(filePath)))
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
@@ -45,14 +47,6 @@ func FromFile(filePath string) (Torrent, error) {
 	}
 	infoHash := meta.HashInfoBytes()
 	log.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
-
-	// Shuffling trackers according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
-	rand.Seed(randSeed)
-	for _, tier := range meta.AnnounceList {
-		rand.Shuffle(len(tier), func(i, j int) {
-			tier[i], tier[j] = tier[j], tier[i]
-		})
-	}
 
 	return &torrentImpl{
 		path:  filePath,
@@ -75,6 +69,7 @@ func FromFile(filePath string) (Torrent, error) {
 			Private:     info.Private,
 			Source:      info.Source,
 		},
+		trackers:  newTrackers(meta.Announce, meta.AnnounceList, supportAnnounceList),
 		infoHash:  infoHash,
 		isRunning: false,
 		stopping:  stop.NewChan(),
@@ -89,6 +84,15 @@ func (t *torrentImpl) Start(client emulatedclient.IEmulatedClient) {
 		return
 	}
 	t.isRunning = true
+
+	// Disable trackers based on client capabilities (UDP, HTTP, ...)
+	for _, track := range t.trackers {
+		if strings.Contains(strings.ToLower(track.Url().Scheme), "http") && !client.SupportsHttpAnnounce() {
+			track.Disable()
+		} else if strings.Contains(strings.ToLower(track.Url().Scheme), "udp") && !client.SupportsUdpAnnounce() {
+			track.Disable()
+		}
+	}
 
 	go torrentRoutine(t, client)
 }
@@ -112,9 +116,13 @@ func (t *torrentImpl) Stop(ctx context.Context) {
 }
 
 func torrentRoutine(t *torrentImpl, client emulatedclient.IEmulatedClient) {
+	onAnnounceSuccess := make(chan announcer.AnnounceResponse)
+	onAnnounceError := make(chan announcer.AnnounceResponse)
+	onAnnounceTime := time.After(0 * time.Second)
+
 	for {
 		select {
-		case resp := <-onAnnounceSucess:
+		case resp := <-onAnnounceSuccess:
 
 		case errorResponse := <-onAnnounceError:
 
