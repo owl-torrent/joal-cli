@@ -14,13 +14,11 @@ const trackerRetryDelayMin = 5 * time.Second
 // Never wait more than 60min before retrying
 const trackerRetryDelayMax = 60 * time.Minute
 
-// Maximum number of announce history to keep for each tracker
+// Maximum number of announce history to keep for each trackerImpl
 const trackerMaxHistorySize = 3
 
 type Tracker interface {
 	Url() url.URL
-	Tier() int16
-	Disable()
 	CanAnnounce(now time.Time) bool
 	IsWorking() bool
 	Succeed(announceHistory AnnounceHistory)
@@ -28,16 +26,16 @@ type Tracker interface {
 	Reset()
 }
 
-type tracker struct {
+type trackerImpl struct {
 	url *url.URL
-	// tier that the tracker belongs to
+	// tier that the trackerImpl belongs to
 	tier int16
-	// if false the tracker must not be used at all
-	enabled      bool
-	trackerState *trackerState
+	// if false the trackerImpl must not be used at all
+	enabled bool
+	state   *trackerState
 }
 
-func newTrackers(announce string, announceList metainfo.AnnounceList, supportAnnounceList bool) []Tracker {
+func newTrackers(announce string, announceList metainfo.AnnounceList, supportAnnounceList bool) []*trackerImpl {
 	// Shuffling trackers according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
 	rand.Seed(randSeed)
 	for _, tier := range announceList {
@@ -46,16 +44,16 @@ func newTrackers(announce string, announceList metainfo.AnnounceList, supportAnn
 		})
 	}
 
-	// tracker does not support annnouceList OR AnnounceList contains only empty url but announce contains a valid url
+	// trackerImpl does not support annnouceList OR AnnounceList contains only empty url but announce contains a valid url
 	if !supportAnnounceList || !announceList.OverridesAnnounce(announce) {
 		u, err := url.Parse(announce)
 		if err != nil {
-			return []Tracker{}
+			return []*trackerImpl{}
 		}
-		return []Tracker{newTracker(u, 0)}
+		return []*trackerImpl{newTracker(u, 0)}
 	}
 
-	var trackers []Tracker
+	var trackers []*trackerImpl
 	for tierIndex, tier := range announceList {
 		for _, trackerUri := range tier {
 			u, err := url.Parse(trackerUri)
@@ -68,63 +66,56 @@ func newTrackers(announce string, announceList metainfo.AnnounceList, supportAnn
 	return trackers
 }
 
-func newTracker(u *url.URL, tierIndex int16) Tracker {
-	return &tracker{
-		url:          u,
-		tier:         tierIndex,
-		enabled:      true,
-		trackerState: &trackerState{},
+func newTracker(u *url.URL, tierIndex int16) *trackerImpl {
+	return &trackerImpl{
+		url:     u,
+		tier:    tierIndex,
+		enabled: true,
+		state:   &trackerState{},
 	}
 }
 
-func (t *tracker) Url() url.URL {
+func (t *trackerImpl) Url() url.URL {
 	return *t.url
 }
-func (t *tracker) Tier() int16 {
-	return t.tier
-}
 
-func (t *tracker) Disable() {
-	t.enabled = false
-}
-
-// CanAnnounce returns true if the tracker is not currently announcing and if the interval to wait is elapsed
-func (t *tracker) CanAnnounce(now time.Time) bool {
+// CanAnnounce returns true if the trackerImpl is not currently announcing and if the interval to wait is elapsed
+func (t *trackerImpl) CanAnnounce(now time.Time) bool {
 	if !t.enabled {
 		return false
 	}
 	// add 1 safety sec before comparing "strictly greater than", because
-	if now.Before(t.trackerState.nextAnnounce) {
+	if now.Before(t.state.nextAnnounce) {
 		return false
 	}
-	if t.trackerState.updating {
+	if t.state.updating {
 		return false
 	}
 	return true
 }
 
 // IsWorking returns true if the last announce was successful
-func (t *tracker) IsWorking() bool {
-	return t.trackerState.fails == 0
+func (t *trackerImpl) IsWorking() bool {
+	return t.enabled && t.state.fails == 0
 }
 
-func (t *tracker) Succeed(announceHistory AnnounceHistory) {
-	t.trackerState.fails = 0
+func (t *trackerImpl) Succeed(announceHistory AnnounceHistory) {
+	t.state.fails = 0
 	t.enqueueAnnounceHistory(announceHistory)
 
-	t.trackerState.nextAnnounce = time.Now().Add(announceHistory.interval)
+	t.state.nextAnnounce = time.Now().Add(announceHistory.interval)
 
-	t.trackerState.updating = false
+	t.state.updating = false
 }
 
-func (t *tracker) Failed(announceHistory AnnounceHistory, backoffRatio int, retryInterval int) {
-	t.trackerState.fails++
+func (t *trackerImpl) Failed(announceHistory AnnounceHistory, backoffRatio int, retryInterval int) {
+	t.state.fails++
 	t.enqueueAnnounceHistory(announceHistory)
 
 	// the exponential back-off ends up being:
 	// 7, 15, 27, 45, 95, 127, 165, ... seconds
 	// with the default tracker_backoff of 250
-	failSquare := time.Duration(t.trackerState.fails*t.trackerState.fails) * time.Second
+	failSquare := time.Duration(t.state.fails*t.state.fails) * time.Second
 
 	delay := math.Max(
 		float64(retryInterval),
@@ -134,19 +125,19 @@ func (t *tracker) Failed(announceHistory AnnounceHistory, backoffRatio int, retr
 		),
 	)
 
-	t.trackerState.nextAnnounce = time.Now().Add(time.Duration(delay) + time.Second)
-	t.trackerState.updating = false
+	t.state.nextAnnounce = time.Now().Add(time.Duration(delay) + time.Second)
+	t.state.updating = false
 }
 
-func (t *tracker) Reset() {
-	t.trackerState = &trackerState{}
+func (t *trackerImpl) Reset() {
+	t.state = &trackerState{}
 }
 
-func (t *tracker) enqueueAnnounceHistory(announceHistory AnnounceHistory) {
-	t.trackerState.announceHistory = append(t.trackerState.announceHistory, announceHistory)
+func (t *trackerImpl) enqueueAnnounceHistory(announceHistory AnnounceHistory) {
+	t.state.announceHistory = append(t.state.announceHistory, announceHistory)
 
-	if len(t.trackerState.announceHistory) > trackerMaxHistorySize {
-		t.trackerState.announceHistory = t.trackerState.announceHistory[:trackerMaxHistorySize]
+	if len(t.state.announceHistory) > trackerMaxHistorySize {
+		t.state.announceHistory = t.state.announceHistory[:trackerMaxHistorySize]
 	}
 }
 
@@ -155,9 +146,9 @@ type trackerState struct {
 	nextAnnounce time.Time
 	// number of consecutive fails
 	fails int16
-	// true if we already sent the START announce to this tracker
+	// true if we already sent the START announce to this trackerImpl
 	startSent bool
-	// true if we sent an announce to this tracker, and we currently are waiting for an answer
+	// true if we sent an announce to this trackerImpl, and we currently are waiting for an answer
 	updating        bool
 	announceHistory []AnnounceHistory
 }
