@@ -29,7 +29,8 @@ type AnnounceResponse struct {
 
 type AnnounceResponseError struct {
 	error
-	Request *AnnounceRequest
+	Request  *AnnounceRequest
+	Interval time.Duration // Minimum seconds the local peer should wait before next announce. May be 0 if the error is not related to the tracker response
 }
 
 type AnnounceCallbacks struct {

@@ -2,6 +2,7 @@ package torrent2
 
 import (
 	"context"
+	"github.com/anacrolix/log"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -132,12 +133,15 @@ func (t *torrentImpl) Stop(ctx context.Context) {
 }
 
 func torrentRoutine(t *torrentImpl, props AnnounceProps) {
+	logger := logs.GetLogger().With(zap.String("torrent", t.info.Name))
 	t.peers.Reset()
 	t.stats.Reset()
 
 	onAnnounceSuccess := make(chan emulatedclient.AnnounceResponse, len(t.trackers))
 	onAnnounceError := make(chan emulatedclient.AnnounceResponseError, len(t.trackers))
-	onAnnounceTime := time.After(0 * time.Second)
+
+	timer := time.NewTimer(0 * time.Second)
+	onAnnounceTime := timer.C
 
 	announceCallbacks := &emulatedclient.AnnounceCallbacks{
 		Success: func(response emulatedclient.AnnounceResponse) {
@@ -167,20 +171,51 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				})
 			}
 
-			//TODO prioritize tracker in his tier
+			t.peers.AddPeer(SwarmUpdateRequest{
+				trackerUrl: currentTracker.Url(),
+				interval:   resp.Interval,
+				seeders:    resp.Seeders,
+				leechers:   resp.Leechers,
+			})
 
-			onAnnounceTime = getNextAnnounceTime()
+			if !timer.Stop() {
+				<-timer.C
+			}
+			nextAnnounce := getNextAnnounceTime(t.trackers, props.AnnounceToAllTiers, props.AnnounceToAllTrackers)
+			if nextAnnounce.IsZero() {
+				logger.Error("getNextAnnounceTime returned a 0 time, this should not happen since the function should only be called after an announce is done. Thus there should always be a tracker to announce next")
+				onAnnounceTime = nil
+			} else {
+				timer = time.NewTimer(nextAnnounce.Sub(time.Now()))
+				onAnnounceTime = timer.C
+			}
 
 		case errorResponse := <-onAnnounceError:
 			currentTracker := findTracker(errorResponse.Request.Url, t.trackers)
 			if currentTracker != nil {
-				currentTracker.Succeed(AnnounceHistory{
+				currentTracker.Failed(AnnounceHistory{
 					error: errorResponse.Error(),
-				})
+				}, 250, int(errorResponse.Interval.Seconds()))
 			}
+			t.peers.AddPeer(SwarmUpdateRequest{
+				trackerUrl: currentTracker.Url(),
+				interval:   0, // set interval to 0 will force the entry to be evicted by the peer electors system
+				seeders:    0,
+				leechers:   0,
+			})
 			// TODO: handle de-prioritization of the tracker
 
-			onAnnounceTime = getNextAnnounceTime(t.trackers)
+			if !timer.Stop() {
+				<-timer.C
+			}
+			nextAnnounce := getNextAnnounceTime(t.trackers, props.AnnounceToAllTiers, props.AnnounceToAllTrackers)
+			if nextAnnounce.IsZero() {
+				logger.Error("getNextAnnounceTime returned a 0 time, this should not happen since the function should only be called after an announce is done. Thus there should always be a tracker to announce next")
+				onAnnounceTime = nil
+			} else {
+				timer = time.NewTimer(nextAnnounce.Sub(time.Now()))
+				onAnnounceTime = timer.C
+			}
 		case <-onAnnounceTime:
 			t.announceToTrackers(props, announceCallbacks, tracker.None)
 
@@ -193,6 +228,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				// context is already expired, no need to announce stop
 				return
 			}
+			//FIXME: change all trackers.nextAnnounce to now, otherwise stop won't be fired
 			t.announceToTrackers(props, announceCallbacks, tracker.Stopped)
 
 			return
@@ -228,41 +264,78 @@ func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *emulate
 	}
 }
 
-// announceAbleTrackers return all the tracker able to announce at the moment
-func findAnnounceReadyTrackers(trackers []*trackerImpl, announceToAllTier bool, announceToAllTracker bool) []*trackerImpl {
-	var announceAbleTrackers []*trackerImpl
+func getNextAnnounceTime(trackers []*trackerImpl, announceToAllTier bool, announceToAllTracker bool) time.Time {
+	nextAnnounce := time.Time{}
 
-	now := time.Now()
-	// index of the tier we last found and announceable tracker
-	__foundForTier := int16(-1)
-	__foundOne := false
+	foundForTier := int16(-1)
+	foundOne := false
 
 	for i, tr := range trackers {
 		if !tr.enabled {
 			continue
 		}
-		if announceToAllTier && !announceToAllTracker && __foundForTier == tr.tier {
+		if announceToAllTier && !announceToAllTracker && foundForTier == tr.tier {
 			continue
 		}
 		// Announcing to a single tracker in a single tier => we found one => exit
-		if !announceToAllTier && !announceToAllTracker && __foundOne {
+		if !announceToAllTier && !announceToAllTracker && foundOne {
+			return nextAnnounce
+		}
+		// Announcing to all trackers in one tier => we have found at least one and changed tier => exit
+		if !announceToAllTier && announceToAllTracker && foundOne && i > 0 && tr.tier > trackers[i-1].tier {
+			return nextAnnounce
+		}
+
+		// set flags to instruct we found a tracker in this tier and a working tracker
+		if tr.state.updating {
+			foundForTier = tr.tier
+			foundOne = true
+			continue
+		}
+
+		if nextAnnounce.IsZero() || nextAnnounce.After(tr.state.nextAnnounce) {
+			nextAnnounce = tr.state.nextAnnounce
+		}
+	}
+
+	return nextAnnounce
+}
+
+// announceAbleTrackers return all the tracker able to announce at the moment
+func findAnnounceReadyTrackers(trackers []*trackerImpl, announceToAllTier bool, announceToAllTracker bool) []*trackerImpl {
+	var announceAbleTrackers []*trackerImpl
+
+	now := time.Now()
+	// index of the tier we last found and announce-ready tracker in
+	foundForTier := int16(-1)
+	foundOne := false
+
+	for i, tr := range trackers {
+		if !tr.enabled {
+			continue
+		}
+		if announceToAllTier && !announceToAllTracker && foundForTier == tr.tier {
+			continue
+		}
+		// Announcing to a single tracker in a single tier => we found one => exit
+		if !announceToAllTier && !announceToAllTracker && foundOne {
 			return announceAbleTrackers
 		}
 		// Announcing to all trackers in one tier => we have found at least one and changed tier => exit
-		if !announceToAllTier && announceToAllTracker && __foundOne && i > 0 && tr.tier > trackers[i-1].tier {
+		if !announceToAllTier && announceToAllTracker && foundOne && i > 0 && tr.tier > trackers[i-1].tier {
 			return announceAbleTrackers
 		}
 
 		if tr.CanAnnounce(now) {
-			__foundOne = true
-			__foundForTier = tr.tier
+			foundOne = true
+			foundForTier = tr.tier
 			announceAbleTrackers = append(announceAbleTrackers, tr)
 			continue
 		}
 		// Can not announce ATM but the tracker is working, flag that we found trackers
 		if tr.IsWorking() {
-			__foundOne = true
-			__foundForTier = tr.tier
+			foundOne = true
+			foundForTier = tr.tier
 		}
 	}
 	return announceAbleTrackers

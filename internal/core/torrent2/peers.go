@@ -1,7 +1,6 @@
 package torrent2
 
 import (
-	"github.com/anthonyraymond/joal-cli/internal/core/announcer"
 	"net/url"
 	"sync"
 	"time"
@@ -93,23 +92,6 @@ type SwarmUpdateRequest struct {
 	interval   time.Duration
 	seeders    int32
 	leechers   int32
-}
-
-func ErrorSwarmUpdateRequest(trackerUrl url.URL) SwarmUpdateRequest {
-	return SwarmUpdateRequest{
-		trackerUrl: trackerUrl,
-		interval:   1800 * time.Second,
-		seeders:    0,
-		leechers:   0,
-	}
-}
-func SuccessSwarmUpdateRequest(trackerUrl url.URL, response announcer.AnnounceResponse) SwarmUpdateRequest {
-	return SwarmUpdateRequest{
-		trackerUrl: trackerUrl,
-		interval:   response.Interval * time.Second,
-		seeders:    response.Seeders,
-		leechers:   response.Leechers,
-	}
 }
 
 func (s SwarmUpdateRequest) toPeersStats() peer {
