@@ -2,7 +2,6 @@ package torrent2
 
 import (
 	"context"
-	"github.com/anacrolix/log"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
@@ -10,6 +9,7 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"net/url"
 	"path/filepath"
@@ -24,20 +24,21 @@ type Torrent interface {
 }
 
 type torrentImpl struct {
-	path      string
-	infoHash  torrent.InfoHash
-	stats     Stats
-	peers     Peers
-	trackers  []*trackerImpl
-	metaInfo  *slimMetaInfo
-	info      *slimInfo
+	path     string
+	infoHash torrent.InfoHash
+	stats    Stats
+	peers    Peers
+	trackers []*trackerImpl
+	metaInfo *slimMetaInfo
+	info     *slimInfo
+
 	isRunning bool
 	stopping  stop.Chan
 	lock      *sync.Mutex
 }
 
 func FromFile(filePath string) (Torrent, error) {
-	log := logs.GetLogger().With(zap.String("torrent", filepath.Base(filePath)))
+	logger := logs.GetLogger().With(zap.String("torrent", filepath.Base(filePath)))
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
@@ -48,7 +49,7 @@ func FromFile(filePath string) (Torrent, error) {
 		return nil, errors.Wrapf(err, "failed to load info from file '%s'", filePath)
 	}
 	infoHash := meta.HashInfoBytes()
-	log.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
+	logger.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
 
 	private := false
 	if info.Private != nil && *info.Private == true {
@@ -122,14 +123,14 @@ func (t *torrentImpl) Stop(ctx context.Context) {
 	}
 	t.isRunning = false
 
-	log := logs.GetLogger().With(zap.String("torrent", filepath.Base(t.path)))
+	logger := logs.GetLogger().With(zap.String("torrent", filepath.Base(t.path)))
 
 	stopReq := stop.NewRequest(ctx)
-	log.Info("torrent: stopping")
+	logger.Info("torrent: stopping")
 	t.stopping <- stopReq
 
 	_ = stopReq.AwaitDone()
-	log.Info("torrent: stopped")
+	logger.Info("torrent: stopped")
 }
 
 func torrentRoutine(t *torrentImpl, props AnnounceProps) {
@@ -143,15 +144,16 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 	timer := time.NewTimer(0 * time.Second)
 	onAnnounceTime := timer.C
 
+	dismissAnnounceResults := atomic.NewBool(false)
 	announceCallbacks := &emulatedclient.AnnounceCallbacks{
 		Success: func(response emulatedclient.AnnounceResponse) {
-			if response.Request.Event == tracker.Stopped {
+			if dismissAnnounceResults.Load() {
 				return
 			}
 			onAnnounceSuccess <- response
 		},
 		Failed: func(responseError emulatedclient.AnnounceResponseError) {
-			if responseError.Request.Event == tracker.Stopped {
+			if dismissAnnounceResults.Load() {
 				return
 			}
 			onAnnounceError <- responseError
@@ -161,7 +163,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 	for {
 		select {
 		case resp := <-onAnnounceSuccess:
-			currentTracker := findTracker(resp.Request.Url, t.trackers)
+			_, currentTracker := findTracker(resp.Request.Url, t.trackers)
 			if currentTracker != nil {
 				currentTracker.state.startSent = true
 				currentTracker.Succeed(AnnounceHistory{
@@ -191,7 +193,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 			}
 
 		case errorResponse := <-onAnnounceError:
-			currentTracker := findTracker(errorResponse.Request.Url, t.trackers)
+			trackerIndex, currentTracker := findTracker(errorResponse.Request.Url, t.trackers)
 			if currentTracker != nil {
 				currentTracker.Failed(AnnounceHistory{
 					error: errorResponse.Error(),
@@ -203,7 +205,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				seeders:    0,
 				leechers:   0,
 			})
-			// TODO: handle de-prioritization of the tracker
+			deprioritizeTracker(t.trackers, trackerIndex)
 
 			if !timer.Stop() {
 				<-timer.C
@@ -224,14 +226,47 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 			defer func() {
 				stopRequest.NotifyDone()
 			}()
+			dismissAnnounceResults.Store(true)
+			//drain announce response channels
+			drainSuccessResponseChan(onAnnounceSuccess)
+			drainErrorResponseChan(onAnnounceError)
+
 			if stopRequest.Ctx().Err() != nil {
 				// context is already expired, no need to announce stop
 				return
 			}
-			//FIXME: change all trackers.nextAnnounce to now, otherwise stop won't be fired
+			for _, tr := range t.trackers {
+				tr.state.nextAnnounce = time.Now()
+			}
 			t.announceToTrackers(props, announceCallbacks, tracker.Stopped)
 
 			return
+		}
+	}
+}
+
+/**
+deprioritizeTracker push a tracker to the end of his tier
+*/
+func deprioritizeTracker(trackers []*trackerImpl, indexToDeprioritize int) {
+	if indexToDeprioritize >= len(trackers)-1 {
+		// out of bound or already the last one
+		return
+	}
+	trackerToDeprioritize := trackers[indexToDeprioritize]
+
+	for i := indexToDeprioritize; i < len(trackers); i++ {
+		if i+1 == len(trackers) {
+			return
+		}
+		t := trackers[i]
+		if t.tier > trackerToDeprioritize.tier {
+			return
+		}
+
+		if trackers[i+1].tier == trackerToDeprioritize.tier {
+			// swap
+			trackers[i], trackers[i+1] = trackers[i+1], trackers[i]
 		}
 	}
 }
@@ -341,17 +376,36 @@ func findAnnounceReadyTrackers(trackers []*trackerImpl, announceToAllTier bool, 
 	return announceAbleTrackers
 }
 
-func findTracker(u url.URL, trackers []*trackerImpl) *trackerImpl {
+func findTracker(u url.URL, trackers []*trackerImpl) (int, *trackerImpl) {
 	u.RawQuery = ""
 	u.RawFragment = ""
-	for _, t := range trackers {
+	for i, t := range trackers {
 		currentUrl := t.Url()
 		if strings.EqualFold(currentUrl.String(), u.String()) {
-			return t
+			return i, t
 		}
 	}
 
-	return nil
+	return 0, nil
+}
+
+func drainSuccessResponseChan(c chan emulatedclient.AnnounceResponse) {
+	for {
+		select {
+		case <-c:
+		default:
+			return
+		}
+	}
+}
+func drainErrorResponseChan(c chan emulatedclient.AnnounceResponseError) {
+	for {
+		select {
+		case <-c:
+		default:
+			return
+		}
+	}
 }
 
 // metainfo.MetaInfo is RAM consuming because of the size of the Piece[], create our own struct that ignore this field
