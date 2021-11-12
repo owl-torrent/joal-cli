@@ -1,4 +1,4 @@
-package queue
+package torrent2
 
 import (
 	"github.com/anacrolix/torrent"

@@ -16,7 +16,7 @@
 - [ ] make listening port customizable
 - [x] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818
 - [ ] Udp support
-- [ ] allow proxy integration both udp and tcp (via http client)
+- [ ] Replace current proxy usage with a SOCK5 proxy impl (work for both udp and TCP)
 - [ ] run some real life tests on public trackers
 - [ ] add a fake tracker for integration tests
 - [ ] add some benchmarks
