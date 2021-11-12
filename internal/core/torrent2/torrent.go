@@ -5,8 +5,8 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
+	"github.com/anthonyraymond/joal-cli/internal/core/queue"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
@@ -32,9 +32,10 @@ type torrentImpl struct {
 	metaInfo *slimMetaInfo
 	info     *slimInfo
 
-	isRunning bool
-	stopping  stop.Chan
-	lock      *sync.Mutex
+	isRunning     bool
+	stopping      stop.Chan
+	lock          *sync.Mutex
+	announceQueue *queue.AnnounceQueue
 }
 
 func FromFile(filePath string) (Torrent, error) {
@@ -93,7 +94,7 @@ type AnnounceProps struct {
 	AnnounceToAllTrackers bool
 }
 
-func (t *torrentImpl) Start(props AnnounceProps) {
+func (t *torrentImpl) Start(props AnnounceProps, announceQueue *queue.AnnounceQueue) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.isRunning {
@@ -102,6 +103,7 @@ func (t *torrentImpl) Start(props AnnounceProps) {
 	t.isRunning = true
 
 	t.trackers = newTrackers(t.metaInfo.Announce, t.metaInfo.AnnounceList, props.SupportAnnounceList)
+	t.announceQueue = announceQueue
 
 	// Disable trackers based on client capabilities (UDP, HTTP, ...)
 	for _, track := range t.trackers {
@@ -138,21 +140,21 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 	t.peers.Reset()
 	t.stats.Reset()
 
-	onAnnounceSuccess := make(chan emulatedclient.AnnounceResponse, len(t.trackers))
-	onAnnounceError := make(chan emulatedclient.AnnounceResponseError, len(t.trackers))
+	onAnnounceSuccess := make(chan queue.AnnounceResponse, len(t.trackers))
+	onAnnounceError := make(chan queue.AnnounceResponseError, len(t.trackers))
 
 	timer := time.NewTimer(0 * time.Second)
 	onAnnounceTime := timer.C
 
 	dismissAnnounceResults := atomic.NewBool(false)
-	announceCallbacks := &emulatedclient.AnnounceCallbacks{
-		Success: func(response emulatedclient.AnnounceResponse) {
+	announceCallbacks := &queue.AnnounceCallbacks{
+		Success: func(response queue.AnnounceResponse) {
 			if dismissAnnounceResults.Load() {
 				return
 			}
 			onAnnounceSuccess <- response
 		},
-		Failed: func(responseError emulatedclient.AnnounceResponseError) {
+		Failed: func(responseError queue.AnnounceResponseError) {
 			if dismissAnnounceResults.Load() {
 				return
 			}
@@ -271,7 +273,7 @@ func deprioritizeTracker(trackers []*trackerImpl, indexToDeprioritize int) {
 	}
 }
 
-func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *emulatedclient.AnnounceCallbacks, event tracker.AnnounceEvent) {
+func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *queue.AnnounceCallbacks, event tracker.AnnounceEvent) {
 	trackersToAnnounce := findAnnounceReadyTrackers(t.trackers, props.AnnounceToAllTiers, props.AnnounceToAllTrackers)
 
 	for _, currentTracker := range trackersToAnnounce {
@@ -283,7 +285,7 @@ func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *emulate
 		if event == tracker.None && !currentTracker.state.startSent {
 			event = tracker.Started
 		}
-		req := emulatedclient.AnnounceRequest{
+		req := &queue.AnnounceRequest{
 			Url:               currentTracker.Url(),
 			InfoHash:          t.infoHash,
 			Downloaded:        t.stats.Downloaded(),
@@ -295,7 +297,7 @@ func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *emulate
 			AnnounceCallbacks: callbacks,
 		}
 
-		queueAnnounce(req)
+		t.announceQueue.Enqueue(req)
 	}
 }
 
@@ -389,7 +391,7 @@ func findTracker(u url.URL, trackers []*trackerImpl) (int, *trackerImpl) {
 	return 0, nil
 }
 
-func drainSuccessResponseChan(c chan emulatedclient.AnnounceResponse) {
+func drainSuccessResponseChan(c chan queue.AnnounceResponse) {
 	for {
 		select {
 		case <-c:
@@ -398,7 +400,7 @@ func drainSuccessResponseChan(c chan emulatedclient.AnnounceResponse) {
 		}
 	}
 }
-func drainErrorResponseChan(c chan emulatedclient.AnnounceResponseError) {
+func drainErrorResponseChan(c chan queue.AnnounceResponseError) {
 	for {
 		select {
 		case <-c:

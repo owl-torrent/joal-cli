@@ -1,4 +1,4 @@
-package emulatedclient
+package queue
 
 import (
 	"github.com/anacrolix/torrent"
@@ -6,6 +6,26 @@ import (
 	"net/url"
 	"time"
 )
+
+const queueCapacity int = 1500
+
+type AnnounceQueue struct {
+	queue chan *AnnounceRequest
+}
+
+func New() *AnnounceQueue {
+	return &AnnounceQueue{
+		queue: make(chan *AnnounceRequest, queueCapacity),
+	}
+}
+
+func (q *AnnounceQueue) Enqueue(req *AnnounceRequest) {
+	q.queue <- req
+}
+
+func (q *AnnounceQueue) Request() <-chan *AnnounceRequest {
+	return q.queue
+}
 
 type AnnounceRequest struct {
 	Url               url.URL
