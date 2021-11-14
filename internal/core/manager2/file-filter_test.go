@@ -1,4 +1,4 @@
-package seedmanager
+package manager2
 
 import (
 	"github.com/anthonyraymond/watcher"
@@ -57,7 +57,7 @@ func TestFileFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := torrentFileFilter()(&tt.args.info, "-")
+			err := torrentFileFilter(&tt.args.info, "-")
 			if tt.wantSkip && err != watcher.ErrSkip {
 				t.Errorf("expected %v to be skipped", tt.args.info)
 			}

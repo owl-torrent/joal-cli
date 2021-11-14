@@ -20,6 +20,11 @@ import (
 var randSeed = time.Now().UnixNano()
 
 type Torrent interface {
+	Stop(ctx context.Context)
+	Start(props AnnounceProps, announceQueue *AnnounceQueue)
+	InfoHash() torrent.InfoHash
+	Path() string
+	ChangePath(path string)
 }
 
 type torrentImpl struct {
@@ -91,6 +96,18 @@ type AnnounceProps struct {
 	SupportUdpAnnounce    bool
 	AnnounceToAllTiers    bool
 	AnnounceToAllTrackers bool
+}
+
+func (t *torrentImpl) InfoHash() torrent.InfoHash {
+	return t.infoHash
+}
+
+func (t *torrentImpl) Path() string {
+	return t.path
+}
+
+func (t *torrentImpl) ChangePath(path string) {
+	t.path = path
 }
 
 func (t *torrentImpl) Start(props AnnounceProps, announceQueue *AnnounceQueue) {
