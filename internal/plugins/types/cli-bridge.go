@@ -5,14 +5,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent"
-	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
-	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
+	"github.com/anthonyraymond/joal-cli/internal/core/manager2"
 	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 )
 
@@ -38,11 +36,11 @@ type RuntimeConfig struct {
 }
 
 type coreBridge struct {
-	manager      seedmanager.ITorrentManager
+	manager      manager2.Manager
 	configLoader *core.CoreConfigLoader
 }
 
-func NewCoreBridge(loader *core.CoreConfigLoader, manager seedmanager.ITorrentManager) ICoreBridge {
+func NewCoreBridge(loader *core.CoreConfigLoader, manager manager2.Manager) ICoreBridge {
 	return &coreBridge{
 		manager:      manager,
 		configLoader: loader,
@@ -53,7 +51,8 @@ func (b *coreBridge) StartSeeding() error {
 	if b.manager == nil {
 		return fmt.Errorf("torrent manager is not available yet")
 	}
-	return b.manager.StartSeeding(nil)
+	b.manager.StartSeeding()
+	return nil
 }
 
 func (b *coreBridge) StopSeeding(ctx context.Context) error {
@@ -110,30 +109,12 @@ func (b *coreBridge) UpdateCoreConfig(newConf *RuntimeConfig) (*RuntimeConfig, e
 }
 
 func (b *coreBridge) AddTorrent(filename string, r io.Reader) error {
-	meta, err := metainfo.Load(r)
+	// Extract the content from the http request reader since the manager.SaveTorrentFile is asynchronous
+	content, err := ioutil.ReadAll(r)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse torrent file")
+		return fmt.Errorf("failed to read torrent file from reader: %w", err)
 	}
-
-	config, err := b.configLoader.ReadConfig()
-	if err != nil {
-		return errors.Wrap(err, "failed to read config file")
-	}
-	if filepath.Ext(filename) != ".torrent" {
-		filename += ".torrent"
-	}
-
-	filename = filepath.Join(config.TorrentsDir, filename)
-	w, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
-	if err != nil {
-		return errors.Wrapf(err, "failed to open file '%s' for writing", filename)
-	}
-
-	err = meta.Write(w)
-	if err != nil {
-		return errors.Wrapf(err, "failed to write to file '%s'", filename)
-	}
-
+	b.manager.SaveTorrentFile(filename, content)
 	return nil
 }
 
@@ -142,7 +123,8 @@ func (b *coreBridge) RemoveTorrent(infohash torrent.InfoHash) error {
 		return fmt.Errorf("torrent manager is not available yet")
 	}
 
-	return b.manager.RemoveTorrent(infohash)
+	b.manager.DeleteTorrent(infohash)
+	return nil
 }
 
 func (b *coreBridge) ListClientFiles() ([]string, error) {

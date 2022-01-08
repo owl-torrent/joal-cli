@@ -71,7 +71,8 @@ func (s *statsImpl) AddDownloaded(downloaded int64) {
 	s.lock.Lock()
 	s.downloaded += downloaded
 	s.lock.Unlock()
-	// TODO: decrement LEFT & once in a while update corrupted?
+	// TODO: decrement LEFT
+	// TODO: update corrupted once in a while?
 }
 
 func (s *statsImpl) Reset() {

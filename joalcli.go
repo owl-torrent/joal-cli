@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/anthonyraymond/joal-cli/internal/core/seedmanager"
+	"github.com/anthonyraymond/joal-cli/internal/core/manager2"
 	"github.com/anthonyraymond/joal-cli/internal/plugins"
 	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
 	"github.com/pkg/errors"
@@ -59,13 +59,13 @@ func main() {
 		panic(err)
 	}
 
-	manager := seedmanager.NewTorrentManager(coreConfigLoader)
+	manager, _ := manager2.Run(coreConfigLoader)
 	bridge := types.NewCoreBridge(coreConfigLoader, manager)
 	pluginManager := plugins.NewPluginManager(configLocation, bridge)
 	pluginManager.BootstrapPlugins(httpClient)
 	pluginManager.StartPlugins()
 
-	err = manager.StartSeeding(appConfig.Proxy.Proxy())
+	manager.StartSeeding()
 	if err != nil {
 		panic(err)
 	}

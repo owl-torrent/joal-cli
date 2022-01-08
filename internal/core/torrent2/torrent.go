@@ -5,6 +5,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/core/announces"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/pkg/errors"
@@ -156,21 +157,21 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 	t.peers.Reset()
 	t.stats.Reset()
 
-	onAnnounceSuccess := make(chan AnnounceResponse, len(t.trackers))
-	onAnnounceError := make(chan AnnounceResponseError, len(t.trackers))
+	onAnnounceSuccess := make(chan announces.AnnounceResponse, len(t.trackers))
+	onAnnounceError := make(chan announces.AnnounceResponseError, len(t.trackers))
 
 	timer := time.NewTimer(0 * time.Second)
 	onAnnounceTime := timer.C
 
 	dismissAnnounceResults := atomic.NewBool(false)
-	announceCallbacks := &AnnounceCallbacks{
-		Success: func(response AnnounceResponse) {
+	announceCallbacks := &announces.AnnounceCallbacks{
+		Success: func(response announces.AnnounceResponse) {
 			if dismissAnnounceResults.Load() {
 				return
 			}
 			onAnnounceSuccess <- response
 		},
-		Failed: func(responseError AnnounceResponseError) {
+		Failed: func(responseError announces.AnnounceResponseError) {
 			if dismissAnnounceResults.Load() {
 				return
 			}
@@ -214,7 +215,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 			trackerIndex, currentTracker := findTracker(errorResponse.Request.Url, t.trackers)
 			if currentTracker != nil {
 				currentTracker.Failed(AnnounceHistory{
-					error: errorResponse.Error(),
+					error: errorResponse.Error.Error(),
 				}, 250, int(errorResponse.Interval.Seconds()))
 			}
 			t.peers.AddPeer(SwarmUpdateRequest{
@@ -237,7 +238,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				onAnnounceTime = timer.C
 			}
 		case <-onAnnounceTime:
-			t.announceToTrackers(props, announceCallbacks, tracker.None)
+			t.announceToTrackers(props, announceCallbacks, tracker.None, context.Background())
 
 		case stopRequest := <-t.stopping:
 			//goland:noinspection GoDeferInLoop
@@ -256,7 +257,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 			for _, tr := range t.trackers {
 				tr.state.nextAnnounce = time.Now()
 			}
-			t.announceToTrackers(props, announceCallbacks, tracker.Stopped)
+			t.announceToTrackers(props, announceCallbacks, tracker.Stopped, stopRequest.Ctx())
 
 			return
 		}
@@ -289,7 +290,7 @@ func deprioritizeTracker(trackers []*trackerImpl, indexToDeprioritize int) {
 	}
 }
 
-func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *AnnounceCallbacks, event tracker.AnnounceEvent) {
+func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *announces.AnnounceCallbacks, event tracker.AnnounceEvent, ctx context.Context) {
 	trackersToAnnounce := findAnnounceReadyTrackers(t.trackers, props.AnnounceToAllTiers, props.AnnounceToAllTrackers)
 
 	for _, currentTracker := range trackersToAnnounce {
@@ -301,7 +302,8 @@ func (t *torrentImpl) announceToTrackers(props AnnounceProps, callbacks *Announc
 		if event == tracker.None && !currentTracker.state.startSent {
 			event = tracker.Started
 		}
-		req := &AnnounceRequest{
+		req := &announces.AnnounceRequest{
+			Ctx:               ctx,
 			Url:               currentTracker.Url(),
 			InfoHash:          t.infoHash,
 			Downloaded:        t.stats.Downloaded(),
@@ -407,7 +409,7 @@ func findTracker(u url.URL, trackers []*trackerImpl) (int, *trackerImpl) {
 	return 0, nil
 }
 
-func drainSuccessResponseChan(c chan AnnounceResponse) {
+func drainSuccessResponseChan(c chan announces.AnnounceResponse) {
 	for {
 		select {
 		case <-c:
@@ -416,7 +418,7 @@ func drainSuccessResponseChan(c chan AnnounceResponse) {
 		}
 	}
 }
-func drainErrorResponseChan(c chan AnnounceResponseError) {
+func drainErrorResponseChan(c chan announces.AnnounceResponseError) {
 	for {
 		select {
 		case <-c:

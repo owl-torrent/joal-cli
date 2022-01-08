@@ -104,7 +104,6 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 		return AnnounceResponse{}, fmt.Errorf("tracker gave failure reason: %q", trackerResponse.FailureReason)
 	}
 	ret := AnnounceResponse{
-		Url:      url,
 		Interval: time.Duration(trackerResponse.Interval) * time.Second,
 		Leechers: trackerResponse.Incomplete,
 		Seeders:  trackerResponse.Complete,

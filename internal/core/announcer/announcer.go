@@ -20,17 +20,18 @@ type AnnounceRequest struct {
 	Downloaded int64
 	Left       int64 // If less than 0, math.MaxInt64 will be used for HTTP trackers instead.
 	Uploaded   int64
+	Corrupt    int64
 	// Apparently this is optional. None can be used for announces done at
 	// regular intervals.
 	Event     tracker.AnnounceEvent
 	IPAddress net.IP
 	Key       uint32
 	NumWant   int32 // How many peer addresses are desired. -1 for default.
+	Private   bool
 	Port      uint16
 } // 82 bytes
 
 type AnnounceResponse struct {
-	Url      url.URL
 	Interval time.Duration // Minimum seconds the local peer should wait before next announce.
 	Leechers int32
 	Seeders  int32

@@ -35,7 +35,6 @@ func TestEmulatedClient_Unmarshall(t *testing.T) {
 	assert.Equal(t, "3.3.1", client.Version)
 	assert.Equal(t, int32(200), client.NumWant)
 	assert.Equal(t, int32(0), client.NumWantOnStop)
-	assert.NotNil(t, client.OrchestratorFactory)
 	assert.NotNil(t, client.KeyGenerator)
 	assert.NotNil(t, client.PeerIdGenerator)
 	assert.NotNil(t, client.Announcer)
@@ -59,7 +58,6 @@ func TestEmulatedClient_ShouldValidate(t *testing.T) {
 		{name: "shouldFailWithEmptyKeyGenerator", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.KeyGenerator", ErrorTag: "required"}},
 		{name: "shouldFailWithEmptyPeerIdGenerator", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.PeerIdGenerator", ErrorTag: "required"}},
 		{name: "shouldFailWithEmptyNumWant", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.NumWant", ErrorTag: "min"}},
-		{name: "shouldFailWithEmptyOrchestrator", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.OrchestratorFactory", ErrorTag: "required"}},
 		{name: "shouldFailWithEmptyAnnouncer", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.Announcer", ErrorTag: "required"}},
 		{name: "shouldFailWithEmptyListener", args: args{Client: EmulatedClient{}}, wantErr: true, errorDescription: testutils.ErrorDescription{ErrorFieldPath: "EmulatedClient.Listener", ErrorTag: "required"}},
 		{name: "shouldValidate", args: args{Client: EmulatedClient{
@@ -79,7 +77,7 @@ func TestEmulatedClient_ShouldValidate(t *testing.T) {
 			},
 			NumWant:       200,
 			NumWantOnStop: 0,
-			OrchestratorFactory: &orchestratorFactory{
+			AnnounceCapabilities: AnnounceCapabilities{
 				SupportAnnounceList:         true,
 				AnnounceToAllTiers:          true,
 				AnnounceToAllTrackersInTier: true,

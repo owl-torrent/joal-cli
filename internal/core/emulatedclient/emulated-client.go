@@ -3,12 +3,11 @@ package emulatedclient
 import (
 	"context"
 	"fmt"
-	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/announcer"
+	"github.com/anthonyraymond/joal-cli/internal/core/announces"
 	keygenerator "github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/key/generator"
 	peeridgenerator "github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/peerid/generator"
-	"github.com/anthonyraymond/joal-cli/internal/core/orchestrator"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -20,10 +19,9 @@ import (
 type IEmulatedClient interface {
 	GetName() string
 	GetVersion() string
-	Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error)
+	Announce(request *announces.AnnounceRequest)
 	StartListener(proxyFunc func(*http.Request) (*url.URL, error)) error
 	StopListener(ctx context.Context)
-	CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error)
 	GetAnnounceCapabilities() AnnounceCapabilities
 	SupportsHttpAnnounce() bool
 	SupportsUdpAnnounce() bool
@@ -36,7 +34,6 @@ type EmulatedClient struct {
 	PeerIdGenerator      *peeridgenerator.PeerIdGenerator `yaml:"peerIdGenerator" validate:"required"`
 	NumWant              int32                            `yaml:"numwant" validate:"min=1"`
 	NumWantOnStop        int32                            `yaml:"numwantOnStop"`
-	OrchestratorFactory  *orchestratorFactory             `yaml:"announceOrchestrator" validate:"required"`
 	AnnounceCapabilities AnnounceCapabilities             `yaml:"announceCapabilities" validate:"required"`
 	Announcer            *announcer.Announcer             `yaml:"announcer" validate:"required"`
 	Listener             *Listener                        `yaml:"listener" validate:"required"`
@@ -103,27 +100,45 @@ func (c *EmulatedClient) GetVersion() string {
 	return c.Version
 }
 
-func (c *EmulatedClient) Announce(ctx context.Context, u url.URL, infoHash torrent.InfoHash, uploaded int64, downloaded int64, left int64, event tracker.AnnounceEvent) (announcer.AnnounceResponse, error) {
+func (c *EmulatedClient) Announce(request *announces.AnnounceRequest) {
 	if c.Listener.ip == nil || c.Listener.listeningPort == nil {
 		panic(fmt.Errorf("EmulatedClient listener is not started"))
 	}
+
 	announceRequest := announcer.AnnounceRequest{
-		InfoHash:   infoHash,
-		PeerId:     c.PeerIdGenerator.Get(infoHash, event),
-		Downloaded: downloaded,
-		Left:       left,
-		Uploaded:   uploaded,
-		Event:      event,
+		InfoHash:   request.InfoHash,
+		PeerId:     c.PeerIdGenerator.Get(request.InfoHash, request.Event),
+		Downloaded: request.Downloaded,
+		Left:       request.Left,
+		Uploaded:   request.Uploaded,
+		Corrupt:    request.Corrupt,
+		Event:      request.Event,
 		IPAddress:  *c.Listener.ip,
-		Key:        uint32(c.KeyGenerator.Get(infoHash, event)),
+		Key:        uint32(c.KeyGenerator.Get(request.InfoHash, request.Event)),
 		NumWant:    c.NumWant,
+		Private:    request.Private,
 		Port:       *c.Listener.listeningPort,
 	}
-	if event == tracker.Stopped {
+	if request.Event == tracker.Stopped {
 		announceRequest.NumWant = c.NumWantOnStop
 	}
 
-	return c.Announcer.Announce(u, announceRequest, ctx)
+	response, err := c.Announcer.Announce(request.Url, announceRequest, request.Ctx)
+	if err != nil {
+		request.AnnounceCallbacks.Failed(announces.AnnounceResponseError{
+			Request:  request,
+			Error:    fmt.Errorf("announce failed: %w", err),
+			Interval: 0,
+		})
+		return
+	}
+	request.AnnounceCallbacks.Success(announces.AnnounceResponse{
+		Request:  request,
+		Interval: response.Interval,
+		Leechers: response.Leechers,
+		Seeders:  response.Seeders,
+		Peers:    response.Peers,
+	})
 }
 
 func (c *EmulatedClient) StartListener(proxyFunc func(*http.Request) (*url.URL, error)) error {
@@ -132,10 +147,6 @@ func (c *EmulatedClient) StartListener(proxyFunc func(*http.Request) (*url.URL, 
 
 func (c *EmulatedClient) StopListener(ctx context.Context) {
 	c.Listener.Stop(ctx)
-}
-
-func (c *EmulatedClient) CreateOrchestratorForTorrent(info *orchestrator.TorrentInfo) (orchestrator.IOrchestrator, error) {
-	return c.OrchestratorFactory.createOrchestrator(info)
 }
 
 func (c *EmulatedClient) GetAnnounceCapabilities() AnnounceCapabilities {

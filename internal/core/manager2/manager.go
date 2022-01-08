@@ -5,14 +5,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/core"
+	"github.com/anthonyraymond/joal-cli/internal/core/announces"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/torrent2"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/anthonyraymond/watcher"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -21,12 +25,11 @@ var NoOpProxy = http.ProxyFromEnvironment
 
 type Manager interface {
 	StartSeeding()
-	StopSeeding()
+	StopSeeding(ctx context.Context)
 	// Quit destroy the Manager in a non-recoverable way. To be called before exiting the program.
 	Quit()
-	//SaveTorrentFile(filename string, bytes []byte)
-	//DeleteTorrent(hash torrent.InfoHash)
-	//SaveConfig(config *core.RuntimeConfig)
+	SaveTorrentFile(filename string, bytes []byte)
+	DeleteTorrent(hash torrent.InfoHash)
 }
 
 type managerImpl struct {
@@ -49,7 +52,9 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 		quit:         stop.NewChan(),
 	}
 
-	conf, err := m.configLoader.ReadConfig() // TODO: the config loader should not be needed to load Joal paths, those should be passed as Run parameter, the loader should only load RuntimeConfig
+	// TODO: the config loader should not be needed to load Joal paths, those should be passed as Run parameter, the loader should only load RuntimeConfig
+	//  this error is the only one that makes the Run() method returns an error
+	conf, err := m.configLoader.ReadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
@@ -59,13 +64,15 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 	_ = torrentFileWatcher.Add(conf.TorrentsDir)
 
 	go func(m *managerImpl) {
-		err := m.doStartSeeding()
-		refreshStatsTicker := time.NewTimer(15 * time.Second) // TODO: remember to stop that on stop, maybe move that as struct propertyes so we can stop and start in StartSeeding/StopSeeding
+		refreshStatsTicker := time.NewTimer(15 * time.Second)
 		for {
 			select {
 			case command := <-m.commands:
 				command()
 			case <-refreshStatsTicker.C:
+				if !m.isSeeding {
+					continue
+				}
 				//TODO: implement => update torrents speed & stats4
 			case err := <-torrentFileWatcher.Error:
 				log.Warn("file watcher has reported an error", zap.Error(err))
@@ -80,7 +87,14 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 					}
 					m.torrents[t.InfoHash()] = t
 					if m.isSeeding {
-						t.Start(clientCapabilities, m.announceQueue)
+						clientAbilities := m.client.GetAnnounceCapabilities()
+						t.Start(torrent2.AnnounceProps{
+							SupportHttpAnnounce:   m.client.SupportsHttpAnnounce(),
+							SupportUdpAnnounce:    m.client.SupportsUdpAnnounce(),
+							SupportAnnounceList:   clientAbilities.SupportAnnounceList,
+							AnnounceToAllTiers:    clientAbilities.AnnounceToAllTiers,
+							AnnounceToAllTrackers: clientAbilities.AnnounceToAllTrackersInTier,
+						}, m.announceQueue)
 					}
 				case watcher.Rename:
 					log.Info(event.String())
@@ -97,7 +111,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 					}
 					delete(m.torrents, t.InfoHash())
 					if m.isSeeding {
-						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 						t.Stop(ctx)
 						cancel()
 					}
@@ -106,18 +120,23 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 					log.Info("Event is ignored", zap.String("file", filepath.Base(event.Path)), zap.String("event", event.Op.String()))
 				}
 			case stopRequest := <-m.quit:
+				//goland:noinspection GoDeferInLoop
 				defer func() {
 					stopRequest.NotifyDone()
 				}()
 
+				// close & drain refreshStatsTicker
+				refreshStatsTicker.Stop()
+				select {
+				case <-refreshStatsTicker.C:
+				default:
+				}
+
 				torrentFileWatcher.Close()
 				<-torrentFileWatcher.Closed
-				m.doStopSeeding()
+				m.doStopSeeding(stopRequest.Ctx())
 
-				if stopRequest.Ctx().Err() != nil {
-					// context is already expired, no need to announce stop
-					return
-				}
+				return
 			}
 		}
 	}(m)
@@ -164,8 +183,8 @@ func (m *managerImpl) doStartSeeding() error {
 
 	m.client = client
 	m.announceQueue = torrent2.NewAnnounceQueue()
-	go RunQueueConsumer(m.announceQueue, func(request *torrent2.AnnounceRequest) {
-		err := client.Announce(request) // TODO: client.Announce should not throw error, announcer should use the error chan instead
+	go RunQueueConsumer(m.announceQueue, func(request *announces.AnnounceRequest) {
+		client.Announce(request)
 	})
 
 	m.isSeeding = true
@@ -173,12 +192,39 @@ func (m *managerImpl) doStartSeeding() error {
 	return nil
 }
 
-func (m *managerImpl) doStopSeeding() {
+func (m *managerImpl) doSaveTorrentFile(filename string, content []byte) error {
+	meta, err := metainfo.Load(bytes.NewReader(content))
+	if err != nil {
+		return errors.Wrap(err, "failed to parse torrent file")
+	}
+
+	config, err := m.configLoader.ReadConfig()
+	if err != nil {
+		return errors.Wrap(err, "failed to read config file")
+	}
+	if filepath.Ext(filename) != ".torrent" {
+		filename += ".torrent"
+	}
+
+	filename = filepath.Join(config.TorrentsDir, filename)
+	w, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open file '%s' for writing", filename)
+	}
+
+	err = meta.Write(w)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write to file '%s'", filename)
+	}
+	return nil
+}
+
+func (m *managerImpl) doStopSeeding(ctx context.Context) {
 	if !m.isSeeding {
 		return
 	}
 	for _, t := range m.torrents {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
 		t.Stop(ctx)
 		cancel()
 	}
@@ -198,8 +244,26 @@ func (m *managerImpl) StartSeeding() {
 	}
 }
 
-func (m *managerImpl) StopSeeding() {
-	m.commands <- m.doStopSeeding
+func (m *managerImpl) SaveTorrentFile(filename string, bytes []byte) {
+	log := logs.GetLogger()
+	m.commands <- func() {
+		err := m.doSaveTorrentFile(filename, bytes)
+		if err != nil {
+			log.Error("manager failed to start seeding", zap.Error(err))
+			//TODO: find a way to return error?
+		}
+	}
+}
+
+func (m *managerImpl) DeleteTorrent(hash torrent.InfoHash) {
+	//TODO implement me: send command doDeleteTorrent
+	panic("implement me")
+}
+
+func (m *managerImpl) StopSeeding(ctx context.Context) {
+	m.commands <- func() {
+		m.doStopSeeding(ctx)
+	}
 }
 
 func (m *managerImpl) Quit() {
