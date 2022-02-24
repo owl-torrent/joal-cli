@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Masterminds/semver/v3"
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v42/github"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"io/ioutil"

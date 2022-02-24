@@ -13,7 +13,6 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core/torrent2"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"github.com/anthonyraymond/watcher"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -29,7 +28,7 @@ type Manager interface {
 	// Quit destroy the Manager in a non-recoverable way. To be called before exiting the program.
 	Quit()
 	SaveTorrentFile(filename string, bytes []byte)
-	DeleteTorrent(hash torrent.InfoHash)
+	ArchiveTorrent(hash torrent.InfoHash)
 }
 
 type managerImpl struct {
@@ -195,12 +194,12 @@ func (m *managerImpl) doStartSeeding() error {
 func (m *managerImpl) doSaveTorrentFile(filename string, content []byte) error {
 	meta, err := metainfo.Load(bytes.NewReader(content))
 	if err != nil {
-		return errors.Wrap(err, "failed to parse torrent file")
+		return fmt.Errorf("failed to parse torrent file: %w", err)
 	}
 
 	config, err := m.configLoader.ReadConfig()
 	if err != nil {
-		return errors.Wrap(err, "failed to read config file")
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 	if filepath.Ext(filename) != ".torrent" {
 		filename += ".torrent"
@@ -209,13 +208,35 @@ func (m *managerImpl) doSaveTorrentFile(filename string, content []byte) error {
 	filename = filepath.Join(config.TorrentsDir, filename)
 	w, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open file '%s' for writing", filename)
+		return fmt.Errorf("failed to open file '%s' for writing: %w", filename, err)
 	}
 
 	err = meta.Write(w)
 	if err != nil {
-		return errors.Wrapf(err, "failed to write to file '%s'", filename)
+		return fmt.Errorf("failed to write to file '%s': %w", filename, err)
 	}
+	return nil
+}
+
+func (m *managerImpl) doArchiveTorrent(hash torrent.InfoHash) error {
+	config, err := m.configLoader.ReadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var torrentToRemove torrent2.Torrent = nil
+	for _, t := range m.torrents {
+		if t.InfoHash().HexString() == hash.HexString() {
+			torrentToRemove = t
+		}
+		return fmt.Errorf("torrent not found in seeding list")
+	}
+
+	err = torrentToRemove.MoveTo(config.ArchivedTorrentsDir)
+	if err != nil {
+		return fmt.Errorf("failed to move torrent file to archive directory: %w", err)
+	}
+
 	return nil
 }
 
@@ -255,9 +276,15 @@ func (m *managerImpl) SaveTorrentFile(filename string, bytes []byte) {
 	}
 }
 
-func (m *managerImpl) DeleteTorrent(hash torrent.InfoHash) {
-	//TODO implement me: send command doDeleteTorrent
-	panic("implement me")
+func (m *managerImpl) ArchiveTorrent(hash torrent.InfoHash) {
+	log := logs.GetLogger()
+	m.commands <- func() {
+		err := m.doArchiveTorrent(hash)
+		if err != nil {
+			log.Error("manager failed to archive torrent", zap.Error(err))
+			//TODO: find a way to return error?
+		}
+	}
 }
 
 func (m *managerImpl) StopSeeding(ctx context.Context) {

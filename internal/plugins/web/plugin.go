@@ -9,7 +9,6 @@ import (
 	"github.com/go-stomp/stomp/v3"
 	stompServer "github.com/go-stomp/stomp/v3/server"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/rs/cors"
 	"go.uber.org/zap"
 	"net"
@@ -66,7 +65,7 @@ func BootStrap(pluginsRootDir string, coreBridge types.ICoreBridge, client *http
 
 	err := bootstrap(configRoot, client, log)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to bootstrap web plugin")
+		return nil, fmt.Errorf("failed to bootstrap web plugin: %w", err)
 	}
 	return p, nil
 }
@@ -89,7 +88,7 @@ func (w *plugin) Start() error {
 	wsListener, err := newWebSocketListener()
 	if err != nil {
 		shutdown(w, nil)
-		return errors.Wrap(err, "failed to create web stomp listener")
+		return fmt.Errorf("failed to create web stomp listener: %w", err)
 	}
 	w.wsListener = wsListener
 
@@ -121,7 +120,7 @@ func (w *plugin) Start() error {
 	stompPublisher, err := createStompPublisher(conf.Http, conf.WebSocket, conf.Stomp)
 	if err != nil {
 		shutdown(w, nil)
-		return errors.Wrap(err, "failed to create the stomp publisher")
+		return fmt.Errorf("failed to create the stomp publisher: %w", err)
 	}
 
 	w.stompPublisher = stompPublisher
@@ -173,7 +172,7 @@ func startHttpServer(httpHandler http.Handler, config *httpConfig, log *zap.Logg
 	// Create a listener for the HTTP server
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to start listenet on port %d", config.Port)
+		return nil, fmt.Errorf("failed to start listenet on port %d: %w", config.Port, err)
 	}
 	server := &http.Server{
 		Handler:           httpHandler,
@@ -200,6 +199,7 @@ func startStompServer(config *stompConfig, wsListener net.Listener, log *zap.Log
 		err := (&stompServer.Server{
 			Authenticator: config,
 			HeartBeat:     config.HeartBeat,
+			Log:           wrapZapLogger(log),
 		}).Serve(wsListener)
 		if err != nil {
 			log.Error("stomp server has been closed", zap.Error(err))
@@ -210,7 +210,7 @@ func startStompServer(config *stompConfig, wsListener net.Listener, log *zap.Log
 func createStompPublisher(httpConf *httpConfig, wsConfig *webSocketConfig, stompConfig *stompConfig) (*stomp.Conn, error) {
 	negotiationEndpoint, err := url.Parse(fmt.Sprintf("ws://localhost:%d%s", httpConf.Port, httpConf.withSecretPathPrefix(httpConf.WsNegotiationEndpointUrl)))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create stomp negotiation endpoint URL")
+		return nil, fmt.Errorf("failed to create stomp negotiation endpoint URL: %w", err)
 	}
 
 	c, _, err := websocket.Dial(context.Background(), negotiationEndpoint.String(), &websocket.DialOptions{
@@ -219,7 +219,7 @@ func createStompPublisher(httpConf *httpConfig, wsConfig *webSocketConfig, stomp
 		CompressionThreshold: 0,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to local websocket endpoint")
+		return nil, fmt.Errorf("failed to connect to local websocket endpoint: %w", err)
 	}
 	c.SetReadLimit(int64(wsConfig.MaxReadLimit))
 	conn, err := stomp.Connect(
@@ -231,7 +231,7 @@ func createStompPublisher(httpConf *httpConfig, wsConfig *webSocketConfig, stomp
 	)
 	if err != nil {
 		_ = c.Close(websocket.StatusGoingAway, "closing websocket because STOMP connect have failed")
-		return nil, errors.Wrap(err, "failed to start stomp publisher")
+		return nil, fmt.Errorf("failed to start stomp publisher: %w", err)
 	}
 	return conn, nil
 }

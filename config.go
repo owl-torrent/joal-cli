@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,13 +19,13 @@ var (
 
 func BootstrapApp(configDir string) (*AppConfig, error) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create folder '%s'", configDir)
+		return nil, fmt.Errorf("failed to create folder '%s': %w", configDir, err)
 	}
 
 	// Create the configuration file if missing
 	f, err := os.OpenFile(configFileFromRoot(configDir), os.O_CREATE, 0755)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create '%s' file", configFileFromRoot(configDir))
+		return nil, fmt.Errorf("failed to create '%s' file: %w", configFileFromRoot(configDir), err)
 	}
 	_ = f.Close()
 

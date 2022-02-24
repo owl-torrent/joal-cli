@@ -70,8 +70,13 @@ func (s *statsImpl) AddUploaded(uploaded int64) {
 func (s *statsImpl) AddDownloaded(downloaded int64) {
 	s.lock.Lock()
 	s.downloaded += downloaded
+	if s.left > 0 {
+		s.left -= downloaded
+		if s.left < 0 {
+			s.left = 0
+		}
+	}
 	s.lock.Unlock()
-	// TODO: decrement LEFT
 	// TODO: update corrupted once in a while?
 }
 

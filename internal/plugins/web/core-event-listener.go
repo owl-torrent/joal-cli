@@ -2,11 +2,11 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/go-stomp/stomp/v3"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/url"
 	"sync"
@@ -386,12 +386,12 @@ func (l *appStateCoreListener) hasTorrent(infohash torrent.InfoHash) bool {
 func sendToStompTopic(stompPublisher *stomp.Conn, destination string, content *stompPayload) error {
 	body, err := json.Marshal(content)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal stomp payload as json")
+		return fmt.Errorf("failed to marshal stomp payload as json: %w", err)
 	}
 
 	err = stompPublisher.Send(destination, "application/json", body)
 	if err != nil {
-		return errors.Wrapf(err, "failed to send a stomp message to the local server for topic %s", destination)
+		return fmt.Errorf("failed to send a stomp message to the local server for topic %s: %w", destination, err)
 	}
 	return nil
 }

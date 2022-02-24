@@ -1,8 +1,8 @@
 package core
 
 import (
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
-	"github.com/pkg/errors"
 )
 
 type CoreConfigLoader struct {
@@ -25,7 +25,7 @@ func (l *CoreConfigLoader) ReadConfig() (*JoalConfig, error) {
 	conf := RuntimeConfig{}.Default()
 	err := configloader.ParseIntoDefault(l.configFilePath, conf)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse RuntimeConfig")
+		return nil, fmt.Errorf("failed to parse RuntimeConfig: %w", err)
 	}
 
 	return &JoalConfig{
@@ -40,7 +40,7 @@ func (l *CoreConfigLoader) ReadConfig() (*JoalConfig, error) {
 func (l *CoreConfigLoader) SaveConfigToFile(newConf *RuntimeConfig) error {
 	err := configloader.SaveToFile(l.configFilePath, newConf)
 	if err != nil {
-		return errors.Wrap(err, "failed to save RuntimeConfig")
+		return fmt.Errorf("failed to save RuntimeConfig: %w", err)
 	}
 
 	return nil

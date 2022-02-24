@@ -6,7 +6,6 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/key"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/key/algorithm"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"time"
 )
@@ -71,7 +70,7 @@ func (a *KeyGenerator) Get(infoHash torrent.InfoHash, event tracker.AnnounceEven
 func (a *KeyGenerator) AfterPropertiesSet() error {
 	err := a.Algorithm.AfterPropertiesSet()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to validate generator algorithm")
+		return fmt.Errorf("failed to validate generator algorithm: %w", err)
 	}
 	return a.IKeyGenerator.afterPropertiesSet()
 }

@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -30,23 +29,23 @@ func Bootstrap(coreRootDir string, client *http.Client) (*CoreConfigLoader, erro
 
 	err := os.MkdirAll(torrentDirFromRoot(coreRootDir), 0755)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create directory '%s'", coreRootDir)
+		return nil, fmt.Errorf("failed to create directory '%s': %w", coreRootDir, err)
 	}
 
 	err = bootstrapConfigFile(coreRootDir)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to bootstrap core")
+		return nil, fmt.Errorf("failed to bootstrap core: %w", err)
 	}
 	err = bootstrapTorrentDirectories(coreRootDir)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to bootstrap core")
+		return nil, fmt.Errorf("failed to bootstrap core: %w", err)
 	}
 
 	configLoader := newCoreConfigLoader(coreRootDir)
 
 	err = bootstrapClients(coreRootDir, client, log)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to bootstrap core")
+		return nil, fmt.Errorf("failed to bootstrap core: %w", err)
 	}
 
 	return configLoader, nil
@@ -56,7 +55,7 @@ func bootstrapConfigFile(coreRootDir string) error {
 	// Create the configuration file if missing
 	f, err := os.OpenFile(configFileFromRoot(coreRootDir), os.O_CREATE, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create '%s' file", configFileFromRoot(coreRootDir))
+		return fmt.Errorf("failed to create '%s' file: %w", configFileFromRoot(coreRootDir), err)
 	}
 	defer func() { _ = f.Close() }()
 	return nil
@@ -65,11 +64,11 @@ func bootstrapConfigFile(coreRootDir string) error {
 func bootstrapTorrentDirectories(coreRootDir string) error {
 	err := os.MkdirAll(torrentDirFromRoot(coreRootDir), 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create directory '%s'", torrentDirFromRoot(coreRootDir))
+		return fmt.Errorf("failed to create directory '%s': %w", torrentDirFromRoot(coreRootDir), err)
 	}
 	err = os.MkdirAll(archivedTorrentDirFromRoot(coreRootDir), 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create directory '%s'", archivedTorrentDirFromRoot(coreRootDir))
+		return fmt.Errorf("failed to create directory '%s': %w", archivedTorrentDirFromRoot(coreRootDir), err)
 	}
 	return nil
 }
@@ -79,7 +78,7 @@ func bootstrapClients(coreRootDir string, client *http.Client, log *zap.Logger) 
 	clientDir := clientsDirFromRoot(coreRootDir)
 	err := os.MkdirAll(clientDir, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create directory '%s'", clientDir)
+		return fmt.Errorf("failed to create directory '%s': %w", clientDir, err)
 	}
 	downloader := newClientDownloader(clientDir, client, newGithubClient(client))
 
@@ -93,7 +92,7 @@ func bootstrapClients(coreRootDir string, client *http.Client, log *zap.Logger) 
 	}
 	err = downloader.Install()
 	if err != nil {
-		return errors.Wrap(err, "failed to install client files")
+		return fmt.Errorf("failed to install client files: %w", err)
 	}
 
 	return nil

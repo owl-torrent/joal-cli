@@ -6,7 +6,6 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/peerid"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/peerid/algorithm"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"time"
 )
@@ -68,7 +67,7 @@ func (a *PeerIdGenerator) Get(infoHash torrent.InfoHash, event tracker.AnnounceE
 func (a *PeerIdGenerator) AfterPropertiesSet() error {
 	err := a.Algorithm.AfterPropertiesSet()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to validate generator algorithm")
+		return fmt.Errorf("failed to validate generator algorithm: %w", err)
 	}
 	return a.IPeerIdGenerator.afterPropertiesSet()
 }

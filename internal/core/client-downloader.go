@@ -6,8 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/c4milo/unpackit"
-	"github.com/google/go-github/v32/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v42/github"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
@@ -76,7 +75,7 @@ func (d *githubClientDownloader) IsInstalled() (bool, *semver.Version, error) {
 func (d *githubClientDownloader) Install() error {
 	release, _, err := d.githubClient.Repositories.GetReleaseByTag(context.Background(), githubRepoOwner, githubRepoName, clientFilesReleaseTag)
 	if err != nil {
-		return errors.Wrapf(err, "client downloader: error when fetching release with tag '%s'", clientFilesReleaseTag)
+		return fmt.Errorf("client downloader: error when fetching release with tag '%s': %w", clientFilesReleaseTag, err)
 	}
 
 	if len(release.Assets) == 0 || len(release.Assets) > 1 {
@@ -86,17 +85,17 @@ func (d *githubClientDownloader) Install() error {
 
 	response, err := d.httpClient.Get(asset.GetBrowserDownloadURL())
 	if err != nil {
-		return errors.Wrapf(err, "client downloader: failed to GET release from '%s'", asset.GetBrowserDownloadURL())
+		return fmt.Errorf("client downloader: failed to GET release from '%s': %w", asset.GetBrowserDownloadURL(), err)
 	}
 
 	if response.StatusCode >= 400 {
 		_ = response.Body.Close()
-		return errors.Wrapf(err, "client downloader: failed to download release, response status code is %d", response.StatusCode)
+		return fmt.Errorf("client downloader: failed to download release, response status code is %d: %w", response.StatusCode, err)
 	}
 
 	_, err = unpackit.Unpack(response.Body, d.clientsDirectory)
 	if err != nil {
-		return errors.Wrap(err, "client downloader: failed to unpack archive")
+		return fmt.Errorf("client downloader: failed to unpack archive: %w", err)
 	}
 
 	return nil
@@ -111,12 +110,12 @@ func installedVersion(dir string) (*semver.Version, error) {
 
 	versionString, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read client version file '%s'", filepath.Join(dir, clientVersionFileName))
+		return nil, fmt.Errorf("failed to read client version file '%s': %w", filepath.Join(dir, clientVersionFileName), err)
 	}
 
 	version, err := semver.NewVersion(strings.TrimSpace(string(versionString)))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse version '%s' as semvers from client version file '%s'", versionString, filepath.Join(dir, clientVersionFileName))
+		return nil, fmt.Errorf("failed to parse version '%s' as semvers from client version file '%s': %w", versionString, filepath.Join(dir, clientVersionFileName), err)
 	}
 	return version, nil
 }

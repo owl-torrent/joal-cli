@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/anacrolix/torrent/tracker"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"net"
 	"net/http"
@@ -100,7 +99,7 @@ func (a *Announcer) Announce(u url.URL, announceRequest AnnounceRequest, ctx con
 
 	ret, err := currentAnnouncer.Announce(u, announceRequest, ctx)
 	if err != nil {
-		return AnnounceResponse{}, errors.Wrap(err, "failed to announce")
+		return AnnounceResponse{}, fmt.Errorf("failed to announce: %w", err)
 	}
 
 	return ret, nil

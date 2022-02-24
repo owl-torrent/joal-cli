@@ -8,7 +8,6 @@ import (
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/manager2"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"path/filepath"
@@ -123,19 +122,19 @@ func (b *coreBridge) RemoveTorrent(infohash torrent.InfoHash) error {
 		return fmt.Errorf("torrent manager is not available yet")
 	}
 
-	b.manager.DeleteTorrent(infohash)
+	b.manager.ArchiveTorrent(infohash)
 	return nil
 }
 
 func (b *coreBridge) ListClientFiles() ([]string, error) {
 	config, err := b.configLoader.ReadConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read config file")
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	files, err := ioutil.ReadDir(config.ClientsDir)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list '%s' directory", config.ClientsDir)
+		return nil, fmt.Errorf("failed to list '%s' directory: %w", config.ClientsDir, err)
 	}
 
 	var clients []string

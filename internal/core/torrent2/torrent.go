@@ -2,16 +2,17 @@ package torrent2
 
 import (
 	"context"
+	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/announces"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
-	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,11 +22,12 @@ import (
 var randSeed = time.Now().UnixNano()
 
 type Torrent interface {
-	Stop(ctx context.Context)
 	Start(props AnnounceProps, announceQueue *AnnounceQueue)
+	Stop(ctx context.Context)
 	InfoHash() torrent.InfoHash
 	Path() string
 	ChangePath(path string)
+	MoveTo(directory string) error
 }
 
 type torrentImpl struct {
@@ -47,12 +49,12 @@ func FromFile(filePath string) (Torrent, error) {
 	logger := logs.GetLogger().With(zap.String("torrent", filepath.Base(filePath)))
 	meta, err := metainfo.LoadFromFile(filePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load meta-info from file '%s'", filePath)
+		return nil, fmt.Errorf("failed to load meta-info from file '%s': %w", filePath, err)
 	}
 
 	info, err := meta.UnmarshalInfo()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load info from file '%s'", filePath)
+		return nil, fmt.Errorf("failed to load info from file '%s': %w", filePath, err)
 	}
 	infoHash := meta.HashInfoBytes()
 	logger.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
@@ -99,18 +101,6 @@ type AnnounceProps struct {
 	AnnounceToAllTrackers bool
 }
 
-func (t *torrentImpl) InfoHash() torrent.InfoHash {
-	return t.infoHash
-}
-
-func (t *torrentImpl) Path() string {
-	return t.path
-}
-
-func (t *torrentImpl) ChangePath(path string) {
-	t.path = path
-}
-
 func (t *torrentImpl) Start(props AnnounceProps, announceQueue *AnnounceQueue) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -150,6 +140,26 @@ func (t *torrentImpl) Stop(ctx context.Context) {
 
 	_ = stopReq.AwaitDone()
 	logger.Info("torrent: stopped")
+}
+
+func (t *torrentImpl) InfoHash() torrent.InfoHash {
+	return t.infoHash
+}
+
+func (t *torrentImpl) Path() string {
+	return t.path
+}
+
+func (t *torrentImpl) ChangePath(path string) {
+	t.path = path
+}
+
+func (t *torrentImpl) MoveTo(directory string) error {
+	err := os.Rename(t.path, filepath.Join(directory, filepath.Base(t.path)))
+	if err != nil {
+		return fmt.Errorf("faield to move file: %w", err)
+	}
+	return nil
 }
 
 func torrentRoutine(t *torrentImpl, props AnnounceProps) {

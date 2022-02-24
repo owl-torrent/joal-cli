@@ -60,7 +60,6 @@ var publicIpProviders = []string{
 	"http://ifconfig.me/ip",
 	"http://ident.me",
 	"http://checkip.amazonaws.com",
-	"http://bot.whatismyipaddress.com",
 	"http://whatismyip.akamai.com",
 	"http://wgetip.com",
 	"http://ip.appspot.com",

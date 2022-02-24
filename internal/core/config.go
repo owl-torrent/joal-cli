@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,7 +19,7 @@ func (c *JoalConfig) ListClientFiles() ([]string, error) {
 
 	err := filepath.Walk(c.ClientsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return errors.Wrapf(err, "error at file '%s'", path)
+			return fmt.Errorf("error at file '%s': %w", path, err)
 		}
 		if info.IsDir() {
 			return nil
@@ -31,7 +31,7 @@ func (c *JoalConfig) ListClientFiles() ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "error while walking though dir '%s'", c.ClientsDir)
+		return nil, fmt.Errorf("error while walking though dir '%s': %w", c.ClientsDir, err)
 	}
 
 	return clients, nil

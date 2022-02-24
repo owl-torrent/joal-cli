@@ -1,7 +1,7 @@
 package logs
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -57,7 +57,7 @@ func ReplaceLogger(config *LogConfig) error {
 	// replace the current log level
 	err = logLevel.UnmarshalText([]byte(config.Level))
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse log level '%s'", config.Level)
+		return fmt.Errorf("failed to parse log level '%s': %w", config.Level, err)
 	}
 
 	log = zap.New(

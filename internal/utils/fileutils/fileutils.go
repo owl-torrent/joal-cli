@@ -1,7 +1,7 @@
 package fileutils
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 	"os"
 )
 
@@ -39,7 +39,7 @@ func FileExists(path string) (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, errors.Wrap(err, "failed to check if file exists")
+		return false, fmt.Errorf("failed to check if file exists: %w", err)
 	}
 	if info.IsDir() {
 		return false, nil
@@ -53,7 +53,7 @@ func DirExists(path string) (bool, error) {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, errors.Wrap(err, "failed to check if directory exists")
+		return false, fmt.Errorf("failed to check if directory exists: %w", err)
 	}
 	if !info.IsDir() {
 		return false, nil

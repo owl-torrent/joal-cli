@@ -2,7 +2,6 @@ package web
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -20,18 +19,18 @@ var (
 
 func bootstrap(configRoot string, client *http.Client, log *zap.Logger) error {
 	if err := os.MkdirAll(configRoot, 0755); err != nil {
-		return errors.Wrapf(err, "failed to create folder '%s'", configRoot)
+		return fmt.Errorf("failed to create folder '%s': %w", configRoot, err)
 	}
 
 	f, err := os.OpenFile(webConfigFilePathFromRoot(configRoot), os.O_CREATE, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create '%s' file", webConfigFilePathFromRoot(configRoot))
+		return fmt.Errorf("failed to create '%s' file: %w", webConfigFilePathFromRoot(configRoot), err)
 	}
 	_ = f.Close()
 
 	err = bootstrapWebUi(configRoot, client, log)
 	if err != nil {
-		return errors.Wrap(err, "failed to download webui")
+		return fmt.Errorf("failed to download webui: %w", err)
 	}
 	return nil
 }
@@ -41,7 +40,7 @@ func bootstrapWebUi(coreRootDir string, client *http.Client, log *zap.Logger) er
 	clientDir := staticFilesDirFromRoot(coreRootDir)
 	err := os.MkdirAll(clientDir, 0755)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create directory '%s'", clientDir)
+		return fmt.Errorf("failed to create directory '%s': %w", clientDir, err)
 	}
 	downloader := newWebuiDownloader(clientDir, client, newGithubClient(client))
 
@@ -55,7 +54,7 @@ func bootstrapWebUi(coreRootDir string, client *http.Client, log *zap.Logger) er
 	}
 	err = downloader.Install()
 	if err != nil {
-		return errors.Wrap(err, "failed to install webui files")
+		return fmt.Errorf("failed to install webui files: %w", err)
 	}
 
 	return nil

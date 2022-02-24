@@ -1,8 +1,8 @@
 package web
 
 import (
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
-	"github.com/pkg/errors"
 )
 
 type webConfigLoader struct {
@@ -19,7 +19,7 @@ func (l *webConfigLoader) ReadConfig() (*webConfig, error) {
 	conf := webConfig{}.Default()
 	err := configloader.ParseIntoDefault(l.configFilePath, conf)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse webConfig")
+		return nil, fmt.Errorf("failed to parse webConfig: %w", err)
 	}
 
 	return conf, nil
@@ -28,7 +28,7 @@ func (l *webConfigLoader) ReadConfig() (*webConfig, error) {
 func (l *webConfigLoader) SaveConfigToFile(newConf *webConfig) error {
 	err := configloader.SaveToFile(l.configFilePath, newConf)
 	if err != nil {
-		return errors.Wrap(err, "failed to save webConfig")
+		return fmt.Errorf("failed to save webConfig: %w", err)
 	}
 	return nil
 }

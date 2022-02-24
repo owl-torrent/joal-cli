@@ -1,9 +1,9 @@
 package algorithm
 
 import (
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/peerid"
 	"github.com/lucasjones/reggen"
-	"github.com/pkg/errors"
 )
 
 type RegexPatternAlgorithm struct {
@@ -21,7 +21,7 @@ func (r *RegexPatternAlgorithm) Generate() peerid.PeerId {
 func (r *RegexPatternAlgorithm) AfterPropertiesSet() error {
 	generator, err := reggen.NewGenerator(r.Pattern)
 	if err != nil {
-		return errors.Wrap(err, "Bad regex pattern for algorithm generator RegexPatternAlgorithm")
+		return fmt.Errorf("Bad regex pattern for algorithm generator RegexPatternAlgorithm: %w", err)
 	}
 	r.generator = generator
 

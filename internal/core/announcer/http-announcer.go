@@ -8,7 +8,6 @@ import (
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient/urlencoder"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net"
@@ -60,7 +59,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 	_url := copyURL(&url)
 	queryString, err := buildQueryString(a.queryTemplate, announceRequest)
 	if err != nil {
-		return AnnounceResponse{}, errors.Wrap(err, "fail to format query string")
+		return AnnounceResponse{}, fmt.Errorf("fail to format query string: %w", err)
 	}
 	if len(_url.Query()) > 0 {
 		queryString = fmt.Sprintf("%s&%s", url.RawQuery, queryString)
@@ -90,7 +89,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 	defer func() { _ = resp.Body.Close() }()
 	bodyBytes, err := readResponseBody(resp)
 	if err != nil {
-		return AnnounceResponse{}, errors.Wrap(err, "failed to read response body")
+		return AnnounceResponse{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 	if resp.StatusCode != 200 {
 		return AnnounceResponse{}, fmt.Errorf("response from tracker: %s: %s", resp.Status, fmt.Sprintf("%x", bodyBytes))
@@ -98,7 +97,7 @@ func (a *HttpAnnouncer) Announce(url url.URL, announceRequest AnnounceRequest, c
 	var trackerResponse tracker.HttpResponse
 	err = bencode.Unmarshal(bodyBytes, &trackerResponse)
 	if _, ok := err.(bencode.ErrUnusedTrailingBytes); !ok && err != nil {
-		return AnnounceResponse{}, errors.Wrapf(err, "error decoding %q", bodyBytes)
+		return AnnounceResponse{}, fmt.Errorf("error decoding %q: %w", bodyBytes, err)
 	}
 	if trackerResponse.FailureReason != "" {
 		return AnnounceResponse{}, fmt.Errorf("tracker gave failure reason: %q", trackerResponse.FailureReason)
@@ -131,7 +130,7 @@ func readResponseBody(response *http.Response) ([]byte, error) {
 		var err error
 		reader, err = gzip.NewReader(response.Body)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode gzip body content")
+			return nil, fmt.Errorf("failed to decode gzip body content: %w", err)
 		}
 		defer func() { _ = reader.Close() }()
 	}

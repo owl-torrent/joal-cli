@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/manager2"
 	"github.com/anthonyraymond/joal-cli/internal/plugins"
 	"github.com/anthonyraymond/joal-cli/internal/plugins/types"
-	"github.com/pkg/errors"
 	"net"
 	"net/http"
 	"os"
@@ -97,12 +97,12 @@ func getConfigRootFolder() string {
 	if strings.TrimSpace(configLocation) == "" {
 		configLocation, err = getDefaultConfigFolder()
 		if err != nil {
-			panic(errors.Wrap(err, "failed to resolve default config folder"))
+			panic(fmt.Errorf("failed to resolve default config folder: %w", err))
 		}
 	}
 	configLocation, err = filepath.Abs(configLocation)
 	if err != nil {
-		panic(errors.Wrapf(err, "failed to transform '%s' to an absolute path", configLocation))
+		panic(fmt.Errorf("failed to transform '%s' to an absolute path: %w", configLocation, err))
 	}
 	return configLocation
 }
