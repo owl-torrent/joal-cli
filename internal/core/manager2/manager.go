@@ -228,6 +228,7 @@ func (m *managerImpl) doArchiveTorrent(hash torrent.InfoHash) error {
 	for _, t := range m.torrents {
 		if t.InfoHash().HexString() == hash.HexString() {
 			torrentToRemove = t
+			break
 		}
 		return fmt.Errorf("torrent not found in seeding list")
 	}

@@ -60,7 +60,7 @@ func FromFile(filePath string) (Torrent, error) {
 	logger.Info("torrent: parsed successfully", zap.ByteString("infohash", infoHash.Bytes()))
 
 	private := false
-	if info.Private != nil && *info.Private == true {
+	if info.Private != nil && *info.Private {
 		private = true
 	}
 
@@ -217,7 +217,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				logger.Error("getNextAnnounceTime returned a 0 time, this should not happen since the function should only be called after an announce is done. Thus there should always be a tracker to announce next")
 				onAnnounceTime = nil
 			} else {
-				timer = time.NewTimer(nextAnnounce.Sub(time.Now()))
+				timer = time.NewTimer(time.Until(nextAnnounce))
 				onAnnounceTime = timer.C
 			}
 
@@ -244,7 +244,7 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				logger.Error("getNextAnnounceTime returned a 0 time, this should not happen since the function should only be called after an announce is done. Thus there should always be a tracker to announce next")
 				onAnnounceTime = nil
 			} else {
-				timer = time.NewTimer(nextAnnounce.Sub(time.Now()))
+				timer = time.NewTimer(time.Until(nextAnnounce))
 				onAnnounceTime = timer.C
 			}
 		case <-onAnnounceTime:
