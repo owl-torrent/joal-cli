@@ -36,7 +36,7 @@ func (q *AnnounceQueue) Request() <-chan *announces.AnnounceRequest {
 	return q.queue
 }
 
-func (q *AnnounceQueue) DiscardFutureEnqueue() {
+func (q *AnnounceQueue) DiscardFutureEnqueueAndDestroy() {
 	q.lock.Lock()
 	if q.isClosed {
 		q.lock.Unlock()

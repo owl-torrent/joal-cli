@@ -1,5 +1,6 @@
-# ROADMAP to v3.0
+# ROADMAP
 
+## Beta availability
 - [x] remove dependency to mockgen. It introduce too much CI clutering
 - [x] add github actions
 - [x] implement the new torrent struct
@@ -12,18 +13,25 @@
 - [x] rewrite dispatcher with performance in mind. This is the bottleneck of the whole project.
 - [x] add application configuration
 - [ ] add an auto default configuration setup if config does not exists yet
+- [ ] wire-up the bandwidth dispatcher with the manager
+- [ ] wire-up the torrent stats updating on regular interval
 - [ ] implement a replacement for seedmanager.seed-manager
-- [ ] make listening port customizable
-- [x] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818
-- [ ] Udp support
-- [ ] Replace current proxy usage with a SOCK5 proxy impl (work for both udp and TCP)
+- [ ] publish messages from core to plugins
+- [ ] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818
 - [ ] run some real life tests on public trackers
-- [ ] add a fake tracker for integration tests
-- [ ] add some benchmarks
 - [ ] write some integrations tests
 - [x] add multi tracker support (that mimic real clients)
 - [x] add multi tier support (that mimic real clients)
+
+## 1.0.0 GA
+- [ ] Udp support
+- [ ] make listening port customizable
+- [ ] add some benchmarks
+- [ ] add a fake tracker for integration tests
+
+## V2.0.0
 - [ ] Add peer listener that "choke" everybody (emulatedclient.listener)
+- [ ] Replace current proxy usage with a SOCK5 proxy impl (work for both udp and TCP)
 
 # Future improvements
 

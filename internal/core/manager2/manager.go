@@ -25,16 +25,17 @@ var NoOpProxy = http.ProxyFromEnvironment
 type Manager interface {
 	StartSeeding()
 	StopSeeding(ctx context.Context)
-	// Quit destroy the Manager in a non-recoverable way. To be called before exiting the program.
-	Quit()
 	SaveTorrentFile(filename string, bytes []byte)
 	ArchiveTorrent(hash torrent.InfoHash)
+	// Quit destroy the Manager in a non-recoverable way. To be called before exiting the program.
+	Quit()
 }
 
 type managerImpl struct {
 	isSeeding     bool
 	commands      chan func()
 	configLoader  *core.CoreConfigLoader
+	loadedConfig  *core.JoalConfig
 	announceQueue *torrent2.AnnounceQueue
 	client        emulatedclient.IEmulatedClient
 	torrents      map[torrent.InfoHash]torrent2.Torrent
@@ -51,16 +52,14 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 		quit:         stop.NewChan(),
 	}
 
-	// TODO: the config loader should not be needed to load Joal paths, those should be passed as Run parameter, the loader should only load RuntimeConfig
-	//  this error is the only one that makes the Run() method returns an error
-	conf, err := m.configLoader.ReadConfig()
+	err := m.doReloadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to start Manager: %w", err)
 	}
 
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter)
-	_ = torrentFileWatcher.Add(conf.TorrentsDir)
+	_ = torrentFileWatcher.Add(m.loadedConfig.TorrentsDir)
 
 	go func(m *managerImpl) {
 		refreshStatsTicker := time.NewTimer(15 * time.Second)
@@ -72,7 +71,9 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 				if !m.isSeeding {
 					continue
 				}
-				//TODO: implement => update torrents speed & stats4
+				//TODO: implement => update torrents speed & stats
+				//   le bandiwth dispatcher aura définis la propriété "currentUploadSpeedBps" du torrent
+				//   ici on va parcourir le tableau de torrent et faire un addUploaded(currentUploadSpeedBps * 15) <= 15 car le refreshStatTicker est de 15 min
 			case err := <-torrentFileWatcher.Error:
 				log.Warn("file watcher has reported an error", zap.Error(err))
 			case event := <-torrentFileWatcher.Event:
@@ -93,7 +94,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 							SupportAnnounceList:   clientAbilities.SupportAnnounceList,
 							AnnounceToAllTiers:    clientAbilities.AnnounceToAllTiers,
 							AnnounceToAllTrackers: clientAbilities.AnnounceToAllTrackersInTier,
-						}, m.announceQueue)
+						}, m.announceQueue /*, TODO: dispatcher */) // On passe le duspatcher pour que le torrent puisse se register
 					}
 				case watcher.Rename:
 					log.Info(event.String())
@@ -111,7 +112,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 					delete(m.torrents, t.InfoHash())
 					if m.isSeeding {
 						ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
-						t.Stop(ctx)
+						t.Stop(ctx /*, TODO: dispatcher */) // On passe le dispatcher pour que le torrent puisse se deregister
 						cancel()
 					}
 				default:
@@ -143,7 +144,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 	// Trigger create events after watcher started (to take into account already present torrent files on startup)
 	go func() {
 		torrentFileWatcher.Wait()
-		log.Info("file watcher: started", zap.String("monitored-folder", conf.TorrentsDir))
+		log.Info("file watcher: started", zap.String("monitored-folder", m.loadedConfig.TorrentsDir))
 		for fullPath, info := range torrentFileWatcher.WatchedFiles() {
 			torrentFileWatcher.Event <- watcher.Event{Op: watcher.Create, Path: fullPath, FileInfo: info}
 		}
@@ -163,15 +164,10 @@ func (m *managerImpl) doStartSeeding() error {
 		return fmt.Errorf("manager is already seeding")
 	}
 
-	conf, err := m.configLoader.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	if conf.RuntimeConfig.Client == "" {
+	if m.loadedConfig.RuntimeConfig.Client == "" {
 		return fmt.Errorf("core config does not contains a client file, please take a look at the documentation")
 	}
-	client, err := emulatedclient.FromClientFile(filepath.Join(conf.ClientsDir, conf.RuntimeConfig.Client), NoOpProxy)
+	client, err := emulatedclient.FromClientFile(filepath.Join(m.loadedConfig.ClientsDir, m.loadedConfig.RuntimeConfig.Client), NoOpProxy)
 	if err != nil {
 		return fmt.Errorf("failed to load client file: %w", err)
 	}
@@ -197,15 +193,7 @@ func (m *managerImpl) doSaveTorrentFile(filename string, content []byte) error {
 		return fmt.Errorf("failed to parse torrent file: %w", err)
 	}
 
-	config, err := m.configLoader.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-	if filepath.Ext(filename) != ".torrent" {
-		filename += ".torrent"
-	}
-
-	filename = filepath.Join(config.TorrentsDir, filename)
+	filename = filepath.Join(m.loadedConfig.TorrentsDir, filename)
 	w, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to open file '%s' for writing: %w", filename, err)
@@ -219,11 +207,6 @@ func (m *managerImpl) doSaveTorrentFile(filename string, content []byte) error {
 }
 
 func (m *managerImpl) doArchiveTorrent(hash torrent.InfoHash) error {
-	config, err := m.configLoader.ReadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-
 	var torrentToRemove torrent2.Torrent = nil
 	for _, t := range m.torrents {
 		if t.InfoHash().HexString() == hash.HexString() {
@@ -233,7 +216,7 @@ func (m *managerImpl) doArchiveTorrent(hash torrent.InfoHash) error {
 		return fmt.Errorf("torrent not found in seeding list")
 	}
 
-	err = torrentToRemove.MoveTo(config.ArchivedTorrentsDir)
+	err := torrentToRemove.MoveTo(m.loadedConfig.ArchivedTorrentsDir)
 	if err != nil {
 		return fmt.Errorf("failed to move torrent file to archive directory: %w", err)
 	}
@@ -247,12 +230,23 @@ func (m *managerImpl) doStopSeeding(ctx context.Context) {
 	}
 	for _, t := range m.torrents {
 		ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
-		t.Stop(ctx)
+		t.Stop(ctx /*, TODO: dispatcher */) // On passe le dispatcher pour que le torrent puisse se deregister)
 		cancel()
 	}
-	m.announceQueue.DiscardFutureEnqueue()
+	m.announceQueue.DiscardFutureEnqueueAndDestroy()
 	m.isSeeding = false
 	m.client.StopListener(context.Background())
+}
+
+func (m *managerImpl) doReloadConfig() error {
+	conf, err := m.configLoader.ReadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	m.loadedConfig = conf
+	// TODO: Based on what have changed, maybe we can publish an event "restart required" to warn the user that a
+	//  restart is needed to fully apply the new configuration (for example: a change of the RuntieConfig.Client need a restart)
+	return nil
 }
 
 func (m *managerImpl) StartSeeding() {

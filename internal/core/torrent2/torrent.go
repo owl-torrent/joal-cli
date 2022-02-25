@@ -38,7 +38,7 @@ type torrentImpl struct {
 	trackers []*trackerImpl
 	metaInfo *slimMetaInfo
 	info     *slimInfo
-
+	// TODO: currentUploadSpeedBps int64
 	isRunning     bool
 	stopping      stop.Chan
 	lock          *sync.Mutex
