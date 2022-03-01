@@ -29,8 +29,7 @@ bandwidth:
 		Client: "coco.client",
 		BandwidthConfig: &BandwidthConfig{
 			Dispatcher: &DispatcherConfig{
-				GlobalBandwidthRefreshInterval:           300 * time.Hour,
-				IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
+				GlobalBandwidthRefreshInterval: 300 * time.Hour,
 			},
 			Speed: &SpeedProviderConfig{
 				MinimumBytesPerSeconds: 10,
@@ -62,8 +61,7 @@ bandwidth:
 		Client: "coco.client",
 		BandwidthConfig: &BandwidthConfig{
 			Dispatcher: &DispatcherConfig{
-				GlobalBandwidthRefreshInterval:           300 * time.Hour,
-				IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
+				GlobalBandwidthRefreshInterval: 300 * time.Hour,
 			},
 			Speed: &SpeedProviderConfig{
 				MinimumBytesPerSeconds: 10,
@@ -91,8 +89,7 @@ speed:
 
 	assert.Equal(t, &BandwidthConfig{
 		Dispatcher: &DispatcherConfig{
-			GlobalBandwidthRefreshInterval:           300 * time.Hour,
-			IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
+			GlobalBandwidthRefreshInterval: 300 * time.Hour,
 		},
 		Speed: &SpeedProviderConfig{
 			MinimumBytesPerSeconds: 10,
@@ -134,8 +131,7 @@ incrementSeedInterval: 1h
 	}
 
 	assert.Equal(t, &DispatcherConfig{
-		GlobalBandwidthRefreshInterval:           300 * time.Hour,
-		IntervalBetweenEachTorrentsSeedIncrement: 1 * time.Hour,
+		GlobalBandwidthRefreshInterval: 300 * time.Hour,
 	}, c)
 }
 
@@ -151,8 +147,7 @@ globalBandwidthRefreshInterval: 300h
 	}
 
 	assert.Equal(t, &DispatcherConfig{
-		GlobalBandwidthRefreshInterval:           300 * time.Hour,
-		IntervalBetweenEachTorrentsSeedIncrement: DispatcherConfig{}.Default().IntervalBetweenEachTorrentsSeedIncrement,
+		GlobalBandwidthRefreshInterval: 300 * time.Hour,
 	}, c)
 }
 

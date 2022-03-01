@@ -7,6 +7,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/announces"
+	"github.com/anthonyraymond/joal-cli/internal/core/bandwidth"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"go.uber.org/atomic"
@@ -22,23 +23,25 @@ import (
 var randSeed = time.Now().UnixNano()
 
 type Torrent interface {
-	Start(props AnnounceProps, announceQueue *AnnounceQueue)
+	Start(props AnnounceProps, announceQueue *AnnounceQueue, dispatcher bandwidth.SpeedDispatcher)
 	Stop(ctx context.Context)
 	InfoHash() torrent.InfoHash
 	Path() string
 	ChangePath(path string)
 	MoveTo(directory string) error
+	// AddDataFor add interval second worth of upload to Stats.Uploaded
+	AddDataFor(interval time.Duration)
 }
 
 type torrentImpl struct {
-	path     string
-	infoHash torrent.InfoHash
-	stats    Stats
-	peers    Peers
-	trackers []*trackerImpl
-	metaInfo *slimMetaInfo
-	info     *slimInfo
-	// TODO: currentUploadSpeedBps int64
+	path          string
+	infoHash      torrent.InfoHash
+	stats         Stats
+	peers         Peers
+	speed         Speeds
+	trackers      []*trackerImpl
+	metaInfo      *slimMetaInfo
+	info          *slimInfo
 	isRunning     bool
 	stopping      stop.Chan
 	lock          *sync.Mutex
@@ -68,6 +71,7 @@ func FromFile(filePath string) (Torrent, error) {
 		path:  filePath,
 		stats: newStats(),
 		peers: newPeersElector(),
+		speed: newSpeed(),
 		metaInfo: &slimMetaInfo{
 			Announce:     meta.Announce,
 			AnnounceList: meta.AnnounceList,
@@ -101,7 +105,7 @@ type AnnounceProps struct {
 	AnnounceToAllTrackers bool
 }
 
-func (t *torrentImpl) Start(props AnnounceProps, announceQueue *AnnounceQueue) {
+func (t *torrentImpl) Start(props AnnounceProps, announceQueue *AnnounceQueue, dispatcher bandwidth.SpeedDispatcher) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.isRunning {
@@ -121,7 +125,7 @@ func (t *torrentImpl) Start(props AnnounceProps, announceQueue *AnnounceQueue) {
 		}
 	}
 
-	go torrentRoutine(t, props)
+	go torrentRoutine(t, props, dispatcher)
 }
 
 func (t *torrentImpl) Stop(ctx context.Context) {
@@ -162,10 +166,35 @@ func (t *torrentImpl) MoveTo(directory string) error {
 	return nil
 }
 
-func torrentRoutine(t *torrentImpl, props AnnounceProps) {
+func (t *torrentImpl) AddDataFor(interval time.Duration) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if !t.isRunning {
+		return
+	}
+	t.stats.AddUploaded(t.speed.UploadSpeed() * int64(interval.Seconds()))
+}
+
+func torrentRoutine(t *torrentImpl, props AnnounceProps, dispatcher bandwidth.SpeedDispatcher) {
 	logger := logs.GetLogger().With(zap.String("torrent", t.info.Name))
 	t.peers.Reset()
 	t.stats.Reset()
+	t.speed.Reset()
+
+	unregisterDispatcher := dispatcher.Register(&bandwidth.RegisteredTorrent{
+		InfoHash: t.infoHash,
+		GetPeers: func() *bandwidth.Peers {
+			return &bandwidth.Peers{
+				Leechers: t.peers.Leechers(),
+				Seeders:  t.peers.Seeders(),
+			}
+		},
+		SetSpeed: func(bps int64) {
+			t.lock.Lock()
+			defer t.lock.Unlock()
+			t.speed.SetUploadSpeed(bps)
+		},
+	})
 
 	onAnnounceSuccess := make(chan announces.AnnounceResponse, len(t.trackers))
 	onAnnounceError := make(chan announces.AnnounceResponseError, len(t.trackers))
@@ -255,6 +284,9 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 			defer func() {
 				stopRequest.NotifyDone()
 			}()
+			if unregisterDispatcher != nil {
+				unregisterDispatcher()
+			}
 			dismissAnnounceResults.Store(true)
 			//drain announce response channels
 			drainSuccessResponseChan(onAnnounceSuccess)
@@ -268,7 +300,9 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps) {
 				tr.state.nextAnnounce = time.Now()
 			}
 			t.announceToTrackers(props, announceCallbacks, tracker.Stopped, stopRequest.Ctx())
-
+			t.stats.Reset()
+			t.peers.Reset()
+			t.speed.Reset()
 			return
 		}
 	}

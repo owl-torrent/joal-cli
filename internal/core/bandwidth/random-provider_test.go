@@ -7,7 +7,7 @@ import (
 )
 
 func TestRandomSpeedProvider_ShouldBuildFromConfig(t *testing.T) {
-	rsp := NewRandomSpeedProvider(&core.SpeedProviderConfig{
+	rsp := newRandomSpeedProvider(&core.SpeedProviderConfig{
 		MinimumBytesPerSeconds: 10,
 		MaximumBytesPerSeconds: 100,
 	})

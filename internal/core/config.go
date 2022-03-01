@@ -63,14 +63,12 @@ func (c BandwidthConfig) Default() *BandwidthConfig {
 }
 
 type DispatcherConfig struct {
-	GlobalBandwidthRefreshInterval           time.Duration `yaml:"globalBandwidthRefreshInterval"`
-	IntervalBetweenEachTorrentsSeedIncrement time.Duration `yaml:"incrementSeedInterval"`
+	GlobalBandwidthRefreshInterval time.Duration `yaml:"globalBandwidthRefreshInterval"`
 }
 
 func (c DispatcherConfig) Default() *DispatcherConfig {
 	return &DispatcherConfig{
-		GlobalBandwidthRefreshInterval:           20 * time.Minute,
-		IntervalBetweenEachTorrentsSeedIncrement: 5 * time.Second,
+		GlobalBandwidthRefreshInterval: 20 * time.Minute,
 	}
 }
 

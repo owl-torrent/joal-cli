@@ -8,6 +8,7 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/announces"
+	"github.com/anthonyraymond/joal-cli/internal/core/bandwidth"
 	"github.com/anthonyraymond/joal-cli/internal/core/emulatedclient"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/core/torrent2"
@@ -32,14 +33,15 @@ type Manager interface {
 }
 
 type managerImpl struct {
-	isSeeding     bool
-	commands      chan func()
-	configLoader  *core.CoreConfigLoader
-	loadedConfig  *core.JoalConfig
-	announceQueue *torrent2.AnnounceQueue
-	client        emulatedclient.IEmulatedClient
-	torrents      map[torrent.InfoHash]torrent2.Torrent
-	quit          stop.Chan
+	isSeeding       bool
+	commands        chan func()
+	configLoader    *core.CoreConfigLoader
+	loadedConfig    *core.JoalConfig
+	announceQueue   *torrent2.AnnounceQueue
+	speedDispatcher bandwidth.SpeedDispatcher
+	client          emulatedclient.IEmulatedClient
+	torrents        map[torrent.InfoHash]torrent2.Torrent
+	quit            stop.Chan
 }
 
 func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
@@ -57,12 +59,15 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 		return nil, fmt.Errorf("failed to start Manager: %w", err)
 	}
 
+	m.speedDispatcher = bandwidth.NewSpeedDispatcher(m.loadedConfig.RuntimeConfig.BandwidthConfig)
+
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter)
 	_ = torrentFileWatcher.Add(m.loadedConfig.TorrentsDir)
 
+	const intervalBetweenTorrentStatsUpdate = 15 * time.Second
 	go func(m *managerImpl) {
-		refreshStatsTicker := time.NewTimer(15 * time.Second)
+		refreshStatsTicker := time.NewTimer(intervalBetweenTorrentStatsUpdate)
 		for {
 			select {
 			case command := <-m.commands:
@@ -71,9 +76,9 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 				if !m.isSeeding {
 					continue
 				}
-				//TODO: implement => update torrents speed & stats
-				//   le bandiwth dispatcher aura définis la propriété "currentUploadSpeedBps" du torrent
-				//   ici on va parcourir le tableau de torrent et faire un addUploaded(currentUploadSpeedBps * 15) <= 15 car le refreshStatTicker est de 15 min
+				for key, _ := range m.torrents {
+					m.torrents[key].AddDataFor(intervalBetweenTorrentStatsUpdate)
+				}
 			case err := <-torrentFileWatcher.Error:
 				log.Warn("file watcher has reported an error", zap.Error(err))
 			case event := <-torrentFileWatcher.Event:
@@ -94,7 +99,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 							SupportAnnounceList:   clientAbilities.SupportAnnounceList,
 							AnnounceToAllTiers:    clientAbilities.AnnounceToAllTiers,
 							AnnounceToAllTrackers: clientAbilities.AnnounceToAllTrackersInTier,
-						}, m.announceQueue /*, TODO: dispatcher */) // On passe le duspatcher pour que le torrent puisse se register
+						}, m.announceQueue, m.speedDispatcher) // On passe le dispatcher pour que le torrent puisse se register
 					}
 				case watcher.Rename:
 					log.Info(event.String())
@@ -112,7 +117,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 					delete(m.torrents, t.InfoHash())
 					if m.isSeeding {
 						ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
-						t.Stop(ctx /*, TODO: dispatcher */) // On passe le dispatcher pour que le torrent puisse se deregister
+						t.Stop(ctx)
 						cancel()
 					}
 				default:
@@ -183,6 +188,7 @@ func (m *managerImpl) doStartSeeding() error {
 	})
 
 	m.isSeeding = true
+	m.speedDispatcher.Start()
 
 	return nil
 }
@@ -230,9 +236,10 @@ func (m *managerImpl) doStopSeeding(ctx context.Context) {
 	}
 	for _, t := range m.torrents {
 		ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
-		t.Stop(ctx /*, TODO: dispatcher */) // On passe le dispatcher pour que le torrent puisse se deregister)
+		t.Stop(ctx)
 		cancel()
 	}
+	m.speedDispatcher.Stop()
 	m.announceQueue.DiscardFutureEnqueueAndDestroy()
 	m.isSeeding = false
 	m.client.StopListener(context.Background())
@@ -246,6 +253,10 @@ func (m *managerImpl) doReloadConfig() error {
 	m.loadedConfig = conf
 	// TODO: Based on what have changed, maybe we can publish an event "restart required" to warn the user that a
 	//  restart is needed to fully apply the new configuration (for example: a change of the RuntieConfig.Client need a restart)
+
+	if m.speedDispatcher != nil {
+		m.speedDispatcher.ReplaceSpeedConfig(m.loadedConfig.RuntimeConfig.BandwidthConfig.Speed)
+	}
 	return nil
 }
 

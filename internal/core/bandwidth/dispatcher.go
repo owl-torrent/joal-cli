@@ -1,120 +1,177 @@
 package bandwidth
 
 import (
+	"context"
 	"fmt"
 	"github.com/anacrolix/torrent"
 	"github.com/anthonyraymond/joal-cli/internal/core"
 	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"github.com/anthonyraymond/joal-cli/internal/utils/dataunit"
+	"github.com/anthonyraymond/joal-cli/internal/utils/stop"
 	"go.uber.org/zap"
 	"sync"
 	"time"
 )
 
-type IBandwidthClaimable interface {
-	InfoHash() torrent.InfoHash
-	AddUploaded(bytes int64)
-	// May return nil
-	GetSwarm() ISwarm
-}
-type ISwarm interface {
-	GetSeeders() int32
-	GetLeechers() int32
+type Peers struct {
+	Leechers int32
+	Seeders  int32
 }
 
-type IDispatcher interface {
-	Start()
+type RegisteredTorrent struct {
+	InfoHash torrent.InfoHash
+	GetPeers func() *Peers
+	SetSpeed func(bps int64)
+}
+
+type SpeedDispatcher interface {
+	Start(config *core.DispatcherConfig)
 	Stop()
+	ReplaceSpeedConfig(config *core.SpeedProviderConfig)
+	Register(rt *RegisteredTorrent) (unregisterTorrent func())
 }
 
-func NewDispatcher(conf *core.DispatcherConfig, pool IBandwidthWeightedClaimerPool, rsp iRandomSpeedProvider) IDispatcher {
-	return &dispatcher{
-		globalBandwidthRefreshInterval:           conf.GlobalBandwidthRefreshInterval,
-		intervalBetweenEachTorrentsSeedIncrement: conf.IntervalBetweenEachTorrentsSeedIncrement,
-		claimerPool:                              pool,
-		randomSpeedProvider:                      rsp,
-		isRunning:                                false,
-		stopping:                                 make(chan chan struct{}),
-		lock:                                     &sync.RWMutex{},
+type speedDispatcherImpl struct {
+	updateTorrentSpeedInterval time.Duration
+	randomSpeedProvider        iRandomSpeedProvider
+	isRunning                  bool
+	stopping                   stop.Chan
+	lock                       *sync.Mutex
+	torrents                   *registeredTorrentList
+}
+
+func NewSpeedDispatcher(conf *core.SpeedProviderConfig) SpeedDispatcher {
+	s := &speedDispatcherImpl{
+		updateTorrentSpeedInterval: 20 * time.Second,
+		randomSpeedProvider:        newRandomSpeedProvider(conf),
+		isRunning:                  false,
+		stopping:                   stop.NewChan(),
+		lock:                       &sync.Mutex{},
+		torrents:                   newRegisteredTorrentList(),
 	}
+
+	return s
 }
 
-type dispatcher struct {
-	globalBandwidthRefreshInterval           time.Duration
-	intervalBetweenEachTorrentsSeedIncrement time.Duration
-	randomSpeedProvider                      iRandomSpeedProvider
-	claimerPool                              IBandwidthWeightedClaimerPool
-	isRunning                                bool
-	stopping                                 chan chan struct{}
-	lock                                     *sync.RWMutex
-}
-
-func (d *dispatcher) Start() {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	if d.isRunning {
+func (s *speedDispatcherImpl) Start(config *core.DispatcherConfig) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.isRunning {
 		return
 	}
-	d.isRunning = true
+	s.isRunning = true
 
-	log := logs.GetLogger()
-	go func() {
-		d.randomSpeedProvider.Refresh()
-		log.Info("bandwidth dispatcher: started",
-			zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
-		)
-
-		globalBandwidthRefreshTicker := time.NewTicker(d.globalBandwidthRefreshInterval)
-		broadcast.EmitGlobalBandwidthChanged(broadcast.GlobalBandwidthChangedEvent{AvailableBandwidth: d.randomSpeedProvider.GetBytesPerSeconds()})
-		timeToAddSeedToClaimers := time.NewTicker(d.intervalBetweenEachTorrentsSeedIncrement)
-		secondsBetweenLoops := d.intervalBetweenEachTorrentsSeedIncrement.Seconds()
-
+	go func(s *speedDispatcherImpl) {
+		logger := logs.GetLogger()
+		refreshBandwidthTicker := time.NewTimer(config.GlobalBandwidthRefreshInterval)
+		updateTorrentSpeedTicker := time.NewTicker(s.updateTorrentSpeedInterval)
 		for {
 			select {
-			case <-globalBandwidthRefreshTicker.C:
-				d.randomSpeedProvider.Refresh()
-				broadcast.EmitGlobalBandwidthChanged(broadcast.GlobalBandwidthChangedEvent{AvailableBandwidth: d.randomSpeedProvider.GetBytesPerSeconds()})
-				log.Info("bandwidth dispatcher: refreshed available bandwidth",
-					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(d.randomSpeedProvider.GetBytesPerSeconds()))),
+			case <-refreshBandwidthTicker.C:
+				s.randomSpeedProvider.Refresh()
+				broadcast.EmitGlobalBandwidthChanged(broadcast.GlobalBandwidthChangedEvent{AvailableBandwidth: s.randomSpeedProvider.GetBytesPerSeconds()})
+				logger.Info("bandwidth dispatcher: refreshed global bandwidth",
+					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(s.randomSpeedProvider.GetBytesPerSeconds()))),
 				)
-			case <-timeToAddSeedToClaimers.C:
-				claimers, totalWeight := d.claimerPool.GetWeights()
+			case <-updateTorrentSpeedTicker.C:
+				//torrentList := s.torrents.List()
+				//TODO: calculate weigth of each torrent and dispatch speed based on weight
+			case stopRequest := <-s.stopping:
+				//goland:noinspection GoDeferInLoop
+				defer func() {
+					stopRequest.NotifyDone()
+				}()
 
-				if totalWeight == 0 {
-					continue
+				// close & drain refreshBandwidthTicker
+				refreshBandwidthTicker.Stop()
+				select {
+				case <-refreshBandwidthTicker.C:
+				default:
+				}
+				// close & drain updateTorrentSpeedTicker
+				updateTorrentSpeedTicker.Stop()
+				select {
+				case <-updateTorrentSpeedTicker.C:
+				default:
 				}
 
-				bytesToDispatch := float64(d.randomSpeedProvider.GetBytesPerSeconds()) * secondsBetweenLoops
-				for _, claimer := range claimers {
-					percentOfSpeedToAssign := claimer.weight / totalWeight
-					claimer.AddUploaded(int64(bytesToDispatch * percentOfSpeedToAssign))
-				}
-			case doneStopping := <-d.stopping:
-				timeToAddSeedToClaimers.Stop()
-				globalBandwidthRefreshTicker.Stop()
-				d.claimerPool.RemoveAllClaimers()
-				doneStopping <- struct{}{}
+				s.torrents.Reset()
+
 				return
 			}
 		}
-	}()
+	}(s)
 }
 
-func (d *dispatcher) Stop() {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	if !d.isRunning {
+func (s *speedDispatcherImpl) Stop() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if !s.isRunning {
 		return
 	}
-	d.isRunning = false
+	s.isRunning = false
 
-	log := logs.GetLogger()
-	log.Info("bandwidth dispatcher: stopping")
+	logger := logs.GetLogger()
 
-	doneStopping := make(chan struct{})
-	d.stopping <- doneStopping
+	stopReq := stop.NewRequest(context.Background())
+	logger.Info("bandwidth dispatcher: stopping")
+	s.stopping <- stopReq
 
-	<-doneStopping
-	log.Info("bandwidth dispatcher: stopped")
+	_ = stopReq.AwaitDone()
+	logger.Info("bandwidth dispatcher: stopped")
+}
+
+func (s *speedDispatcherImpl) ReplaceSpeedConfig(config *core.SpeedProviderConfig) {
+	s.randomSpeedProvider.ReplaceSpeedConfig(config)
+}
+
+func (s *speedDispatcherImpl) Register(rt *RegisteredTorrent) (unregisterTorrent func()) {
+	s.torrents.Add(rt)
+
+	unregisterTorrent = func() {
+		s.torrents.Remove(rt)
+	}
+	return unregisterTorrent
+}
+
+type registeredTorrentList struct {
+	torrents map[string]*RegisteredTorrent
+	lock     *sync.RWMutex
+}
+
+func newRegisteredTorrentList() *registeredTorrentList {
+	return &registeredTorrentList{
+		torrents: make(map[string]*RegisteredTorrent),
+		lock:     &sync.RWMutex{},
+	}
+}
+
+func (l *registeredTorrentList) Add(registeredTorrent *RegisteredTorrent) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.torrents[registeredTorrent.InfoHash.HexString()] = registeredTorrent
+}
+
+func (l *registeredTorrentList) List() []*RegisteredTorrent {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+	v := make([]*RegisteredTorrent, 0, len(l.torrents))
+
+	for _, value := range l.torrents {
+		v = append(v, value)
+	}
+	return v
+}
+
+func (l *registeredTorrentList) Remove(registeredTorrent *RegisteredTorrent) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	delete(l.torrents, registeredTorrent.InfoHash.HexString())
+}
+
+func (l *registeredTorrentList) Reset() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.torrents = make(map[string]*RegisteredTorrent)
 }

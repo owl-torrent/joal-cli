@@ -1,5 +1,6 @@
 package bandwidth
 
+/* TODO: refactor to new implementation; see dispatcher.go
 import (
 	"fmt"
 	"github.com/anacrolix/torrent"
@@ -387,3 +388,4 @@ func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
 		t.Fatal("timeout")
 	}
 }
+*/
