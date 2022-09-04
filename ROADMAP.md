@@ -15,7 +15,7 @@
 - [x] add an auto default configuration setup if config does not exists yet
 - [x] wire-up the bandwidth dispatcher with the manager
 - [x] wire-up the torrent stats updating on regular interval
-- [ ] finish bandwidth dispatcher implementation
+- [x] finish bandwidth dispatcher implementation
 - [ ] implement a replacement for seedmanager.seed-manager
 - [ ] publish messages from core to plugins
 - [ ] review all the map[]: `delete` from map does not free any memory, if a map is getting a lot of delete it need to be rebuilt once in a while (iterate old with for and append values to a new one). https://stackoverflow.com/a/23231539/2275818

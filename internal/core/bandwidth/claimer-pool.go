@@ -1,12 +1,6 @@
 package bandwidth
 
-import (
-	"github.com/anacrolix/torrent"
-	"github.com/anthonyraymond/joal-cli/internal/core/broadcast"
-	"sync"
-)
-
-type claimerWeight = float64
+/*type claimerWeight = float64
 type weightedClaimer struct {
 	IBandwidthClaimable
 	weight claimerWeight
@@ -113,4 +107,4 @@ func broadcastWeights(pool *claimerPool) {
 		TotalWeight:    pool.totalWeight,
 		TorrentWeights: weightMap,
 	})
-}
+}*/

@@ -59,7 +59,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 		return nil, fmt.Errorf("failed to start Manager: %w", err)
 	}
 
-	m.speedDispatcher = bandwidth.NewSpeedDispatcher(m.loadedConfig.RuntimeConfig.BandwidthConfig)
+	m.speedDispatcher = bandwidth.NewSpeedDispatcher(m.loadedConfig.RuntimeConfig.BandwidthConfig.Speed)
 
 	torrentFileWatcher := watcher.New()
 	torrentFileWatcher.AddFilterHook(torrentFileFilter)
@@ -67,7 +67,7 @@ func Run(configLoader *core.CoreConfigLoader) (Manager, error) {
 
 	const intervalBetweenTorrentStatsUpdate = 15 * time.Second
 	go func(m *managerImpl) {
-		refreshStatsTicker := time.NewTimer(intervalBetweenTorrentStatsUpdate)
+		refreshStatsTicker := time.NewTicker(intervalBetweenTorrentStatsUpdate)
 		for {
 			select {
 			case command := <-m.commands:
@@ -174,7 +174,7 @@ func (m *managerImpl) doStartSeeding() error {
 	}
 	client, err := emulatedclient.FromClientFile(filepath.Join(m.loadedConfig.ClientsDir, m.loadedConfig.RuntimeConfig.Client), NoOpProxy)
 	if err != nil {
-		return fmt.Errorf("failed to load client file: %w", err)
+		return fmt.Errorf("failed to load client file %s: %w", m.loadedConfig.RuntimeConfig.Client, err)
 	}
 	err = client.StartListener(NoOpProxy)
 	if err != nil {
@@ -188,7 +188,18 @@ func (m *managerImpl) doStartSeeding() error {
 	})
 
 	m.isSeeding = true
-	m.speedDispatcher.Start()
+	m.speedDispatcher.Start(m.loadedConfig.RuntimeConfig.BandwidthConfig.Dispatcher)
+	clientAbilities := m.client.GetAnnounceCapabilities()
+	for _, t := range m.torrents {
+
+		t.Start(torrent2.AnnounceProps{
+			SupportHttpAnnounce:   m.client.SupportsHttpAnnounce(),
+			SupportUdpAnnounce:    m.client.SupportsUdpAnnounce(),
+			SupportAnnounceList:   clientAbilities.SupportAnnounceList,
+			AnnounceToAllTiers:    clientAbilities.AnnounceToAllTiers,
+			AnnounceToAllTrackers: clientAbilities.AnnounceToAllTrackersInTier,
+		}, m.announceQueue, m.speedDispatcher) // On passe le dispatcher pour que le torrent puisse se register
+	}
 
 	return nil
 }

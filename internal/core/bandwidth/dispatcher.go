@@ -64,7 +64,7 @@ func (s *speedDispatcherImpl) Start(config *core.DispatcherConfig) {
 
 	go func(s *speedDispatcherImpl) {
 		logger := logs.GetLogger()
-		refreshBandwidthTicker := time.NewTimer(config.GlobalBandwidthRefreshInterval)
+		refreshBandwidthTicker := time.NewTicker(config.GlobalBandwidthRefreshInterval)
 		updateTorrentSpeedTicker := time.NewTicker(s.updateTorrentSpeedInterval)
 		for {
 			select {
@@ -75,8 +75,7 @@ func (s *speedDispatcherImpl) Start(config *core.DispatcherConfig) {
 					zap.String("available-bandwidth", fmt.Sprintf("%s/s", dataunit.ByteCountSI(s.randomSpeedProvider.GetBytesPerSeconds()))),
 				)
 			case <-updateTorrentSpeedTicker.C:
-				//torrentList := s.torrents.List()
-				//TODO: calculate weigth of each torrent and dispatch speed based on weight
+				updateSpeed(s.torrents.List(), s.randomSpeedProvider.GetBytesPerSeconds())
 			case stopRequest := <-s.stopping:
 				//goland:noinspection GoDeferInLoop
 				defer func() {
@@ -102,6 +101,48 @@ func (s *speedDispatcherImpl) Start(config *core.DispatcherConfig) {
 			}
 		}
 	}(s)
+}
+
+func updateSpeed(torrents []*RegisteredTorrent, currentBandwidth int64) {
+	if len(torrents) == 0 {
+		return
+	}
+
+	sumOfLeechers := float64(0)
+	for _, registeredTorrent := range torrents {
+		p := registeredTorrent.GetPeers()
+		leech := float64(p.Leechers)
+
+		sumOfLeechers += leech
+	}
+
+	totalWeight := float64(0)
+	weights := make([]float64, len(torrents))
+	for i, registeredTorrent := range torrents {
+		p := registeredTorrent.GetPeers()
+		if p.Leechers == 0 || p.Seeders == 0 {
+			weights[i] = 0
+			continue
+		}
+		leech := float64(p.Leechers)
+		seed := float64(p.Seeders)
+
+		seederRatio := leech / (leech + seed)       // more seeders compared to leecher the better
+		leechersPercentage := leech / sumOfLeechers // more seeder compared to total number of seeders the better
+
+		weight := (seederRatio + leechersPercentage) / 2 // sum the two ratio and divide by two to get a number between 0 and 1
+		totalWeight += weight
+		weights[i] = weight
+	}
+	for i, registeredTorrent := range torrents {
+		p := registeredTorrent.GetPeers()
+		if p.Leechers == 0 || p.Seeders == 0 {
+			registeredTorrent.SetSpeed(0)
+			continue
+		}
+		percentageOfWeight := weights[i] / totalWeight
+		registeredTorrent.SetSpeed(int64(percentageOfWeight * float64(currentBandwidth)))
+	}
 }
 
 func (s *speedDispatcherImpl) Stop() {
@@ -167,7 +208,11 @@ func (l *registeredTorrentList) List() []*RegisteredTorrent {
 func (l *registeredTorrentList) Remove(registeredTorrent *RegisteredTorrent) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	delete(l.torrents, registeredTorrent.InfoHash.HexString())
+	r, exists := l.torrents[registeredTorrent.InfoHash.HexString()]
+	if exists {
+		r.SetSpeed(0)
+		delete(l.torrents, registeredTorrent.InfoHash.HexString())
+	}
 }
 
 func (l *registeredTorrentList) Reset() {

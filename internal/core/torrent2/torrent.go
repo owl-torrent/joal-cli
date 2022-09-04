@@ -192,7 +192,9 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps, dispatcher bandwidth.Sp
 		SetSpeed: func(bps int64) {
 			t.lock.Lock()
 			defer t.lock.Unlock()
-			t.speed.SetUploadSpeed(bps)
+			if t.isRunning {
+				t.speed.SetUploadSpeed(bps)
+			}
 		},
 	})
 
@@ -308,7 +310,8 @@ func torrentRoutine(t *torrentImpl, props AnnounceProps, dispatcher bandwidth.Sp
 	}
 }
 
-/**
+/*
+*
 deprioritizeTracker push a tracker to the end of his tier
 */
 func deprioritizeTracker(trackers []*trackerImpl, indexToDeprioritize int) {

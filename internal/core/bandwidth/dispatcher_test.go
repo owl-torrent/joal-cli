@@ -1,5 +1,10 @@
 package bandwidth
 
+import (
+	"fmt"
+	"testing"
+)
+
 /* TODO: refactor to new implementation; see dispatcher.go
 import (
 	"fmt"
@@ -389,3 +394,45 @@ func TestDispatcher_ShouldWorkWithTremendousAmountOfClaimers(t *testing.T) {
 	}
 }
 */
+
+type Pe struct {
+	Str      string
+	Leechers int32
+	Seeders  int32
+	Weigth   float64
+}
+
+func TestName(t *testing.T) {
+	d := []*Pe{
+		{Leechers: 1000, Seeders: 50, Str: "a"},
+		{Leechers: 1000, Seeders: 1000, Str: "b"},
+		{Leechers: 50, Seeders: 1000, Str: "c"},
+	}
+
+	sumOfLeechers := float64(0)
+	for _, p := range d {
+		leech := float64(p.Leechers)
+
+		sumOfLeechers += leech
+	}
+	totalWeight := float64(0)
+	weigths := make([]float64, len(d))
+	for i, p := range d {
+		leech := float64(p.Leechers)
+		seed := float64(p.Seeders)
+
+		seederRatio := leech / (leech + seed)       // more seeders compared to leecher the better
+		leechersPercentage := leech / sumOfLeechers // more seeder compared to total number of seeders the better
+
+		weight := (seederRatio + leechersPercentage) / 2 // sum the two ratio and divide by two to get a number between 0 and 1
+		totalWeight += weight
+		weigths[i] = weight
+	}
+	for i, p := range d {
+		p.Weigth = weigths[i] / totalWeight
+	}
+
+	for _, p := range d {
+		fmt.Println(fmt.Sprintf("%v", p))
+	}
+}

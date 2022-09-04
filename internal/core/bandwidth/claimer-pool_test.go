@@ -1,11 +1,6 @@
 package bandwidth
 
-import (
-	"github.com/anacrolix/torrent/metainfo"
-	"github.com/stretchr/testify/assert"
-	"testing"
-)
-
+/*
 func Test_calculateWeightShouldNeverGoBelowZero(t *testing.T) {
 	type args struct {
 		swarm ISwarm
@@ -132,4 +127,4 @@ func TestClaimerPool_ShouldReturnWeights(t *testing.T) {
 	assert.Equal(t, totalWeight, pool.claimers[c1.InfoHash()].weight+pool.claimers[c2.InfoHash()].weight)
 	assert.Greater(t, pool.claimers[c1.InfoHash()].weight, 0.0)
 	assert.Greater(t, pool.claimers[c2.InfoHash()].weight, 0.0)
-}
+}*/
