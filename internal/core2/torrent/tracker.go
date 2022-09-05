@@ -14,8 +14,8 @@ const (
 )
 
 var (
-	announceProtocolNotSupported = TrackerDisabled{disabled: true, reason: "client.announce.protocol.not-supported"}
-	announceListNotSupported     = TrackerDisabled{disabled: true, reason: "client.announce.announce-list.not-supported"}
+	announceProtocolNotSupported = TrackerDisabled{disabled: true, reason: "tracker.disabled.protocol-not-supported"}
+	announceListNotSupported     = TrackerDisabled{disabled: true, reason: "tracker.disabled.announce-list-not-supported"}
 )
 
 type Tracker struct {
@@ -103,7 +103,7 @@ func appendToAnnounceHistory(slice []AnnounceHistory, h AnnounceHistory, maxLen 
 type AnnouncePolicy interface {
 	SupportHttpAnnounce() bool
 	SupportUdpAnnounce() bool
-	ShouldSupportAnnounceList() bool
+	SupportAnnounceList() bool
 	ShouldAnnounceToAllTier() bool
 	ShouldAnnounceToAllTrackersInTier() bool
 }
