@@ -7,6 +7,28 @@ import (
 	"time"
 )
 
+func TestTracker_getTier(t1 *testing.T) {
+	type fields struct {
+		tier int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   int
+	}{
+		{name: "tier 1", fields: fields{tier: 1}, want: 1},
+		{name: "tier 22", fields: fields{tier: 22}, want: 22},
+	}
+	for _, tt := range tests {
+		t1.Run(tt.name, func(t1 *testing.T) {
+			t := &Tracker{
+				tier: tt.fields.tier,
+			}
+			assert.Equalf(t1, tt.want, t.getTier(), "getTier()")
+		})
+	}
+}
+
 func TestTracker_isAnnouncing(t1 *testing.T) {
 	type fields struct {
 		isCurrentlyAnnouncing bool

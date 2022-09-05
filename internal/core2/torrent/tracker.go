@@ -20,12 +20,17 @@ var (
 
 type Tracker struct {
 	url                   url.URL
+	tier                  int
 	disabled              TrackerDisabled
 	nextAnnounce          time.Time
 	consecutiveFails      int
 	startSent             bool
 	isCurrentlyAnnouncing bool
 	announcesHistory      []AnnounceHistory
+}
+
+func (t *Tracker) getTier() int {
+	return t.tier
 }
 
 func (t *Tracker) isAnnouncing() bool {
@@ -64,7 +69,9 @@ func (t *Tracker) announceSucceed(h AnnounceHistory) {
 }
 
 func (t *Tracker) announceFailed(h AnnounceHistory) {
-	t.consecutiveFails = t.consecutiveFails + 1
+	if t.consecutiveFails != math.MaxInt {
+		t.consecutiveFails = t.consecutiveFails + 1
+	}
 	t.isCurrentlyAnnouncing = false
 	t.announcesHistory = appendToAnnounceHistory(t.announcesHistory, h, announceHistoryMaxLen)
 
@@ -72,7 +79,7 @@ func (t *Tracker) announceFailed(h AnnounceHistory) {
 
 	// the exponential back-off ends up being:
 	// 17, 55, 117, 205, 317, 455, 617, ... seconds
-	// with the default tracker_backoff of 250
+	// with tracker_backoff = 250
 	delay := math.Max(
 		h.interval.Seconds(),
 		math.Min(
@@ -106,8 +113,8 @@ type TrackerDisabled struct {
 	reason   string
 }
 
-func (t TrackerDisabled) IsDisabled() bool {
-	return t.disabled
+func (d TrackerDisabled) IsDisabled() bool {
+	return d.disabled
 }
 
 type AnnounceHistory struct {
