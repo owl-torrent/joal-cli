@@ -39,11 +39,11 @@ func (t *Tracker) isAnnouncing() bool {
 
 // return true if the tracker is the tracker is ready to announce
 // (not disabled && nextAnnounce is passed && not announcing)
-func (t *Tracker) canAnnounce() bool {
+func (t *Tracker) canAnnounce(at time.Time) bool {
 	if t.disabled.IsDisabled() {
 		return false
 	}
-	if time.Now().Before(t.nextAnnounce) {
+	if at.Before(t.nextAnnounce) {
 		return false
 	}
 	if t.isCurrentlyAnnouncing {

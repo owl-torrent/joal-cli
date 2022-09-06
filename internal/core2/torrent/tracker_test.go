@@ -57,46 +57,50 @@ func TestTracker_canAnnounce(t1 *testing.T) {
 		nextAnnounce          time.Time
 		isCurrentlyAnnouncing bool
 	}
+	type args struct {
+		at time.Time
+	}
 	tests := []struct {
 		name   string
 		fields fields
+		args   args
 		want   bool
 	}{
 		{name: "disabled && time elapsed && not announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time future && not announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(5 * time.Minute),
 			isCurrentlyAnnouncing: false,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time elapsed && announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: true,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time elapsed && not announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time elapsed && announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: true,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time future && not announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(5 * time.Minute),
 			isCurrentlyAnnouncing: false,
-		}, want: false},
+		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time elapsed && not announcing", fields: fields{
 			disabled:              TrackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
-		}, want: true},
+		}, args: args{at: time.Now()}, want: true},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
@@ -105,7 +109,7 @@ func TestTracker_canAnnounce(t1 *testing.T) {
 				nextAnnounce:          tt.fields.nextAnnounce,
 				isCurrentlyAnnouncing: tt.fields.isCurrentlyAnnouncing,
 			}
-			assert.Equalf(t1, tt.want, t.canAnnounce(), "canAnnounce()")
+			assert.Equalf(t1, tt.want, t.canAnnounce(tt.args.at), "canAnnounce()")
 		})
 	}
 }

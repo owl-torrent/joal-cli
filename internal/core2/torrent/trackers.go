@@ -83,7 +83,7 @@ func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy 
 		}
 	}
 
-	// disable trackers acording to policy
+	// disable trackers according to policy
 	for i := range trackers {
 		// may have been disabled because of announceList not supported
 		if trackers[i].disabled.IsDisabled() {
@@ -114,31 +114,120 @@ func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy 
 	}, nil
 }
 
-// Return all tracker that may be used given announce policy
-func findTrackersInUse(trackerList []Tracker, announceToAllTiers bool, announceToAllTrackersInTier bool) []Tracker {
-	panic(fmt.Errorf("not implemented"))
-}
+//	 FIXME: ready to announce seems to be the only caller of findTrackersInUse, it might be possible to merge the two methods to prevent double array parsing + double rray assignements
+//		 Also, it may be possible to modify the signature of findInuse to trackerList findInuse([]Tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(Tracker) bool), the filter being: if canAnnounce return true.
+//		 One think to keep in mind though. If a tracker is "currentlyAnnouncing" it should be considered inUse, but not eligible to readyToAnnounce
+func (ts *Trackers) ReadyToAnnounce(at time.Time) []Tracker {
+	inUse := findTrackersInUse(ts.trackers, ts.announceToAllTiers, ts.announceToAllTrackersInTier)
 
-func (ts *Trackers) ReadyToAnnounce(time.Time) []Tracker {
-	// return inUse & ready to announce
-	panic(fmt.Errorf("not implemented"))
+	var ready []Tracker
+	for _, tracker := range inUse {
+		if tracker.canAnnounce(at) {
+			ready = append(ready, tracker)
+		}
+	}
+
+	return ready
 }
 
 func (ts *Trackers) Succeed(trackerUrl url.URL, response common.AnnounceResponse) {
-	panic(fmt.Errorf("not implemented"))
+	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
+	if err != nil {
+		return
+	}
+
+	ts.trackers[trackerIndex].announceSucceed(AnnounceHistory{
+		at:       time.Now(),
+		interval: response.Interval,
+		seeders:  response.Seeders,
+		leechers: response.Leechers,
+		error:    "",
+	})
 }
 
 func (ts *Trackers) Failed(trackerUrl url.URL, response common.AnnounceResponseError) {
-	// deprioritizeTracker()
-	panic(fmt.Errorf("not implemented"))
+	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
+	if err != nil {
+		return
+	}
+
+	// operate on tracker before it gets moved in the list
+	ts.trackers[trackerIndex].announceFailed(AnnounceHistory{
+		at:    time.Now(),
+		error: response.Error.Error(),
+	})
+
+	deprioritizeTracker(ts.trackers, trackerIndex)
 }
 
-func findTrackerForUrl(trackerList []Tracker, u url.URL) (index int, t Tracker, err error) {
-	panic(fmt.Errorf("not implemented"))
+func findTrackerForUrl(trackerList []Tracker, u url.URL) (int, error) {
+	for i := range trackerList {
+		if strings.EqualFold(trackerList[i].url.String(), u.String()) {
+			return i, nil
+		}
+	}
+
+	return -1, fmt.Errorf("no tracker of url '%s' in list", u.String())
 }
 
-func deprioritizeTracker(trackers []Tracker, indexToDeprioritize int) []Tracker {
-	panic(fmt.Errorf("not implemented"))
+// Return all tracker that may be used given announce policy
+//   - AnnounceToAllTier = true , announceToAllTrackersInTier = true  => all (non-disabled) trackers
+//   - AnnounceToAllTier = true , announceToAllTrackersInTier = false => first (non-disabled) tracker of each tier (if not first tracker it means that the tracker has been deprioritized)
+//   - AnnounceToAllTier = false, announceToAllTrackersInTier = true => all (non-disabled) trackers of the first tier that contains a (non-disabled) tracker
+//   - AnnounceToAllTier = false, announceToAllTrackersInTier = false => first (non-disabled) tracker
+func findTrackersInUse(trackerList []Tracker, announceToAllTiers bool, announceToAllTrackersInTier bool) []Tracker {
+	var inUse []Tracker
+
+	// index of the tier we last found and inUse tracker in
+	foundForTier := -1
+	foundOne := false
+
+	for i, tr := range trackerList {
+		if tr.disabled.IsDisabled() {
+			continue
+		}
+		if announceToAllTiers && !announceToAllTrackersInTier && foundForTier == tr.tier {
+			continue
+		}
+		// Announcing to a single tracker in a single tier => we found one => exit
+		if !announceToAllTiers && !announceToAllTrackersInTier && foundOne {
+			return inUse
+		}
+		// Announcing to all trackers in one tier => we have found at least one and changed tier => exit
+		if !announceToAllTiers && announceToAllTrackersInTier && foundOne && i > 0 && tr.tier > trackerList[i-1].tier {
+			return inUse
+		}
+
+		foundOne = true
+		foundForTier = tr.tier
+		inUse = append(inUse, tr)
+	}
+
+	return inUse
+}
+
+// deprioritizeTracker push a tracker pointed by indexToDeprioritize to the end of his tier.
+func deprioritizeTracker(trackers []Tracker, indexToDeprioritize int) {
+	if indexToDeprioritize >= len(trackers)-1 {
+		// out of bound or already the last one
+		return
+	}
+	trackerToDeprioritize := trackers[indexToDeprioritize]
+
+	for i := indexToDeprioritize; i < len(trackers); i++ {
+		if i+1 == len(trackers) {
+			return
+		}
+		t := trackers[i]
+		if t.tier > trackerToDeprioritize.tier {
+			return
+		}
+
+		if trackers[i+1].tier == trackerToDeprioritize.tier {
+			// swap
+			trackers[i], trackers[i+1] = trackers[i+1], trackers[i]
+		}
+	}
 }
 
 func hasOneEnabled(trackers []Tracker) bool {
