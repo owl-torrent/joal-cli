@@ -10,20 +10,20 @@ import (
 func TestPeersElectorGetPeersZeroByDefault(t *testing.T) {
 	elector := newPeersElector()
 
-	peers := elector.GetPeers()
-	assert.Equal(t, int32(0), peers.Seeders)
-	assert.Equal(t, int32(0), peers.Leechers)
+	p := elector.GetPeers()
+	assert.Equal(t, int32(0), p.Seeders())
+	assert.Equal(t, int32(0), p.Leechers())
 }
 
 func TestPeersElector_UpdatePeersForTrackerShouldAddEntry(t *testing.T) {
 	elector := newPeersElector()
 
-	elector.UpdatePeersForTracker(PeersUpdateRequest{
+	elector.updatePeersForTracker(peersUpdateRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 		Seeders:    10,
 		Leechers:   20,
 	})
-	elector.UpdatePeersForTracker(PeersUpdateRequest{
+	elector.updatePeersForTracker(peersUpdateRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:2/announce"),
 		Seeders:    10,
 		Leechers:   20,
@@ -34,29 +34,29 @@ func TestPeersElector_UpdatePeersForTrackerShouldAddEntry(t *testing.T) {
 
 func TestPeersElector_UpdatePeersForTrackerShouldElectAfterAdding(t *testing.T) {
 	elector := newPeersElector()
-	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = Peers{}
+	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = peers{}
 
-	elector.UpdatePeersForTracker(PeersUpdateRequest{
+	elector.updatePeersForTracker(peersUpdateRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 		Seeders:    10,
 		Leechers:   20,
 	})
 
 	elected := elector.GetPeers()
-	assert.EqualValues(t, 10, elected.Seeders)
-	assert.EqualValues(t, 20, elected.Leechers)
+	assert.EqualValues(t, 10, elected.Seeders())
+	assert.EqualValues(t, 20, elected.Leechers())
 }
 
 func TestPeersElector_UpdatePeersForTrackerShouldReplacingEntry(t *testing.T) {
 	elector := newPeersElector(mostLeeched)
 
-	elector.UpdatePeersForTracker(PeersUpdateRequest{
+	elector.updatePeersForTracker(peersUpdateRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 		Seeders:    10,
 		Leechers:   20,
 	})
 
-	elector.UpdatePeersForTracker(PeersUpdateRequest{
+	elector.updatePeersForTracker(peersUpdateRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 		Seeders:    0,
 		Leechers:   10,
@@ -68,10 +68,10 @@ func TestPeersElector_UpdatePeersForTrackerShouldReplacingEntry(t *testing.T) {
 func TestPeersElector_RemovePeersForTracker(t *testing.T) {
 	elector := newPeersElector()
 
-	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = Peers{}
+	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = peers{}
 	assert.Len(t, elector.allPeers, 1)
 
-	elector.RemovePeersForTracker(PeersDeleteRequest{
+	elector.removePeersForTracker(peersDeleteRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 	})
 
@@ -80,54 +80,54 @@ func TestPeersElector_RemovePeersForTracker(t *testing.T) {
 
 func TestPeersElector_RemovePeersForTrackerShouldElectAfterRemoving(t *testing.T) {
 	elector := newPeersElector()
-	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = Peers{}
-	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:9000/announce"))] = Peers{
-		Seeders:  50,
-		Leechers: 50,
+	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:1/announce"))] = peers{}
+	elector.allPeers[peersIdentifierFromUrl(*testutils.MustParseUrl("http://localhost:9000/announce"))] = peers{
+		seeders:  50,
+		leechers: 50,
 	}
 
 	// ensure the election has not been processed yet
-	assert.EqualValues(t, 0, elector.GetPeers().Leechers)
+	assert.EqualValues(t, 0, elector.GetPeers().Leechers())
 
-	elector.RemovePeersForTracker(PeersDeleteRequest{
+	elector.removePeersForTracker(peersDeleteRequest{
 		trackerUrl: *testutils.MustParseUrl("http://localhost:1/announce"),
 	})
 
 	// ensure the election has not been processed yet
 	elected := elector.GetPeers()
-	assert.EqualValues(t, 50, elected.Seeders)
-	assert.EqualValues(t, 50, elected.Leechers)
+	assert.EqualValues(t, 50, elected.Seeders())
+	assert.EqualValues(t, 50, elected.Leechers())
 }
 
 func Test_electionAlgorithm_electMostLeechedShouldPreferTheBiggestAmountOfLeechers(t *testing.T) {
-	candidate1 := Peers{Seeders: 10, Leechers: 100}
-	candidate2 := Peers{Seeders: 1000, Leechers: 50}
+	candidate1 := peers{seeders: 10, leechers: 100}
+	candidate2 := peers{seeders: 1000, leechers: 50}
 
 	assert.EqualValues(t, candidate1, mostLeeched(candidate1, candidate2))
 	assert.EqualValues(t, candidate1, mostLeeched(candidate2, candidate1))
 }
 
 func Test_electionAlgorithm_electMostLeechedShouldPreferTheBiggestAmountOfLeechersWithAtLeastOneSeeders(t *testing.T) {
-	candidate1 := Peers{Seeders: 10, Leechers: 100}
-	candidate2 := Peers{Seeders: 0, Leechers: 10000000}
+	candidate1 := peers{seeders: 10, leechers: 100}
+	candidate2 := peers{seeders: 0, leechers: 10000000}
 
 	assert.EqualValues(t, candidate1, mostLeeched(candidate1, candidate2))
 	assert.EqualValues(t, candidate1, mostLeeched(candidate2, candidate1))
 }
 
 func Test_electionAlgorithm_electMostLeechedShouldPreferTheBiggestAmountOfLeechersIfAllHaveZeroSeeders(t *testing.T) {
-	candidate1 := Peers{Seeders: 0, Leechers: 100}
-	candidate2 := Peers{Seeders: 0, Leechers: 50}
+	candidate1 := peers{seeders: 0, leechers: 100}
+	candidate2 := peers{seeders: 0, leechers: 50}
 
 	assert.EqualValues(t, candidate1, mostLeeched(candidate1, candidate2))
 	assert.EqualValues(t, candidate1, mostLeeched(candidate2, candidate1))
 }
 
 func Test_electPeersShouldElectEmptyArray(t *testing.T) {
-	expectedWinner := Peers{Seeders: 0, Leechers: 0}
-	var candidates map[string]Peers
+	expectedWinner := peers{seeders: 0, leechers: 0}
+	var candidates map[string]peers
 
-	var noopAlgo electionAlgorithm = func(p1 Peers, p2 Peers) Peers {
+	var noopAlgo electionAlgorithm = func(p1 peers, p2 peers) peers {
 		return p1
 	}
 

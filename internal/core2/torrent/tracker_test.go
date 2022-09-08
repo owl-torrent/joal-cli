@@ -21,7 +21,7 @@ func TestTracker_getTier(t1 *testing.T) {
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &Tracker{
+			t := &tracker{
 				tier: tt.fields.tier,
 			}
 			assert.Equalf(t1, tt.want, t.getTier(), "getTier()")
@@ -43,7 +43,7 @@ func TestTracker_isAnnouncing(t1 *testing.T) {
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &Tracker{
+			t := &tracker{
 				isCurrentlyAnnouncing: tt.fields.isCurrentlyAnnouncing,
 			}
 			assert.Equalf(t1, tt.want, t.isAnnouncing(), "isAnnouncing()")
@@ -53,7 +53,7 @@ func TestTracker_isAnnouncing(t1 *testing.T) {
 
 func TestTracker_canAnnounce(t1 *testing.T) {
 	type fields struct {
-		disabled              TrackerDisabled
+		disabled              trackerDisabled
 		nextAnnounce          time.Time
 		isCurrentlyAnnouncing bool
 	}
@@ -67,44 +67,44 @@ func TestTracker_canAnnounce(t1 *testing.T) {
 		want   bool
 	}{
 		{name: "disabled && time elapsed && not announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: true},
+			disabled:              trackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time future && not announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: true},
+			disabled:              trackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(5 * time.Minute),
 			isCurrentlyAnnouncing: false,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time elapsed && announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: true},
+			disabled:              trackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: true,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "disabled && time elapsed && not announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: true},
+			disabled:              trackerDisabled{disabled: true},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time elapsed && announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: false},
+			disabled:              trackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: true,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time future && not announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: false},
+			disabled:              trackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(5 * time.Minute),
 			isCurrentlyAnnouncing: false,
 		}, args: args{at: time.Now()}, want: false},
 		{name: "not disabled && time elapsed && not announcing", fields: fields{
-			disabled:              TrackerDisabled{disabled: false},
+			disabled:              trackerDisabled{disabled: false},
 			nextAnnounce:          time.Now().Add(-1 * time.Hour),
 			isCurrentlyAnnouncing: false,
 		}, args: args{at: time.Now()}, want: true},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &Tracker{
+			t := &tracker{
 				disabled:              tt.fields.disabled,
 				nextAnnounce:          tt.fields.nextAnnounce,
 				isCurrentlyAnnouncing: tt.fields.isCurrentlyAnnouncing,
@@ -128,32 +128,32 @@ func TestTracker_HasAnnouncedStart(t1 *testing.T) {
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &Tracker{
+			t := &tracker{
 				startSent: tt.fields.startSent,
 			}
-			assert.Equalf(t1, tt.want, t.HasAnnouncedStart(), "HasAnnouncedStart()")
+			assert.Equalf(t1, tt.want, t.hasAnnouncedStart(), "hasAnnouncedStart()")
 		})
 	}
 }
 
 func TestTracker_announcing(t1 *testing.T) {
-	t := Tracker{isCurrentlyAnnouncing: false}
+	t := tracker{isCurrentlyAnnouncing: false}
 	t.announcing()
 
 	assert.True(t1, t.isCurrentlyAnnouncing)
 }
 
 func TestTracker_announceSucceed(t1 *testing.T) {
-	t := Tracker{
+	t := tracker{
 		nextAnnounce:          time.Now().Add(-5 * time.Hour),
 		isCurrentlyAnnouncing: true,
-		announcesHistory:      []AnnounceHistory{},
+		announcesHistory:      []announceHistory{},
 		consecutiveFails:      10,
 	}
 
 	at := time.Now()
 
-	t.announceSucceed(AnnounceHistory{
+	t.announceSucceed(announceHistory{
 		at:       at,
 		interval: 3520 * time.Second,
 		seeders:  50,
@@ -168,16 +168,16 @@ func TestTracker_announceSucceed(t1 *testing.T) {
 }
 
 func TestTracker_announceFailed(t1 *testing.T) {
-	t := Tracker{
+	t := tracker{
 		nextAnnounce:          time.Now().Add(-5 * time.Hour),
 		isCurrentlyAnnouncing: true,
-		announcesHistory:      []AnnounceHistory{},
+		announcesHistory:      []announceHistory{},
 		consecutiveFails:      6,
 	}
 
 	at := time.Now()
 
-	t.announceFailed(AnnounceHistory{
+	t.announceFailed(announceHistory{
 		at:    at,
 		error: "failed",
 	})
@@ -189,13 +189,13 @@ func TestTracker_announceFailed(t1 *testing.T) {
 }
 
 func TestTracker_announceFailed_shouldNotOverflowConsecutiveFails(t1 *testing.T) {
-	t := Tracker{
+	t := tracker{
 		isCurrentlyAnnouncing: true,
-		announcesHistory:      []AnnounceHistory{},
+		announcesHistory:      []announceHistory{},
 		consecutiveFails:      math.MaxInt,
 	}
 
-	t.announceFailed(AnnounceHistory{
+	t.announceFailed(announceHistory{
 		at:    time.Now(),
 		error: "failed",
 	})
@@ -204,19 +204,19 @@ func TestTracker_announceFailed_shouldNotOverflowConsecutiveFails(t1 *testing.T)
 }
 
 func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAndBeCappedAtMaximumRetryDelay_IfAnnounceHistoryDoesNotContainsInterval(t1 *testing.T) {
-	t := Tracker{
+	t := tracker{
 		nextAnnounce:          time.Now().Add(-5 * time.Hour),
 		isCurrentlyAnnouncing: true,
-		announcesHistory:      []AnnounceHistory{},
+		announcesHistory:      []announceHistory{},
 	}
 
 	at := time.Now()
 
 	// delta between next announce time and time.Now
-	nextAnnounceDeltas := []time.Duration{}
+	var nextAnnounceDeltas []time.Duration
 
 	for i := 0; i < 100; i++ {
-		t.announceFailed(AnnounceHistory{
+		t.announceFailed(announceHistory{
 			at:    at,
 			error: "failed",
 		})
@@ -232,19 +232,19 @@ func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAn
 }
 
 func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAndBeCappedAtMaximumRetryDelayButShouldPreferIntervalIfGreater(t1 *testing.T) {
-	t := Tracker{
+	t := tracker{
 		nextAnnounce:          time.Now().Add(-5 * time.Hour),
 		isCurrentlyAnnouncing: true,
-		announcesHistory:      []AnnounceHistory{},
+		announcesHistory:      []announceHistory{},
 	}
 
 	at := time.Now()
 
-	nextAnnounceDeltas := []time.Duration{}
+	var nextAnnounceDeltas []time.Duration
 
 	interval := 25 * time.Minute
 	for i := 0; i < 100; i++ {
-		t.announceFailed(AnnounceHistory{
+		t.announceFailed(announceHistory{
 			at:       at,
 			interval: interval,
 			error:    "failed",
@@ -263,12 +263,12 @@ func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAn
 }
 
 func TestTracker_appendToAnnounceHistory_ShouldNotStoreMoreThanXEntries(t1 *testing.T) {
-	var history []AnnounceHistory
+	var history []announceHistory
 
 	maxLen := 6
 
 	for i := 0; i < maxLen+2; i++ {
-		history = appendToAnnounceHistory(history, AnnounceHistory{
+		history = appendToAnnounceHistory(history, announceHistory{
 			at:    time.Now(),
 			error: "failed !",
 		}, maxLen)

@@ -2,53 +2,31 @@ package torrent
 
 import (
 	"fmt"
-	"github.com/anacrolix/torrent/metainfo"
-	"github.com/anthonyraymond/joal-cli/internal/core2/common"
-	"math/rand"
 	"net/url"
 	"strings"
 	"time"
 )
 
-var (
-	ErrAllTrackerAreDisabled = fmt.Errorf("trackers.all-trackers-disabled")
-)
-
 type Trackers struct {
-	trackers                    []Tracker
+	trackers                    []tracker
 	announceToAllTiers          bool
 	announceToAllTrackersInTier bool
 }
 
-// FIXME: this implementation may be more simple if we had url.URL instead of string and [][]string in constructor, see if caller can Parse URL instead
-
-// TODO: the client should provide the announceList shuffled? that way he can decide to shuffle or not (depending on client configuration)
-func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy AnnouncePolicy) (Trackers, error) {
-	var trackers []Tracker
-
-	announceList = createShuffledCopyOfAnnounceList(announceList)
-	// Shuffling trackers of announceList according to BEP-12: https://www.bittorrent.org/beps/bep_0012.html
-	rand.Seed(time.Now().UnixNano())
-	for _, tier := range announceList {
-		rand.Shuffle(len(tier), func(i, j int) {
-			tier[i], tier[j] = tier[j], tier[i]
-		})
-	}
+func CreateTrackers(announce url.URL, announceList [][]url.URL, policy AnnouncePolicy) (Trackers, error) {
+	// TODO: the client should provide the announceList shuffled (depending on client behaviour)
+	var trackers []tracker
 
 	// add all announceList trackers (starting at tier 1)
 	for tierIdx := range announceList {
 		for trackerIdx := range announceList[tierIdx] {
-			u, err := url.Parse(announceList[tierIdx][trackerIdx])
-			if err != nil {
-				//FIXME: log failed to parse tracker
-				continue
-			}
+			u := announceList[tierIdx][trackerIdx]
 
-			trackers = append(trackers, Tracker{
-				url:              *u,
+			trackers = append(trackers, tracker{
+				url:              u,
 				tier:             tierIdx + 1,
 				nextAnnounce:     time.Now(),
-				announcesHistory: []AnnounceHistory{},
+				announcesHistory: []announceHistory{},
 			})
 		}
 	}
@@ -60,33 +38,28 @@ func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy 
 			trackers[i].disabled = announceListNotSupported
 		}
 
-		u, err := url.Parse(announce)
-		if err == nil {
-			singleTracker := Tracker{
-				url:              *u,
-				tier:             0,
-				nextAnnounce:     time.Now(),
-				announcesHistory: []AnnounceHistory{},
-			}
-
-			// filter all occurrence of this new tracker from the announceList
-			var filteredCopy []Tracker
-			for _, tr := range trackers {
-				if tr.url.String() != singleTracker.url.String() {
-					filteredCopy = append(filteredCopy, tr)
-				}
-			}
-
-			trackers = append([]Tracker{singleTracker}, filteredCopy...)
-		} else {
-			//FIXME: log failed to parse URL
+		singleTracker := tracker{
+			url:              announce,
+			tier:             0,
+			nextAnnounce:     time.Now(),
+			announcesHistory: []announceHistory{},
 		}
+
+		// filter all occurrence of this new tracker from the announceList
+		var filteredCopy []tracker
+		for _, tr := range trackers {
+			if tr.url.String() != singleTracker.url.String() {
+				filteredCopy = append(filteredCopy, tr)
+			}
+		}
+
+		trackers = append([]tracker{singleTracker}, filteredCopy...)
 	}
 
 	// disable trackers according to policy
 	for i := range trackers {
 		// may have been disabled because of announceList not supported
-		if trackers[i].disabled.IsDisabled() {
+		if trackers[i].disabled.isDisabled() {
 			continue
 		}
 		// disable udp according to policy
@@ -103,10 +76,6 @@ func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy 
 		}
 	}
 
-	if !hasOneEnabled(trackers) {
-		return Trackers{}, ErrAllTrackerAreDisabled
-	}
-
 	return Trackers{
 		trackers:                    trackers,
 		announceToAllTiers:          policy.ShouldAnnounceToAllTier(),
@@ -114,29 +83,29 @@ func CreateTrackers(announce string, announceList metainfo.AnnounceList, policy 
 	}, nil
 }
 
-//	 FIXME: ready to announce seems to be the only caller of findTrackersInUse, it might be possible to merge the two methods to prevent double array parsing + double rray assignements
-//		 Also, it may be possible to modify the signature of findInuse to trackerList findInuse([]Tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(Tracker) bool), the filter being: if canAnnounce return true.
+//	 FIXME: ready to announce seems to be the only caller of findTrackersInUse, it might be possible to merge the two methods to prevent double array parsing + double array assignements
+//		 Also, it may be possible to modify the signature of findInuse to trackerList findInuse([]tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(tracker) bool), the filter being: if canAnnounce return true.
 //		 One think to keep in mind though. If a tracker is "currentlyAnnouncing" it should be considered inUse, but not eligible to readyToAnnounce
-func (ts *Trackers) ReadyToAnnounce(at time.Time) []Tracker {
+func (ts *Trackers) ReadyToAnnounce(at time.Time) []tracker {
 	inUse := findTrackersInUse(ts.trackers, ts.announceToAllTiers, ts.announceToAllTrackersInTier)
 
-	var ready []Tracker
-	for _, tracker := range inUse {
-		if tracker.canAnnounce(at) {
-			ready = append(ready, tracker)
+	var ready []tracker
+	for _, tr := range inUse {
+		if tr.canAnnounce(at) {
+			ready = append(ready, tr)
 		}
 	}
 
 	return ready
 }
 
-func (ts *Trackers) Succeed(trackerUrl url.URL, response common.AnnounceResponse) {
+func (ts *Trackers) Succeed(trackerUrl url.URL, response TrackerAnnounceResponse) {
 	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
 	if err != nil {
 		return
 	}
 
-	ts.trackers[trackerIndex].announceSucceed(AnnounceHistory{
+	ts.trackers[trackerIndex].announceSucceed(announceHistory{
 		at:       time.Now(),
 		interval: response.Interval,
 		seeders:  response.Seeders,
@@ -145,14 +114,14 @@ func (ts *Trackers) Succeed(trackerUrl url.URL, response common.AnnounceResponse
 	})
 }
 
-func (ts *Trackers) Failed(trackerUrl url.URL, response common.AnnounceResponseError) {
+func (ts *Trackers) Failed(trackerUrl url.URL, response TrackerAnnounceResponseError) {
 	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
 	if err != nil {
 		return
 	}
 
 	// operate on tracker before it gets moved in the list
-	ts.trackers[trackerIndex].announceFailed(AnnounceHistory{
+	ts.trackers[trackerIndex].announceFailed(announceHistory{
 		at:    time.Now(),
 		error: response.Error.Error(),
 	})
@@ -160,7 +129,7 @@ func (ts *Trackers) Failed(trackerUrl url.URL, response common.AnnounceResponseE
 	deprioritizeTracker(ts.trackers, trackerIndex)
 }
 
-func findTrackerForUrl(trackerList []Tracker, u url.URL) (int, error) {
+func findTrackerForUrl(trackerList []tracker, u url.URL) (int, error) {
 	for i := range trackerList {
 		if strings.EqualFold(trackerList[i].url.String(), u.String()) {
 			return i, nil
@@ -175,15 +144,15 @@ func findTrackerForUrl(trackerList []Tracker, u url.URL) (int, error) {
 //   - AnnounceToAllTier = true , announceToAllTrackersInTier = false => first (non-disabled) tracker of each tier (if not first tracker it means that the tracker has been deprioritized)
 //   - AnnounceToAllTier = false, announceToAllTrackersInTier = true => all (non-disabled) trackers of the first tier that contains a (non-disabled) tracker
 //   - AnnounceToAllTier = false, announceToAllTrackersInTier = false => first (non-disabled) tracker
-func findTrackersInUse(trackerList []Tracker, announceToAllTiers bool, announceToAllTrackersInTier bool) []Tracker {
-	var inUse []Tracker
+func findTrackersInUse(trackerList []tracker, announceToAllTiers bool, announceToAllTrackersInTier bool) []tracker {
+	var inUse []tracker
 
 	// index of the tier we last found and inUse tracker in
 	foundForTier := -1
 	foundOne := false
 
 	for i, tr := range trackerList {
-		if tr.disabled.IsDisabled() {
+		if tr.disabled.isDisabled() {
 			continue
 		}
 		if announceToAllTiers && !announceToAllTrackersInTier && foundForTier == tr.tier {
@@ -207,7 +176,7 @@ func findTrackersInUse(trackerList []Tracker, announceToAllTiers bool, announceT
 }
 
 // deprioritizeTracker push a tracker pointed by indexToDeprioritize to the end of his tier.
-func deprioritizeTracker(trackers []Tracker, indexToDeprioritize int) {
+func deprioritizeTracker(trackers []tracker, indexToDeprioritize int) {
 	if indexToDeprioritize >= len(trackers)-1 {
 		// out of bound or already the last one
 		return
@@ -230,21 +199,12 @@ func deprioritizeTracker(trackers []Tracker, indexToDeprioritize int) {
 	}
 }
 
-func hasOneEnabled(trackers []Tracker) bool {
-	for _, tracker := range trackers {
-		if !tracker.disabled.IsDisabled() {
+func hasOneEnabled(trackers []tracker) bool {
+	for _, tr := range trackers {
+		if !tr.disabled.isDisabled() {
 			return true
 		}
 	}
 
 	return false
-}
-
-func createShuffledCopyOfAnnounceList(list [][]string) [][]string {
-	duplicate := make([][]string, len(list))
-	for i := range list {
-		duplicate[i] = make([]string, len(list[i]))
-		copy(duplicate[i], list[i])
-	}
-	return duplicate
 }

@@ -14,33 +14,33 @@ const (
 )
 
 var (
-	announceProtocolNotSupported = TrackerDisabled{disabled: true, reason: "tracker.disabled.protocol-not-supported"}
-	announceListNotSupported     = TrackerDisabled{disabled: true, reason: "tracker.disabled.announce-list-not-supported"}
+	announceProtocolNotSupported = trackerDisabled{disabled: true, reason: "tracker.disabled.protocol-not-supported"}
+	announceListNotSupported     = trackerDisabled{disabled: true, reason: "tracker.disabled.announce-list-not-supported"}
 )
 
-type Tracker struct {
+type tracker struct {
 	url                   url.URL
 	tier                  int
-	disabled              TrackerDisabled
+	disabled              trackerDisabled
 	nextAnnounce          time.Time
 	consecutiveFails      int
 	startSent             bool
 	isCurrentlyAnnouncing bool
-	announcesHistory      []AnnounceHistory
+	announcesHistory      []announceHistory
 }
 
-func (t *Tracker) getTier() int {
+func (t *tracker) getTier() int {
 	return t.tier
 }
 
-func (t *Tracker) isAnnouncing() bool {
+func (t *tracker) isAnnouncing() bool {
 	return t.isCurrentlyAnnouncing
 }
 
 // return true if the tracker is the tracker is ready to announce
 // (not disabled && nextAnnounce is passed && not announcing)
-func (t *Tracker) canAnnounce(at time.Time) bool {
-	if t.disabled.IsDisabled() {
+func (t *tracker) canAnnounce(at time.Time) bool {
+	if t.disabled.isDisabled() {
 		return false
 	}
 	if at.Before(t.nextAnnounce) {
@@ -52,15 +52,15 @@ func (t *Tracker) canAnnounce(at time.Time) bool {
 	return true
 }
 
-func (t *Tracker) HasAnnouncedStart() bool {
+func (t *tracker) hasAnnouncedStart() bool {
 	return t.startSent
 }
 
-func (t *Tracker) announcing() {
+func (t *tracker) announcing() {
 	t.isCurrentlyAnnouncing = true
 }
 
-func (t *Tracker) announceSucceed(h AnnounceHistory) {
+func (t *tracker) announceSucceed(h announceHistory) {
 	t.consecutiveFails = 0
 	t.isCurrentlyAnnouncing = false
 	t.announcesHistory = appendToAnnounceHistory(t.announcesHistory, h, announceHistoryMaxLen)
@@ -68,7 +68,7 @@ func (t *Tracker) announceSucceed(h AnnounceHistory) {
 	t.nextAnnounce = h.at.Add(h.interval)
 }
 
-func (t *Tracker) announceFailed(h AnnounceHistory) {
+func (t *tracker) announceFailed(h announceHistory) {
 	if t.consecutiveFails != math.MaxInt {
 		t.consecutiveFails = t.consecutiveFails + 1
 	}
@@ -91,7 +91,7 @@ func (t *Tracker) announceFailed(h AnnounceHistory) {
 	t.nextAnnounce = h.at.Add(time.Duration(delay) * time.Second)
 }
 
-func appendToAnnounceHistory(slice []AnnounceHistory, h AnnounceHistory, maxLen int) []AnnounceHistory {
+func appendToAnnounceHistory(slice []announceHistory, h announceHistory, maxLen int) []announceHistory {
 	slice = append(slice, h)
 
 	if len(slice) > maxLen {
@@ -100,24 +100,16 @@ func appendToAnnounceHistory(slice []AnnounceHistory, h AnnounceHistory, maxLen 
 	return slice
 }
 
-type AnnouncePolicy interface {
-	SupportHttpAnnounce() bool
-	SupportUdpAnnounce() bool
-	SupportAnnounceList() bool
-	ShouldAnnounceToAllTier() bool
-	ShouldAnnounceToAllTrackersInTier() bool
-}
-
-type TrackerDisabled struct {
+type trackerDisabled struct {
 	disabled bool
 	reason   string
 }
 
-func (d TrackerDisabled) IsDisabled() bool {
+func (d trackerDisabled) isDisabled() bool {
 	return d.disabled
 }
 
-type AnnounceHistory struct {
+type announceHistory struct {
 	at       time.Time
 	interval time.Duration
 	seeders  int32

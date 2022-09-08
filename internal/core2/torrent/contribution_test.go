@@ -6,19 +6,19 @@ import (
 )
 
 func TestContribution_AddUploaded(t *testing.T) {
-	var c Contribution
+	var c contribution
 
-	c.AddUploaded(25)
+	c.addUploaded(25)
 	assert.Equal(t, int64(25), c.uploaded)
 
-	c.AddUploaded(11111)
+	c.addUploaded(11111)
 	assert.Equal(t, int64(11136), c.uploaded)
 }
 
 func TestContribution_AddUploadedShouldPreventAddingNegativeNumber(t *testing.T) {
-	var c Contribution
+	var c contribution
 
-	c.AddUploaded(-20)
+	c.addUploaded(-20)
 
 	assert.Equal(t, int64(0), c.uploaded)
 }

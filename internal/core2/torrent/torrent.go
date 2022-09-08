@@ -1,6 +1,6 @@
 package torrent
 
-type Torrent struct {
-	contrib Contribution
+type torrent struct {
+	contrib contribution
 	peers   peersElector
 }
