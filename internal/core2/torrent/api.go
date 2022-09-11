@@ -2,10 +2,17 @@ package torrent
 
 import (
 	libtracker "github.com/anacrolix/torrent/tracker"
+	"net/url"
 	"time"
 )
 
-type AnnounceAbleTorrent interface {
+type Factory interface {
+	CreateOne(announce, announceList [][]url.URL, announcePolicy AnnouncePolicy) Torrent
+}
+
+type Torrent interface {
+	GetPeers() Peers
+
 	// AnnounceStop unconditionally send Stop event to all tracker currently in use
 	AnnounceStop(event libtracker.AnnounceEvent, announcingFunction AnnouncingFunction)
 	// AnnounceToReadyTrackers announce to all tracker that are ready to receive an announce
@@ -14,8 +21,6 @@ type AnnounceAbleTorrent interface {
 	HandleAnnounceSuccess(response TrackerAnnounceResponse)
 	// HandleAnnounceError delegate the handling of the response to the trackers
 	HandleAnnounceError(response TrackerAnnounceResponseError)
-
-	GetPeers() Peers
 }
 
 type TrackerAnnounceResponse struct {

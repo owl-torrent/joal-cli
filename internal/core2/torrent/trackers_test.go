@@ -50,7 +50,7 @@ func TestCreateTrackers(t *testing.T) {
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("https://localhost:20/tier2/tr2"), *testutils.MustParseUrl("udp://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	for _, tr := range trackers.trackers {
@@ -72,7 +72,7 @@ func TestCreateTrackers_shouldDisableUdpTrackers(t *testing.T) {
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("https://localhost:20/tier2/tr2"), *testutils.MustParseUrl("UDP://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	disabledCount := 0
@@ -98,7 +98,7 @@ func TestCreateTrackers_shouldDisableHttpAndHttpsTrackers(t *testing.T) {
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("https://localhost:20/tier2/tr2"), *testutils.MustParseUrl("udp://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	disabledCount := 0
@@ -124,7 +124,7 @@ func TestCreateTrackers_shouldDisableUnknownTrackers(t *testing.T) {
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("pat://localhost:20/tier2/tr2"), *testutils.MustParseUrl("udp://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	disabledCount := 0
@@ -150,7 +150,7 @@ func TestCreateTrackers_shouldDisableAllTrackerIfAnnounceListIsNotSupportedAndAd
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("https://localhost:20/tier2/tr2"), *testutils.MustParseUrl("udp://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	// When supportAnnounceList is false, the single "announce" tracker should be moved on alone on tier 1 and all tiers of announceList must be incremented by one
@@ -188,7 +188,7 @@ func TestCreateTrackers_shouldRemoveSingleTrackerUrlFromAnnounceListIfAnnounceLi
 		{*testutils.MustParseUrl("http://localhost:20/tier2/tr1"), *testutils.MustParseUrl("http://localhost:1111/announce"), *testutils.MustParseUrl("udp://localhost:20/tier2/tr3")},
 	}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	numberOfTimeFound := 0
@@ -209,40 +209,11 @@ func TestCreateTrackers_shouldUseSingleTrackerFromAnnounceListIfSupportAnnounceL
 
 	announceList := [][]url.URL{{}, {}}
 
-	trackers, err := CreateTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
+	trackers, err := createTrackers(*testutils.MustParseUrl("http://localhost:1111/announce"), announceList, announcePolicy)
 	assert.NoError(t, err)
 
 	assert.Len(t, trackers.trackers, 1)
 	assert.Equal(t, trackers.trackers[0].url.String(), "http://localhost:1111/announce")
-}
-
-func Test_hasOneEnabled(t *testing.T) {
-	var createDisabled = func() tracker {
-		return tracker{disabled: trackerDisabled{disabled: true}}
-	}
-	var createEnabled = func() tracker {
-		return tracker{disabled: trackerDisabled{disabled: false}}
-	}
-	type args struct {
-		trackers []tracker
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{name: "empty should not return enabled", args: args{trackers: []tracker{}}, want: false},
-		{name: "only one but disabled", args: args{trackers: []tracker{createDisabled()}}, want: false},
-		{name: "all disabled", args: args{trackers: []tracker{createDisabled(), createDisabled()}}, want: false},
-		{name: "some enabled", args: args{trackers: []tracker{createDisabled(), createEnabled()}}, want: true},
-		{name: "all enabled", args: args{trackers: []tracker{createEnabled(), createEnabled()}}, want: true},
-		{name: "only one and enabled", args: args{trackers: []tracker{createEnabled()}}, want: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, hasOneEnabled(tt.args.trackers), "hasOneEnabled(%v)", tt.args.trackers)
-		})
-	}
 }
 
 func Test_findTrackerForUrl(t *testing.T) {
@@ -691,7 +662,7 @@ func Test_findTrackersInUse(t *testing.T) {
 }
 
 func TestTrackers_Succeed(t *testing.T) {
-	trs := Trackers{
+	trs := trackerPool{
 		trackers: []tracker{
 			{url: *testutils.MustParseUrl("http://localhost:10"), tier: 1, announcesHistory: []announceHistory{}},
 			{url: *testutils.MustParseUrl("http://localhost:11"), tier: 1, announcesHistory: []announceHistory{}},
@@ -701,7 +672,7 @@ func TestTrackers_Succeed(t *testing.T) {
 		announceToAllTrackersInTier: false,
 	}
 
-	trs.Succeed(*testutils.MustParseUrl("http://localhost:10"), TrackerAnnounceResponse{
+	trs.succeed(*testutils.MustParseUrl("http://localhost:10"), TrackerAnnounceResponse{
 		Request:  TrackerAnnounceRequest{},
 		Interval: 1 * time.Second,
 		Leechers: 2,
@@ -714,7 +685,7 @@ func TestTrackers_Succeed(t *testing.T) {
 }
 
 func TestTrackers_Failed(t *testing.T) {
-	trs := Trackers{
+	trs := trackerPool{
 		trackers: []tracker{
 			{url: *testutils.MustParseUrl("http://localhost:10"), tier: 1, announcesHistory: []announceHistory{}},
 			{url: *testutils.MustParseUrl("http://localhost:11"), tier: 1, announcesHistory: []announceHistory{}},
@@ -724,7 +695,7 @@ func TestTrackers_Failed(t *testing.T) {
 		announceToAllTrackersInTier: false,
 	}
 
-	trs.Failed(*testutils.MustParseUrl("http://localhost:10"), TrackerAnnounceResponseError{
+	trs.failed(*testutils.MustParseUrl("http://localhost:10"), TrackerAnnounceResponseError{
 		Request: TrackerAnnounceRequest{},
 		Error:   fmt.Errorf("nop"),
 	})

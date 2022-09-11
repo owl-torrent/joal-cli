@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-type Trackers struct {
+type trackerPool struct {
 	trackers                    []tracker
 	announceToAllTiers          bool
 	announceToAllTrackersInTier bool
 }
 
-func CreateTrackers(announce url.URL, announceList [][]url.URL, policy AnnouncePolicy) (Trackers, error) {
+func createTrackers(announce url.URL, announceList [][]url.URL, policy AnnouncePolicy) (trackerPool, error) {
 	// TODO: the client should provide the announceList shuffled (depending on client behaviour)
 	var trackers []tracker
 
@@ -76,7 +76,7 @@ func CreateTrackers(announce url.URL, announceList [][]url.URL, policy AnnounceP
 		}
 	}
 
-	return Trackers{
+	return trackerPool{
 		trackers:                    trackers,
 		announceToAllTiers:          policy.ShouldAnnounceToAllTier(),
 		announceToAllTrackersInTier: policy.ShouldAnnounceToAllTrackersInTier(),
@@ -86,7 +86,7 @@ func CreateTrackers(announce url.URL, announceList [][]url.URL, policy AnnounceP
 //	 FIXME: ready to announce seems to be the only caller of findTrackersInUse, it might be possible to merge the two methods to prevent double array parsing + double array assignements
 //		 Also, it may be possible to modify the signature of findInuse to trackerList findInuse([]tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(tracker) bool), the filter being: if canAnnounce return true.
 //		 One think to keep in mind though. If a tracker is "currentlyAnnouncing" it should be considered inUse, but not eligible to readyToAnnounce
-func (ts *Trackers) ReadyToAnnounce(at time.Time) []tracker {
+func (ts *trackerPool) readyToAnnounce(at time.Time) []tracker {
 	inUse := findTrackersInUse(ts.trackers, ts.announceToAllTiers, ts.announceToAllTrackersInTier)
 
 	var ready []tracker
@@ -99,7 +99,7 @@ func (ts *Trackers) ReadyToAnnounce(at time.Time) []tracker {
 	return ready
 }
 
-func (ts *Trackers) Succeed(trackerUrl url.URL, response TrackerAnnounceResponse) {
+func (ts *trackerPool) succeed(trackerUrl url.URL, response TrackerAnnounceResponse) {
 	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
 	if err != nil {
 		return
@@ -114,7 +114,7 @@ func (ts *Trackers) Succeed(trackerUrl url.URL, response TrackerAnnounceResponse
 	})
 }
 
-func (ts *Trackers) Failed(trackerUrl url.URL, response TrackerAnnounceResponseError) {
+func (ts *trackerPool) failed(trackerUrl url.URL, response TrackerAnnounceResponseError) {
 	trackerIndex, err := findTrackerForUrl(ts.trackers, trackerUrl)
 	if err != nil {
 		return
@@ -197,14 +197,4 @@ func deprioritizeTracker(trackers []tracker, indexToDeprioritize int) {
 			trackers[i], trackers[i+1] = trackers[i+1], trackers[i]
 		}
 	}
-}
-
-func hasOneEnabled(trackers []tracker) bool {
-	for _, tr := range trackers {
-		if !tr.disabled.isDisabled() {
-			return true
-		}
-	}
-
-	return false
 }
