@@ -1,6 +1,8 @@
 package torrent
 
 import (
+	"fmt"
+	trackerlib "github.com/anacrolix/torrent/tracker"
 	"math"
 	"net/url"
 	"time"
@@ -37,7 +39,7 @@ func (t *tracker) isAnnouncing() bool {
 	return t.isCurrentlyAnnouncing
 }
 
-// return true if the tracker is the tracker is ready to announce
+// return true if the tracker is ready to announce
 // (not disabled && nextAnnounce is passed && not announcing)
 func (t *tracker) canAnnounce(at time.Time) bool {
 	if t.disabled.isDisabled() {
@@ -52,12 +54,31 @@ func (t *tracker) canAnnounce(at time.Time) bool {
 	return true
 }
 
-func (t *tracker) hasAnnouncedStart() bool {
-	return t.startSent
-}
+func (t *tracker) announce(event trackerlib.AnnounceEvent, contrib contribution, announceFunction AnnouncingFunction) error {
+	if t.disabled.disabled {
+		return fmt.Errorf("can not announce, tracker is disabled")
+	}
 
-func (t *tracker) announcing() {
+	// if we never announced start replace the None announce with a start
+	if event == trackerlib.None && !t.startSent {
+		event = trackerlib.Started
+	}
+	// if we never announced start, there is no need to announce Stopped
+	if event == trackerlib.Stopped && !t.startSent {
+		return nil
+	}
+
 	t.isCurrentlyAnnouncing = true
+	announceFunction(TrackerAnnounceRequest{
+		Event:      event,
+		Url:        t.url,
+		Uploaded:   contrib.uploaded,
+		Downloaded: contrib.downloaded,
+		Left:       contrib.left,
+		Corrupt:    contrib.corrupt,
+	})
+
+	return nil
 }
 
 func (t *tracker) announceSucceed(h announceHistory) {

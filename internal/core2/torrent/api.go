@@ -26,8 +26,8 @@ type Torrent interface {
 type TrackerAnnounceResponse struct {
 	Request  TrackerAnnounceRequest
 	Interval time.Duration
-	Leechers int32
 	Seeders  int32
+	Leechers int32
 }
 
 type TrackerAnnounceResponseError struct {

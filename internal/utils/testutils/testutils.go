@@ -1,7 +1,6 @@
 package testutils
 
 import (
-	"fmt"
 	"github.com/go-playground/validator/v10"
 	"net/url"
 	"sync"
@@ -32,7 +31,7 @@ func AssertValidateError(t *testing.T, validationErrors validator.ValidationErro
 
 // Await for the WaitGroup to unlock until the timeout occurs.
 // If the WaitGroup unlock no error is returned, if the timeout occurs first an error is returned
-func WaitOrFailAfterTimeout(wg *sync.WaitGroup, timeout time.Duration) error {
+func WaitOrFailAfterTimeout(t *testing.T, wg *sync.WaitGroup, timeout time.Duration) {
 	c := make(chan struct{})
 	go func() {
 		defer close(c)
@@ -40,9 +39,10 @@ func WaitOrFailAfterTimeout(wg *sync.WaitGroup, timeout time.Duration) error {
 	}()
 	select {
 	case <-c:
-		return nil // completed normally
+		return // completed normally
 	case <-time.After(timeout):
-		return fmt.Errorf("WaitGroup.Wait() timeout") // timed out
+		t.Fail() // timed out
+		t.Errorf("\n%s", "timed out while waiting for wait group")
 	}
 }
 

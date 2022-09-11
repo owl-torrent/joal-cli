@@ -1,6 +1,8 @@
 package torrent
 
 import (
+	trackerlib "github.com/anacrolix/torrent/tracker"
+	"github.com/anthonyraymond/joal-cli/internal/utils/testutils"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -114,33 +116,84 @@ func TestTracker_canAnnounce(t1 *testing.T) {
 	}
 }
 
-func TestTracker_HasAnnouncedStart(t1 *testing.T) {
-	type fields struct {
-		startSent bool
+func TestTracker_announce(t1 *testing.T) {
+	t := tracker{
+		url:          *testutils.MustParseUrl("http://localhost:8081"),
+		nextAnnounce: time.Now(),
+		startSent:    true,
 	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   bool
-	}{
-		{name: "not sent", fields: fields{startSent: false}, want: false},
-		{name: "sent", fields: fields{startSent: true}, want: true},
-	}
-	for _, tt := range tests {
-		t1.Run(tt.name, func(t1 *testing.T) {
-			t := &tracker{
-				startSent: tt.fields.startSent,
-			}
-			assert.Equalf(t1, tt.want, t.hasAnnouncedStart(), "hasAnnouncedStart()")
-		})
-	}
+
+	var req TrackerAnnounceRequest
+	err := t.announce(trackerlib.None, contribution{uploaded: 1, downloaded: 2, left: 3, corrupt: 4}, func(request TrackerAnnounceRequest) {
+		req = request
+	})
+	assert.NoError(t1, err)
+
+	assert.Equal(t1, true, t.isCurrentlyAnnouncing)
+	assert.Equal(t1, "http://localhost:8081", req.Url.String())
+	assert.Equal(t1, trackerlib.None, req.Event)
+	assert.EqualValues(t1, 1, req.Uploaded)
+	assert.EqualValues(t1, 2, req.Downloaded)
+	assert.EqualValues(t1, 3, req.Left)
+	assert.EqualValues(t1, 4, req.Corrupt)
 }
 
-func TestTracker_announcing(t1 *testing.T) {
-	t := tracker{isCurrentlyAnnouncing: false}
-	t.announcing()
+func TestTracker_announce_shouldReplaceAnnounceNoneWithStartedIfNotStartedYet(t1 *testing.T) {
+	t := tracker{
+		url:          *testutils.MustParseUrl("http://localhost:8081"),
+		nextAnnounce: time.Now(),
+		startSent:    false,
+	}
 
-	assert.True(t1, t.isCurrentlyAnnouncing)
+	var req TrackerAnnounceRequest
+	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {
+		req = request
+
+	})
+	assert.NoError(t1, err)
+
+	assert.Equal(t1, trackerlib.Started, req.Event)
+}
+
+func TestTracker_announce_shouldNotAnnounceIfDisabled(t1 *testing.T) {
+	t := tracker{
+		url:          *testutils.MustParseUrl("http://localhost:8081"),
+		nextAnnounce: time.Now(),
+		disabled:     trackerDisabled{disabled: true},
+	}
+
+	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {})
+	assert.Error(t1, err)
+	assert.Contains(t1, err.Error(), "tracker is disabled")
+}
+
+func TestTracker_announce_shouldNotAnnounceIfEventIsStoppedAndNeverSentStart(t1 *testing.T) {
+	t := tracker{
+		url:          *testutils.MustParseUrl("http://localhost:8081"),
+		nextAnnounce: time.Now(),
+		startSent:    false,
+	}
+
+	hasAnnounced := false
+	err := t.announce(trackerlib.Stopped, contribution{}, func(request TrackerAnnounceRequest) {
+		hasAnnounced = true
+	})
+	assert.NoError(t1, err)
+	assert.False(t1, hasAnnounced)
+	assert.False(t1, t.isCurrentlyAnnouncing)
+}
+
+func TestTracker_announce_shouldAllowAnnounceIfNextAnnounceIsNotElapsed(t1 *testing.T) {
+	t := tracker{
+		url:          *testutils.MustParseUrl("http://localhost:8081"),
+		nextAnnounce: time.Now().Add(1 * time.Hour),
+	}
+	hasAnnounced := false
+	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {
+		hasAnnounced = true
+	})
+	assert.NoError(t1, err)
+	assert.True(t1, hasAnnounced)
 }
 
 func TestTracker_announceSucceed(t1 *testing.T) {
@@ -225,9 +278,9 @@ func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAn
 
 	for i := 1; i < len(nextAnnounceDeltas); i++ {
 		if nextAnnounceDeltas[i] != maximumRetryDelay { // reached the peak amount (maximumRetryDelay)
-			assert.Greater(t1, nextAnnounceDeltas[i].Seconds(), nextAnnounceDeltas[i-1].Seconds())
+			assert.Greater(t1, math.Ceil(nextAnnounceDeltas[i].Seconds()), nextAnnounceDeltas[i-1].Seconds())
 		}
-		assert.LessOrEqual(t1, nextAnnounceDeltas[i].Seconds(), maximumRetryDelay.Seconds())
+		assert.LessOrEqual(t1, math.Ceil(nextAnnounceDeltas[i].Seconds()), maximumRetryDelay.Seconds())
 	}
 }
 
@@ -254,11 +307,11 @@ func TestTracker_announceFailed_ShouldIncrementAnnounceIntervalEachTimeItFailsAn
 
 	for i := 1; i < len(nextAnnounceDeltas); i++ {
 		// never lower than interval
-		assert.GreaterOrEqual(t1, nextAnnounceDeltas[i].Seconds(), interval.Seconds())
+		assert.GreaterOrEqual(t1, math.Ceil(nextAnnounceDeltas[i].Seconds()), interval.Seconds())
 		if nextAnnounceDeltas[i] != interval && nextAnnounceDeltas[i] != maximumRetryDelay {
-			assert.Greater(t1, nextAnnounceDeltas[i].Seconds(), nextAnnounceDeltas[i-1].Seconds())
+			assert.Greater(t1, math.Ceil(nextAnnounceDeltas[i].Seconds()), nextAnnounceDeltas[i-1].Seconds())
 		}
-		assert.LessOrEqual(t1, nextAnnounceDeltas[i].Seconds(), maximumRetryDelay.Seconds())
+		assert.LessOrEqual(t1, math.Ceil(nextAnnounceDeltas[i].Seconds()), maximumRetryDelay.Seconds())
 	}
 }
 

@@ -1,9 +1,5 @@
 package torrent
 
-import (
-	trackerlib "github.com/anacrolix/torrent/tracker"
-)
-
 type torrent struct {
 	contrib  contribution
 	peers    peersElector
@@ -14,22 +10,30 @@ func (t *torrent) GetPeers() Peers {
 	return t.peers.GetPeers()
 }
 
-func (t *torrent) AnnounceStop(event trackerlib.AnnounceEvent, announcingFunction AnnouncingFunction) {
-	//TODO implement me
+func (t *torrent) AnnounceStop(announcingFunction AnnouncingFunction) {
+	//TODO: implement me
 	panic("implement me")
 }
 
 func (t *torrent) AnnounceToReadyTrackers(announcingFunction AnnouncingFunction) {
-	//TODO implement me
+	//TODO: implement me
 	panic("implement me")
 }
 
 func (t *torrent) HandleAnnounceSuccess(response TrackerAnnounceResponse) {
-	//TODO implement me
-	panic("implement me")
+	trackerUrl := response.Request.Url
+	t.trackers.succeed(trackerUrl, response)
+
+	t.peers.updatePeersForTracker(peersUpdateRequest{
+		trackerUrl: trackerUrl,
+		Seeders:    response.Seeders,
+		Leechers:   response.Leechers,
+	})
 }
 
 func (t *torrent) HandleAnnounceError(response TrackerAnnounceResponseError) {
-	//TODO implement me
-	panic("implement me")
+	trackerUrl := response.Request.Url
+	t.trackers.failed(trackerUrl, response)
+
+	t.peers.removePeersForTracker(peersDeleteRequest{trackerUrl: trackerUrl})
 }
