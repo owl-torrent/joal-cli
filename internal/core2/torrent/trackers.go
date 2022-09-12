@@ -83,9 +83,8 @@ func createTrackers(announce url.URL, announceList [][]url.URL, policy AnnounceP
 	}, nil
 }
 
-//	 FIXME: ready to announce seems to be the only caller of findTrackersInUse, it might be possible to merge the two methods to prevent double array parsing + double array assignements
-//		 Also, it may be possible to modify the signature of findInuse to trackerList findInuse([]tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(tracker) bool), the filter being: if canAnnounce return true.
-//		 One think to keep in mind though. If a tracker is "currentlyAnnouncing" it should be considered inUse, but not eligible to readyToAnnounce
+// FIXME: It may be possible to modify the signature of findInuse to trackerList findInuse([]tracker, announceToAllTiers bool, announceToAllTrackersInTier bool, filter func(tracker) bool), the filter being: if canAnnounce return true.
+// FIXME: One think to keep in mind though. If a tracker is "currentlyAnnouncing" it should be considered inUse, but not eligible to readyToAnnounce
 func (ts *trackerPool) readyToAnnounce(at time.Time) []tracker {
 	inUse := findTrackersInUse(ts.trackers, ts.announceToAllTiers, ts.announceToAllTrackersInTier)
 
@@ -97,6 +96,10 @@ func (ts *trackerPool) readyToAnnounce(at time.Time) []tracker {
 	}
 
 	return ready
+}
+
+func (ts *trackerPool) inUse() []tracker {
+	return findTrackersInUse(ts.trackers, ts.announceToAllTiers, ts.announceToAllTrackersInTier)
 }
 
 func (ts *trackerPool) succeed(trackerUrl url.URL, response TrackerAnnounceResponse) {

@@ -1,16 +1,20 @@
 package torrent
 
 import (
+	libtorrent "github.com/anacrolix/torrent"
 	libtracker "github.com/anacrolix/torrent/tracker"
 	"net/url"
 	"time"
 )
 
 type Factory interface {
+	// CreateOne create a Torrent. announceList might have
 	CreateOne(announce, announceList [][]url.URL, announcePolicy AnnouncePolicy) Torrent
 }
 
 type Torrent interface {
+	InfoHash() libtorrent.InfoHash
+	Name() string
 	GetPeers() Peers
 
 	// AnnounceStop unconditionally send Stop event to all tracker currently in use

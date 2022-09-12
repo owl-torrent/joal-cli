@@ -124,7 +124,7 @@ func TestTracker_announce(t1 *testing.T) {
 	}
 
 	var req TrackerAnnounceRequest
-	err := t.announce(trackerlib.None, contribution{uploaded: 1, downloaded: 2, left: 3, corrupt: 4}, func(request TrackerAnnounceRequest) {
+	err := t.announce(trackerlib.None, func(request TrackerAnnounceRequest) {
 		req = request
 	})
 	assert.NoError(t1, err)
@@ -132,10 +132,6 @@ func TestTracker_announce(t1 *testing.T) {
 	assert.Equal(t1, true, t.isCurrentlyAnnouncing)
 	assert.Equal(t1, "http://localhost:8081", req.Url.String())
 	assert.Equal(t1, trackerlib.None, req.Event)
-	assert.EqualValues(t1, 1, req.Uploaded)
-	assert.EqualValues(t1, 2, req.Downloaded)
-	assert.EqualValues(t1, 3, req.Left)
-	assert.EqualValues(t1, 4, req.Corrupt)
 }
 
 func TestTracker_announce_shouldReplaceAnnounceNoneWithStartedIfNotStartedYet(t1 *testing.T) {
@@ -146,7 +142,7 @@ func TestTracker_announce_shouldReplaceAnnounceNoneWithStartedIfNotStartedYet(t1
 	}
 
 	var req TrackerAnnounceRequest
-	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {
+	err := t.announce(trackerlib.None, func(request TrackerAnnounceRequest) {
 		req = request
 
 	})
@@ -162,7 +158,7 @@ func TestTracker_announce_shouldNotAnnounceIfDisabled(t1 *testing.T) {
 		disabled:     trackerDisabled{disabled: true},
 	}
 
-	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {})
+	err := t.announce(trackerlib.None, func(request TrackerAnnounceRequest) {})
 	assert.Error(t1, err)
 	assert.Contains(t1, err.Error(), "tracker is disabled")
 }
@@ -175,7 +171,7 @@ func TestTracker_announce_shouldNotAnnounceIfEventIsStoppedAndNeverSentStart(t1 
 	}
 
 	hasAnnounced := false
-	err := t.announce(trackerlib.Stopped, contribution{}, func(request TrackerAnnounceRequest) {
+	err := t.announce(trackerlib.Stopped, func(request TrackerAnnounceRequest) {
 		hasAnnounced = true
 	})
 	assert.NoError(t1, err)
@@ -189,7 +185,7 @@ func TestTracker_announce_shouldAllowAnnounceIfNextAnnounceIsNotElapsed(t1 *test
 		nextAnnounce: time.Now().Add(1 * time.Hour),
 	}
 	hasAnnounced := false
-	err := t.announce(trackerlib.None, contribution{}, func(request TrackerAnnounceRequest) {
+	err := t.announce(trackerlib.None, func(request TrackerAnnounceRequest) {
 		hasAnnounced = true
 	})
 	assert.NoError(t1, err)

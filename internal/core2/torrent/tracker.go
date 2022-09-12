@@ -54,7 +54,7 @@ func (t *tracker) canAnnounce(at time.Time) bool {
 	return true
 }
 
-func (t *tracker) announce(event trackerlib.AnnounceEvent, contrib contribution, announceFunction AnnouncingFunction) error {
+func (t *tracker) announce(event trackerlib.AnnounceEvent, announceFunction AnnouncingFunction) error {
 	if t.disabled.disabled {
 		return fmt.Errorf("can not announce, tracker is disabled")
 	}
@@ -70,12 +70,8 @@ func (t *tracker) announce(event trackerlib.AnnounceEvent, contrib contribution,
 
 	t.isCurrentlyAnnouncing = true
 	announceFunction(TrackerAnnounceRequest{
-		Event:      event,
-		Url:        t.url,
-		Uploaded:   contrib.uploaded,
-		Downloaded: contrib.downloaded,
-		Left:       contrib.left,
-		Corrupt:    contrib.corrupt,
+		Event: event,
+		Url:   t.url,
 	})
 
 	return nil
