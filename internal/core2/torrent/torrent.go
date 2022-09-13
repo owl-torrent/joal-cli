@@ -2,6 +2,7 @@ package torrent
 
 import (
 	libtorrent "github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
 	libtracker "github.com/anacrolix/torrent/tracker"
 	"github.com/anthonyraymond/joal-cli/internal/core/logs"
 	"go.uber.org/zap"
@@ -89,4 +90,18 @@ type slimInfo struct {
 	length      int64
 	private     bool
 	source      string
+}
+
+func infoToSlimInfo(info metainfo.Info) slimInfo {
+	si := slimInfo{
+		pieceLength: info.PieceLength,
+		name:        info.Name,
+		length:      info.Length,
+		private:     false,
+		source:      info.Source,
+	}
+	if info.Private != nil {
+		si.private = *info.Private
+	}
+	return si
 }

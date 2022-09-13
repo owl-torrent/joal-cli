@@ -2,14 +2,13 @@ package torrent
 
 import (
 	libtorrent "github.com/anacrolix/torrent"
-	libtracker "github.com/anacrolix/torrent/tracker"
-	"net/url"
+	"github.com/anacrolix/torrent/metainfo"
 	"time"
 )
 
 type Factory interface {
-	// CreateOne create a Torrent. announceList might have
-	CreateOne(announce, announceList [][]url.URL, announcePolicy AnnouncePolicy) Torrent
+	// CreateTorrent create a Torrent. announceList might have been shuffled
+	CreateTorrent(meta metainfo.MetaInfo, announcePolicy AnnouncePolicy) (Torrent, error)
 }
 
 type Torrent interface {
@@ -18,7 +17,7 @@ type Torrent interface {
 	GetPeers() Peers
 
 	// AnnounceStop unconditionally send Stop event to all tracker currently in use
-	AnnounceStop(event libtracker.AnnounceEvent, announcingFunction AnnouncingFunction)
+	AnnounceStop(announcingFunction AnnouncingFunction)
 	// AnnounceToReadyTrackers announce to all tracker that are ready to receive an announce
 	AnnounceToReadyTrackers(announcingFunction AnnouncingFunction)
 	// HandleAnnounceSuccess delegate the handling of the response to the trackers

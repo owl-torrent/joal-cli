@@ -161,7 +161,7 @@ func TestCreateTrackers_shouldDisableAllTrackerIfAnnounceListIsNotSupportedAndAd
 			trackersOfTierZero = append(trackersOfTierZero, tr)
 		}
 	}
-	assert.Len(t, trackersOfTierZero, 1, "Tier zero should contains only the single announce")
+	assert.Len(t, trackersOfTierZero, 1, "getTier zero should contains only the single announce")
 	assert.Equal(t, "http://localhost:1111/announce", trackersOfTierZero[0].url.String())
 
 	// All trackers from announceList should be disabled
