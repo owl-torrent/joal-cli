@@ -21,7 +21,7 @@ func (f FactoryImpl) CreateTorrent(meta metainfo.MetaInfo, announcePolicy Announ
 	}
 	announceList, err := parseAnnounceList(meta.AnnounceList)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse announce list: %w")
+		return nil, fmt.Errorf("failed to parse announce list: %w", err)
 	}
 
 	trackers, err := createTrackers(*announce, announceList, announcePolicy)
