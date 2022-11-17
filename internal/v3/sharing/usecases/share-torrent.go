@@ -11,7 +11,7 @@ type ShareTorrentUseCase interface {
 }
 
 type ShareTorrentUseCaseImpl struct {
-	repository domain.SharedTorrentRepository
+	repository SharedTorrentRepository
 }
 
 func (u ShareTorrentUseCaseImpl) execute(torrentId commonDomain.TorrentId) error {

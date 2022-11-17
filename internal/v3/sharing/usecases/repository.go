@@ -1,8 +1,9 @@
-package domain
+package usecases
 
 import (
 	"errors"
 	v3 "github.com/anthonyraymond/joal-cli/internal/v3/commons/domain"
+	"github.com/anthonyraymond/joal-cli/internal/v3/sharing/domain"
 )
 
 var (
@@ -10,7 +11,7 @@ var (
 )
 
 type SharedTorrentRepository interface {
-	FindByTorrentId(torrentId v3.TorrentId) (SharedTorrent, error)
+	FindByTorrentId(torrentId v3.TorrentId) (domain.SharedTorrent, error)
 	Remove(torrentId v3.TorrentId) error
-	Save(SharedTorrent) error
+	Save(domain.SharedTorrent) error
 }

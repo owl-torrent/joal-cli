@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	commonDomain "github.com/anthonyraymond/joal-cli/internal/v3/commons/domain"
-	"github.com/anthonyraymond/joal-cli/internal/v3/sharing/domain"
 )
 
 type UpdatePeersUseCase interface {
@@ -12,7 +11,7 @@ type UpdatePeersUseCase interface {
 }
 
 type UpdatePeersUseCaseImpl struct {
-	repository            domain.SharedTorrentRepository
+	repository            SharedTorrentRepository
 	peerElectionAlgorithm PeerElectionAlgorithm
 }
 
@@ -36,7 +35,7 @@ var (
 func (u UpdatePeersUseCaseImpl) execute(torrentId commonDomain.TorrentId, peers []commonDomain.Peers) error {
 	sharedTorrent, err := u.repository.FindByTorrentId(torrentId)
 	if err != nil {
-		if errors.Is(err, domain.SharedTorrentNotFound) {
+		if errors.Is(err, SharedTorrentNotFound) {
 			return nil
 		}
 		return fmt.Errorf("failed to query SharedTorrent [%s] from repository: %w", torrentId, err)
