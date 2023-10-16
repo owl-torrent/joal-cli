@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/anthonyraymond/joal-cli/internal/common/configloader"
-	"github.com/anthonyraymond/joal-cli/internal/core/logs"
+	"github.com/anthonyraymond/joal-cli/internal/old/common/configloader"
+	"github.com/anthonyraymond/joal-cli/internal/old/core/logs"
 	"net/http"
 	"net/url"
 	"os"
