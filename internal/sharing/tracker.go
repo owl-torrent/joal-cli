@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
+/*
 type TrackerState int
 
-/*
 const (
 
 	InUse    TrackerState = 0 // InUse describe a tracker that we are announcing to
@@ -18,7 +18,6 @@ const (
 */
 
 type Tracker struct {
-	state            TrackerState
 	url              *url.URL
 	consecutiveFails int
 	isAnnouncing     bool
