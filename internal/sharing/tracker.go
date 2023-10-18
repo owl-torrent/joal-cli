@@ -16,12 +16,14 @@ const (
 
 )
 */
+
 type Tracker struct {
 	state            TrackerState
 	url              *url.URL
 	consecutiveFails int
 	isAnnouncing     bool
 	nextAnnounceAt   time.Time
+	disabled         TrackerDisabled
 }
 
 func (t *Tracker) announceSucceed(response TrackerAnnounceResponse) {
@@ -35,9 +37,34 @@ func (t *Tracker) announceFailed(error TrackerAnnounceError) {
 	t.consecutiveFails++
 }
 
+func (t *Tracker) disable(reason TrackerDisableReason) {
+	t.disabled = TrackerDisabled{
+		isDisabled: true,
+		reason:     reason,
+	}
+}
+
+func (t *Tracker) isDisabled() bool {
+	return t.disabled.isDisabled
+}
+
 type TrackerAnnounceResponse struct {
 	Interval time.Duration
 }
 
 type TrackerAnnounceError struct {
 }
+
+type TrackerDisabled struct {
+	isDisabled bool
+	reason     TrackerDisableReason
+}
+
+type TrackerDisableReason struct {
+	reason string
+}
+
+var (
+	AnnounceProtocolNotSupported = TrackerDisableReason{reason: "tracker.disabled.protocol-not-supported"}
+	AnnounceListNotSupported     = TrackerDisableReason{reason: "tracker.disabled.announce-list-not-supported"}
+)

@@ -12,8 +12,7 @@ import (
  *    - Should calculate nextAnnounceAt (backoff) on announceFailed
  *  - Announce to a tracker
  *    - return an announce request (or announce request builder?)
- *  - canAnnounce()
- *  - Disable a tracker
+ *  - canAnnounce() // not disable, not updating ATM, nextAnnounce > now (now est un time passé en param à la fn)
  *  - Store an history of announce success & error (maybe an object AnnonceHistory{announceResponse, error} where announceResponse and error can be nil ?
  */
 
@@ -60,4 +59,16 @@ func TestTracker_shouldReceiveAnnounceError(t *testing.T) {
 
 	assert.False(t, tracker.isAnnouncing)
 	assert.Equal(t, 1, tracker.consecutiveFails)
+}
+
+func TestTracker_shouldDisableTracker(t *testing.T) {
+	tracker := Tracker{}
+
+	assert.False(t, tracker.isDisabled())
+	tracker.disable(AnnounceProtocolNotSupported)
+	assert.True(t, tracker.isDisabled())
+	assert.Equal(t, TrackerDisabled{
+		isDisabled: true,
+		reason:     AnnounceProtocolNotSupported,
+	}, tracker.disabled)
 }
