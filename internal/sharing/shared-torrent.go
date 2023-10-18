@@ -14,5 +14,5 @@ type SharedTorrent interface {
 type sharedTorrentImpl struct {
 	swarm         Swarm
 	contributions Contributions
-	state         TrackerState
+	state         State
 }
