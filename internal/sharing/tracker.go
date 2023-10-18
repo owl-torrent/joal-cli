@@ -65,5 +65,4 @@ type TrackerDisableReason struct {
 
 var (
 	AnnounceProtocolNotSupported = TrackerDisableReason{reason: "tracker.disabled.protocol-not-supported"}
-	AnnounceListNotSupported     = TrackerDisableReason{reason: "tracker.disabled.announce-list-not-supported"}
 )

@@ -8,7 +8,7 @@ import (
 )
 
 /* TODO: tracker impl
- *  - Receive AnnounceResult
+ *  - Receive TrackerAnnounceError
  *    - Should calculate nextAnnounceAt (backoff) on announceFailed
  *  - Announce to a tracker
  *    - return an announce request (or announce request builder?)
