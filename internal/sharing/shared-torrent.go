@@ -12,6 +12,7 @@ type SharedTorrent interface {
 }
 
 type sharedTorrentImpl struct {
+	torrentId     TorrentId
 	swarm         Swarm
 	contributions Contributions
 	state         State
