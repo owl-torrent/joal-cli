@@ -1,6 +1,7 @@
 package sharing
 
 import (
+	"github.com/anthonyraymond/joal-cli/pkg/duration"
 	"net/url"
 	"time"
 )
@@ -33,6 +34,7 @@ func (t *Tracker) announceSucceed(response TrackerAnnounceResponse) {
 
 func (t *Tracker) announceFailed(error TrackerAnnounceError) {
 	t.isAnnouncing = false
+	t.nextAnnounceAt = time.Now().Add(calculateBackoff(t.consecutiveFails, 5*time.Second, 1800*time.Second))
 	t.consecutiveFails++
 }
 
@@ -66,3 +68,18 @@ type TrackerDisableReason struct {
 var (
 	AnnounceProtocolNotSupported = TrackerDisableReason{reason: "tracker.disabled.protocol-not-supported"}
 )
+
+func calculateBackoff(consecutiveFails int, minDelay time.Duration, maxDelay time.Duration) time.Duration {
+	backoffRatio := 250
+	// the exponential back-off ends up being:
+	// 7, 15, 27, 45, 95, 127, 165, ... seconds
+	// with the default tracker_backoff of 250
+	sqrt := float64(consecutiveFails * consecutiveFails)
+
+	backoffDelay := minDelay.Seconds() + sqrt*minDelay.Seconds()*float64(backoffRatio/100)
+
+	return duration.Min(
+		maxDelay,
+		time.Duration(backoffDelay)*time.Second,
+	)
+}
