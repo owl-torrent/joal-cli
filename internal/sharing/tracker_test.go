@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+//TODO: Tracker
+// - keep track of pending announce response
+// - reject any non-pending announce response
+// - if an announce is pending, prevent a None announce to be requested
+// - if Completed or Stopped announed is requested, discard any other pending announce
+// - rename canAnnounce => requireAnnounce
+
 func mustParseUrl(str string) *url.URL {
 	u, err := url.Parse(str)
 	if err != nil {
