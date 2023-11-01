@@ -49,6 +49,10 @@ func (t *Tracker) isDisabled() bool {
 	return t.disabled.isDisabled
 }
 
+func (t *Tracker) canAnnounce(at time.Time) bool {
+	return !t.isAnnouncing && t.nextAnnounceAt.Before(at) && !t.isDisabled()
+}
+
 type TrackerAnnounceResponse struct {
 	Interval time.Duration
 }

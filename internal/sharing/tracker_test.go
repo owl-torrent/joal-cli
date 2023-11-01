@@ -9,7 +9,6 @@ import (
 )
 
 /* TODO: tracker impl
- *  - canAnnounce() // not disable, not updating ATM, nextAnnounce > now (now est un time passé en param à la fn)
  *  - Announce to a tracker
  *    - return an announce request (or announce request builder?)
  */
@@ -85,6 +84,16 @@ func TestTracker_shouldDelayNextAnnounceMoreAndMoreAsConsecutiveFailsIncrease(t 
 	for i := 0; i < 4; i++ {
 		assert.Less(t, announcesDelay[i], announcesDelay[i+1])
 	}
+}
+
+func TestTracker_canAnnounce(t *testing.T) {
+	assert.True(t, (&Tracker{}).canAnnounce(time.Now()))
+	assert.True(t, (&Tracker{nextAnnounceAt: time.Now().Add(5 * time.Minute)}).canAnnounce(time.Now().Add(6*time.Minute)))
+
+	assert.False(t, (&Tracker{isAnnouncing: true}).canAnnounce(time.Now()), "can not announce when already announcing")
+	assert.False(t, (&Tracker{nextAnnounceAt: time.Now().Add(5 * time.Hour)}).canAnnounce(time.Now()), "can not announce when nextAnnounce is after")
+	assert.False(t, (&Tracker{nextAnnounceAt: time.Now().Add(-5 * time.Hour)}).canAnnounce(time.Now().Add(-6*time.Hour)), "can not announce when nextAnnounce is after")
+	assert.False(t, (&Tracker{disabled: TrackerDisabled{isDisabled: true}}).canAnnounce(time.Now()), "can not announce when disabled")
 }
 
 func TestCalculateBackoff(t *testing.T) {
