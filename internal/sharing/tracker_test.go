@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-/* TODO: tracker impl
- *  - Announce to a tracker
- *    - return an announce request (or announce request builder?)
- */
-
 func mustParseUrl(str string) *url.URL {
 	u, err := url.Parse(str)
 	if err != nil {
@@ -44,6 +39,7 @@ func TestTracker_shouldReceiveAnnounce(t *testing.T) {
 	assert.False(t, tracker.isAnnouncing)
 	assert.Equal(t, 0, tracker.consecutiveFails) // reset consecutive fails ont success
 	assert.True(t, inTimeSpan(time.Now().Add(1790*time.Second), time.Now().Add(1810*time.Second), tracker.nextAnnounceAt))
+	assert.True(t, tracker.hasAnnouncedOnce)
 }
 
 func TestTracker_shouldReceiveAnnounceError(t *testing.T) {
@@ -94,6 +90,34 @@ func TestTracker_canAnnounce(t *testing.T) {
 	assert.False(t, (&Tracker{nextAnnounceAt: time.Now().Add(5 * time.Hour)}).canAnnounce(time.Now()), "can not announce when nextAnnounce is after")
 	assert.False(t, (&Tracker{nextAnnounceAt: time.Now().Add(-5 * time.Hour)}).canAnnounce(time.Now().Add(-6*time.Hour)), "can not announce when nextAnnounce is after")
 	assert.False(t, (&Tracker{disabled: TrackerDisabled{isDisabled: true}}).canAnnounce(time.Now()), "can not announce when disabled")
+}
+
+func TestTracker_shouldAnnounce(t *testing.T) {
+	tracker := Tracker{
+		url: mustParseUrl("http://localhost:4333/announce"),
+	}
+
+	builder := &announceRequestBuilder{}
+	tracker.announce(Started, builder)
+
+	assert.True(t, tracker.isAnnouncing)
+
+	assert.Equal(t, tracker.url, builder.url)
+	assert.Equal(t, Started, builder.event)
+}
+
+func TestTracker_announceShouldReplaceNoneWithStatedIfNeverAnnouncedStarted(t *testing.T) {
+	tracker := Tracker{
+		url: mustParseUrl("http://localhost:4333/announce"),
+	}
+
+	builder := &announceRequestBuilder{}
+	tracker.announce(None, builder)
+
+	assert.True(t, tracker.isAnnouncing)
+
+	assert.Equal(t, tracker.url, builder.url)
+	assert.Equal(t, Started, builder.event)
 }
 
 func TestCalculateBackoff(t *testing.T) {

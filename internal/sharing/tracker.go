@@ -18,18 +18,29 @@ const (
 )
 */
 
+type AnnounceEvent uint8
+
+const (
+	None      AnnounceEvent = iota // None is a regular announce
+	Completed                      // Completed announce sent when the download process is done
+	Started                        // Started announce is sent when the torrent start/resume
+	Stopped                        // Stopped announce is sent when the torrent is stopped
+)
+
 type Tracker struct {
 	url              *url.URL
 	consecutiveFails int
 	isAnnouncing     bool
 	nextAnnounceAt   time.Time
 	disabled         TrackerDisabled
+	hasAnnouncedOnce bool
 }
 
 func (t *Tracker) announceSucceed(response TrackerAnnounceResponse) {
 	t.isAnnouncing = false
 	t.consecutiveFails = 0
 	t.nextAnnounceAt = time.Now().Add(response.Interval)
+	t.hasAnnouncedOnce = true
 }
 
 func (t *Tracker) announceFailed(error TrackerAnnounceError) {
@@ -51,6 +62,16 @@ func (t *Tracker) isDisabled() bool {
 
 func (t *Tracker) canAnnounce(at time.Time) bool {
 	return !t.isAnnouncing && t.nextAnnounceAt.Before(at) && !t.isDisabled()
+}
+
+func (t *Tracker) announce(event AnnounceEvent, announceBuilder *announceRequestBuilder) {
+	t.isAnnouncing = true
+
+	announceBuilder.withUrl(t.url)
+	if !t.hasAnnouncedOnce && event == None {
+		event = Started
+	}
+	announceBuilder.withEvent(event)
 }
 
 type TrackerAnnounceResponse struct {
