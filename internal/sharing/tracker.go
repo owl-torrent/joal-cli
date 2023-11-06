@@ -1,6 +1,7 @@
 package sharing
 
 import (
+	"fmt"
 	"github.com/anthonyraymond/joal-cli/pkg/duration"
 	"github.com/google/uuid"
 	"net/url"
@@ -16,31 +17,61 @@ const (
 	Stopped                        // Stopped announce is sent when the torrent is stopped
 )
 
-type Tracker struct {
-	url              *url.URL
-	consecutiveFails int
-	nextAnnounceAt   time.Time
-	disabled         TrackerDisabled
-	hasAnnouncedOnce bool
-	pendingAnnounce  *trackerAnnounceRequest // pendingAnnounce store announce sent and waiting for response
+type Tracker interface {
+	disable(reason TrackerDisableReason)
+	requireAnnounce(at time.Time) bool
+	announce(event AnnounceEvent) (*trackerAnnounceRequest, error)
+	announceSucceed(response TrackerAnnounceResponse) error
+	announceFailed(error TrackerAnnounceError) error
+	Url() *url.URL
+	ConsecutiveFails() int
+	IsDisabled() bool
 }
 
-func (t *Tracker) disable(reason TrackerDisableReason) {
+type trackerImpl struct {
+	url                  *url.URL
+	consecutiveFailCount int
+	nextAnnounceAt       time.Time
+	disabled             TrackerDisabled
+	hasAnnouncedOnce     bool
+	pendingAnnounce      *trackerAnnounceRequest // pendingAnnounce store announce sent and waiting for response
+}
+
+func (t *trackerImpl) ConsecutiveFails() int {
+	return t.consecutiveFailCount
+}
+
+func (t *trackerImpl) Url() *url.URL {
+	return t.url
+}
+
+func newTracker(u *url.URL) Tracker {
+	return &trackerImpl{
+		url:             u,
+		pendingAnnounce: nil,
+	}
+}
+
+func (t *trackerImpl) disable(reason TrackerDisableReason) {
 	t.disabled = TrackerDisabled{
 		isDisabled: true,
 		reason:     reason,
 	}
 }
 
-func (t *Tracker) isDisabled() bool {
+func (t *trackerImpl) IsDisabled() bool {
 	return t.disabled.isDisabled
 }
 
-func (t *Tracker) requireAnnounce(at time.Time) bool {
-	return t.pendingAnnounce == nil && t.nextAnnounceAt.Before(at) && !t.isDisabled()
+func (t *trackerImpl) requireAnnounce(at time.Time) bool {
+	return t.pendingAnnounce == nil && t.nextAnnounceAt.Before(at) && !t.IsDisabled()
 }
 
-func (t *Tracker) announce(event AnnounceEvent) *trackerAnnounceRequest {
+func (t *trackerImpl) announce(event AnnounceEvent) (*trackerAnnounceRequest, error) {
+	if t.pendingAnnounce != nil && event != Stopped && event != Completed {
+		return nil, fmt.Errorf("awaiting for an announce response, can't send a concurent [%s] announce", string(event))
+	}
+
 	if !t.hasAnnouncedOnce && event == None {
 		event = Started
 	}
@@ -48,29 +79,31 @@ func (t *Tracker) announce(event AnnounceEvent) *trackerAnnounceRequest {
 	announceRequest := newAnnounceRequest(t.url, event)
 	t.pendingAnnounce = announceRequest
 
-	return announceRequest
+	return announceRequest, nil
 }
 
-func (t *Tracker) announceSucceed(response TrackerAnnounceResponse) {
+func (t *trackerImpl) announceSucceed(response TrackerAnnounceResponse) error {
 	if !t.isResponseExpected(response.announceUid) {
-		return
+		return fmt.Errorf("unexpected announce response [%s]", response.announceUid.String())
 	}
 	t.pendingAnnounce = nil
-	t.consecutiveFails = 0
+	t.consecutiveFailCount = 0
 	t.nextAnnounceAt = time.Now().Add(response.Interval)
 	t.hasAnnouncedOnce = true
+	return nil
 }
 
-func (t *Tracker) announceFailed(error TrackerAnnounceError) {
+func (t *trackerImpl) announceFailed(error TrackerAnnounceError) error {
 	if !t.isResponseExpected(error.announceUid) {
-		return
+		return fmt.Errorf("unexpected announce response [%s]", error.announceUid.String())
 	}
 	t.pendingAnnounce = nil
-	t.nextAnnounceAt = time.Now().Add(calculateBackoff(t.consecutiveFails, 5*time.Second, 1800*time.Second))
-	t.consecutiveFails++
+	t.nextAnnounceAt = time.Now().Add(calculateBackoff(t.consecutiveFailCount, 5*time.Second, 1800*time.Second))
+	t.consecutiveFailCount++
+	return nil
 }
 
-func (t *Tracker) isResponseExpected(announceUid uuid.UUID) bool {
+func (t *trackerImpl) isResponseExpected(announceUid uuid.UUID) bool {
 	if t.pendingAnnounce == nil {
 		return false
 	}
