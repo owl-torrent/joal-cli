@@ -1,4 +1,11 @@
 package sharing
 
-type Trackers struct {
+type Trackers interface {
+}
+
+type trackersList struct {
+}
+
+func newTrackers() Trackers {
+	return &trackersList{}
 }
