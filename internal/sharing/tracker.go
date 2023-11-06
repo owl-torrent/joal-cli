@@ -26,6 +26,7 @@ type Tracker interface {
 	Url() *url.URL
 	ConsecutiveFails() int
 	IsDisabled() bool
+	NextAnnounceAt() time.Time
 }
 
 type trackerImpl struct {
@@ -37,14 +38,6 @@ type trackerImpl struct {
 	pendingAnnounce      *trackerAnnounceRequest // pendingAnnounce store announce sent and waiting for response
 }
 
-func (t *trackerImpl) ConsecutiveFails() int {
-	return t.consecutiveFailCount
-}
-
-func (t *trackerImpl) Url() *url.URL {
-	return t.url
-}
-
 func newTracker(u *url.URL) Tracker {
 	return &trackerImpl{
 		url:             u,
@@ -52,15 +45,26 @@ func newTracker(u *url.URL) Tracker {
 	}
 }
 
+func (t *trackerImpl) ConsecutiveFails() int {
+	return t.consecutiveFailCount
+}
+
+func (t *trackerImpl) Url() *url.URL {
+	return t.url
+}
+func (t *trackerImpl) IsDisabled() bool {
+	return t.disabled.isDisabled
+}
+
+func (t *trackerImpl) NextAnnounceAt() time.Time {
+	return t.nextAnnounceAt
+}
+
 func (t *trackerImpl) disable(reason TrackerDisableReason) {
 	t.disabled = TrackerDisabled{
 		isDisabled: true,
 		reason:     reason,
 	}
-}
-
-func (t *trackerImpl) IsDisabled() bool {
-	return t.disabled.isDisabled
 }
 
 func (t *trackerImpl) requireAnnounce(at time.Time) bool {

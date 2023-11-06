@@ -79,7 +79,7 @@ func TestTracker_shouldDelayNextAnnounceMoreAndMoreAsConsecutiveFailsIncrease(t 
 	for i := 0; i < 5; i++ {
 		req, _ := tracker.announce(None)
 		_ = tracker.announceFailed(TrackerAnnounceError{announceUid: req.uid})
-		announcesDelay = append(announcesDelay, tracker.(*trackerImpl).nextAnnounceAt.Sub(time.Now()))
+		announcesDelay = append(announcesDelay, tracker.NextAnnounceAt().Sub(time.Now()))
 	}
 
 	for i := 0; i < 4; i++ {
