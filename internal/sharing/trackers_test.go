@@ -1,6 +1,7 @@
 package sharing
 
 //TODO: Trackers
+// - check if any require announces
+//   - isUse tracker have to be determined on announceToAllTrackers/allTiers value. The selector "inUse" selector could be a function choice (4 possible implementations)
 // - for each tracker that require announce, gather announceRequests
-// - on announce success => promote tracker in tier
-// - on announce error => put back a tracker at the end of his
+// - on announce error => deprioritize in tier

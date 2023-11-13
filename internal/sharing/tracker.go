@@ -45,13 +45,14 @@ func newTracker(u *url.URL) Tracker {
 	}
 }
 
+func (t *trackerImpl) Url() *url.URL {
+	return t.url
+}
+
 func (t *trackerImpl) ConsecutiveFails() int {
 	return t.consecutiveFailCount
 }
 
-func (t *trackerImpl) Url() *url.URL {
-	return t.url
-}
 func (t *trackerImpl) IsDisabled() bool {
 	return t.disabled.isDisabled
 }

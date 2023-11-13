@@ -20,6 +20,9 @@ func mustParseUrl(str string) *url.URL {
 func defaultTracker() Tracker {
 	return newTracker(mustParseUrl("http://localhost:8080"))
 }
+func fakeTracker(url string) Tracker {
+	return newTracker(mustParseUrl(url))
+}
 
 func TestTracker_shouldReceiveAnnounceResponse(t *testing.T) {
 	tracker := defaultTracker()
